@@ -1481,3 +1481,36 @@ function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+// Expose functions globally for HTML inline handlers
+window.setTab = setTab;
+window.toggleSidebar = toggleSidebar;
+window.openChartSymbolPicker = openChartSymbolPicker;
+window.closeSymbolPicker = closeSymbolPicker;
+window.filterSymbols = filterSymbols;
+window.openTFPicker = openTFPicker;
+window.closeTFPicker = closeTFPicker;
+window.setTimeframe = setTimeframe;
+window.adjustChartLot = adjustChartLot;
+window.quickBuy = quickBuy;
+window.quickSell = quickSell;
+window.openNewOrder = openNewOrder;
+window.closeNewOrder = closeNewOrder;
+window.closeOrderModal = closeOrderModal;
+window.selectOrderType = selectOrderType;
+window.updateOrderPrice = updateOrderPrice;
+window.adjustVolume = adjustVolume;
+window.placeOrder = placeOrder;
+window.openCloseModal = openCloseModal;
+window.closeCloseModal = closeCloseModal;
+window.adjustCloseVolume = adjustCloseVolume;
+window.confirmClose = confirmClose;
+window.openEditPending = openEditPending;
+window.closeEditPending = closeEditPending;
+window.savePendingEdit = savePendingEdit;
+window.deletePendingOrder = deletePendingOrder;
+window.editBalance = editBalance;
+window.closeBalanceModal = closeBalanceModal;
+window.setBalancePreset = setBalancePreset;
+window.applyBalance = applyBalance;
+window.filterHistory = filterHistory;
