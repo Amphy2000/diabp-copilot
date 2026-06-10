@@ -1,206 +1,215 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
 <title>MT5 Trade Platform</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="style.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 
-<!-- ═══════════ TOP HEADER ═══════════ -->
+<!-- ═══════ TOP BAR ═══════ -->
 <div class="top-bar" id="topBar">
-  <button class="icon-btn" id="menuBtn" onclick="toggleSidebar()">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><line x1="3" y1="6" x2="21" y2="6" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="3" y1="12" x2="21" y2="12" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="3" y1="18" x2="21" y2="18" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+  <button class="icon-btn" onclick="toggleSidebar()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><line x1="3" y1="5" x2="21" y2="5" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="3" y1="12" x2="21" y2="12" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="3" y1="19" x2="21" y2="19" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
   </button>
-  <span class="top-title" id="topTitle">Quotes</span>
-  <div class="top-right-actions" id="topActions">
-    <button class="icon-btn" id="sortBtn" title="Sort">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M8 5l-4 4 4 4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 9h16" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M16 19l4-4-4-4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 15H4" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+
+  <!-- Standard title (Quotes/Trade/History/Messages) -->
+  <div class="top-title-wrap" id="topTitleWrap">
+    <span class="top-title" id="topTitle">Trade</span>
+    <span class="top-subtitle" id="topSubtitle"></span>
+  </div>
+
+  <!-- Charts tab toolbar icons (center) -->
+  <div class="chart-top-actions" id="chartTopActions" style="display:none">
+    <button class="chart-tb-btn" onclick="openNewOrder()" title="New Order">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><line x1="12" y1="4" x2="12" y2="20" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="4" y1="12" x2="20" y2="12" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
     </button>
-    <button class="icon-btn" id="addBtn" title="Add" onclick="openNewOrder()">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="white" stroke-width="2"/><line x1="12" y1="8" x2="12" y2="16" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="12" x2="16" y2="12" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+    <button class="chart-tb-btn" title="Drawing tools">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 17l4-8 4 5 3-4 4 7H3z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="chart-tf-pill" id="tfPillBtn" onclick="openTFPicker()">H1</button>
+    <button class="chart-tb-btn" title="Alerts">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.5"/><polyline points="12 7 12 12 15 14" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+    <button class="chart-tb-btn chart-tb-trade" onclick="openNewOrder()" title="Trade">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" fill="#1a6bcc" stroke="#2a8de0" stroke-width="1"/><polyline points="7 14 10 11 13 13 17 9" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+
+  <!-- Right actions (Quotes/Trade/History/Messages) -->
+  <div class="top-right-actions" id="topActions">
+    <button class="icon-btn" title="Sort">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M8 5l-4 4 4 4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 9h16" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M16 19l4-4-4-4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 15H4" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <button class="icon-btn" onclick="openNewOrder()" title="New Order">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="white" stroke-width="2"/><line x1="12" y1="8" x2="12" y2="16" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="12" x2="16" y2="12" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
     </button>
   </div>
 </div>
 
-<!-- ═══════════ SIDEBAR ═══════════ -->
+<!-- ═══════ SIDEBAR ═══════ -->
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 <div class="sidebar" id="sidebar">
   <div class="sidebar-header">
     <div class="sidebar-logo">MT5 Platform</div>
-    <div class="sidebar-account">Demo Account #12345678</div>
+    <div class="sidebar-account">Demo · #12345678</div>
   </div>
   <nav class="sidebar-nav">
-    <div class="sidebar-item active" onclick="setTab('quotes');toggleSidebar()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Quotes
+    <div class="sidebar-item" onclick="setTab('quotes');toggleSidebar()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Quotes
     </div>
     <div class="sidebar-item" onclick="setTab('charts');toggleSidebar()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="4" height="18" rx="1" fill="currentColor" opacity="0.4"/><rect x="10" y="8" width="4" height="13" rx="1" fill="currentColor"/><rect x="17" y="5" width="4" height="16" rx="1" fill="currentColor" opacity="0.7"/></svg>
-      Charts
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="4" width="4" height="16" rx="1" fill="currentColor" opacity="0.5"/><rect x="10" y="8" width="4" height="12" rx="1" fill="currentColor"/><rect x="18" y="6" width="4" height="14" rx="1" fill="currentColor" opacity="0.7"/></svg>Charts
     </div>
-    <div class="sidebar-item" onclick="setTab('trade');toggleSidebar()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      Trade
+    <div class="sidebar-item active" onclick="setTab('trade');toggleSidebar()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="17 6 23 6 23 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Trade
     </div>
     <div class="sidebar-item" onclick="setTab('history');toggleSidebar()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><polyline points="12 6 12 12 16 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      History
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><polyline points="12 7 12 12 15 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>History
     </div>
     <div class="sidebar-item" onclick="setTab('messages');toggleSidebar()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="2"/></svg>
-      Messages
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="2"/></svg>Messages
     </div>
   </nav>
-  <div class="sidebar-footer">
-    <div class="sidebar-version">Version 5.0.4582</div>
-  </div>
+  <div class="sidebar-footer"><div class="sidebar-version">Version 5.0.4582</div></div>
 </div>
 
-<!-- ═══════════ MAIN CONTENT ═══════════ -->
+<!-- ═══════ CONTENT ═══════ -->
 <div class="content" id="mainContent">
 
-  <!-- ── QUOTES TAB ── -->
-  <div class="tab-panel active" id="tab-quotes">
+  <!-- ── QUOTES ── -->
+  <div class="tab-panel" id="tab-quotes">
     <div class="quotes-header-row">
-      <span class="quotes-col-symbol">Symbol</span>
-      <span class="quotes-col-bid">Bid</span>
-      <span class="quotes-col-ask">Ask</span>
+      <span class="q-col-sym">Symbol</span>
+      <span class="q-col-bid">Bid</span>
+      <span class="q-col-ask">Ask</span>
     </div>
-    <div class="quotes-list" id="quotesList"></div>
+    <div id="quotesList"></div>
   </div>
 
-  <!-- ── CHARTS TAB ── -->
+  <!-- ── CHARTS ── -->
   <div class="tab-panel" id="tab-charts">
-    <div class="chart-toolbar">
-      <div class="chart-symbol-row">
-        <div class="chart-symbol-clickable" id="chartSymbolClickable" onclick="openChartSymbolPicker()">
-          <span class="chart-symbol-name" id="chartSymbolName">XAUUSD</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="margin-left:4px;flex-shrink:0"><polyline points="6 9 12 15 18 9" stroke="#00b4d8" stroke-width="2"/></svg>
-        </div>
-        <span class="chart-symbol-sub" id="chartSymbolDesc">Gold vs US Dollar</span>
-        <span class="chart-market-status" id="chartMarketStatus">Market open</span>
-      </div>
-      <div class="chart-tf-row">
-        <button class="tf-btn" onclick="setTimeframe('M1')">M1</button>
-        <button class="tf-btn" onclick="setTimeframe('M5')">M5</button>
-        <button class="tf-btn" onclick="setTimeframe('M15')">M15</button>
-        <button class="tf-btn active" onclick="setTimeframe('H1')">H1</button>
-        <button class="tf-btn" onclick="setTimeframe('H4')">H4</button>
-        <button class="tf-btn" onclick="setTimeframe('D1')">D1</button>
-      </div>
-    </div>
-    <div class="chart-container" id="chartContainer">
-      <canvas id="chartCanvas"></canvas>
-      <div class="chart-crosshair-v" id="crosshairV"></div>
-      <div class="chart-crosshair-h" id="crosshairH"></div>
-      <div class="chart-tooltip" id="chartTooltip"></div>
-      <div class="chart-price-label" id="chartPriceLabel"></div>
-    </div>
-    <div class="chart-bottom-bar">
-      <button class="chart-action-btn" onclick="openNewOrder()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="white" stroke-width="2"/><line x1="5" y1="12" x2="19" y2="12" stroke="white" stroke-width="2"/></svg>
-        New Order
+    <!-- Quick Order Bar -->
+    <div class="quick-order-bar" id="quickOrderBar">
+      <button class="qob-sell" onclick="quickSell()">
+        <span class="qob-label">SELL</span>
+        <span class="qob-price" id="qobBid">—</span>
       </button>
+      <div class="qob-lot-ctrl">
+        <button class="qob-adj" onclick="adjustChartLot(-0.01)">&#8964;</button>
+        <span class="qob-lot" id="qobLot">0.01</span>
+        <button class="qob-adj" onclick="adjustChartLot(0.01)">&#8963;</button>
+      </div>
+      <button class="qob-buy" onclick="quickBuy()">
+        <span class="qob-price" id="qobAsk">—</span>
+        <span class="qob-label">BUY</span>
+      </button>
+    </div>
+    <!-- Chart Area -->
+    <div class="chart-area-wrap" id="chartAreaWrap">
+      <!-- Symbol info overlay -->
+      <div class="chart-sym-overlay" id="chartSymOverlay">
+        <div class="cso-line1">
+          <span class="cso-symbol" id="csoSymbol">XAUUSD.x</span>
+          <span class="cso-arrow" onclick="openChartSymbolPicker()">&#9660;</span>
+          <span class="cso-tf" id="csoTF">H1</span>
+        </div>
+        <div class="cso-desc" id="csoDesc">Gold vs US Dollar</div>
+        <div class="cso-status" id="csoStatus">Market open</div>
+      </div>
+      <!-- Canvas -->
+      <canvas id="chartCanvas"></canvas>
+      <!-- Crosshairs -->
+      <div class="crosshair-v" id="crosshairV"></div>
+      <div class="crosshair-h" id="crosshairH"></div>
+      <!-- OHLC tooltip -->
+      <div class="chart-tooltip" id="chartTooltip"></div>
+      <!-- Dots button -->
+      <div class="chart-dots-btn">&#183;&#183;&#183;</div>
+    </div>
+    <!-- Bottom OHLC bar -->
+    <div class="chart-bottom-bar">
       <span id="chartOHLC" class="chart-ohlc-info">O: — H: — L: — C: —</span>
     </div>
   </div>
 
-  <!-- ── TRADE TAB ── -->
+  <!-- ── TRADE ── -->
   <div class="tab-panel" id="tab-trade">
     <div class="account-summary" id="accountSummary">
-      <div class="account-row">
-        <span class="account-label">Balance:</span>
-        <div class="account-dotline"></div>
-        <span class="account-value" id="balanceDisplay">10 000.00</span>
-        <button class="edit-btn" onclick="editBalance()" title="Edit Balance">✎</button>
+      <div class="acct-row">
+        <span class="acct-label">Balance:</span>
+        <div class="acct-dots"></div>
+        <span class="acct-val" id="balanceDisplay">10 000.00</span>
       </div>
-      <div class="account-row">
-        <span class="account-label">Equity:</span>
-        <div class="account-dotline"></div>
-        <span class="account-value" id="equityDisplay">10 000.00</span>
+      <div class="acct-row">
+        <span class="acct-label">Equity:</span>
+        <div class="acct-dots"></div>
+        <span class="acct-val" id="equityDisplay">10 000.00</span>
       </div>
-      <div class="account-row">
-        <span class="account-label">Free margin:</span>
-        <div class="account-dotline"></div>
-        <span class="account-value" id="marginDisplay">10 000.00</span>
+      <div class="acct-row" id="marginRow" style="display:none">
+        <span class="acct-label">Margin:</span>
+        <div class="acct-dots"></div>
+        <span class="acct-val" id="marginDisplay">0.00</span>
       </div>
-      <div class="account-row" id="profitRow" style="display:none">
-        <span class="account-label">Profit:</span>
-        <div class="account-dotline"></div>
-        <span class="account-value" id="profitDisplay">0.00</span>
+      <div class="acct-row">
+        <span class="acct-label">Free margin:</span>
+        <div class="acct-dots"></div>
+        <span class="acct-val" id="freeMarginDisplay">10 000.00</span>
+      </div>
+      <div class="acct-row" id="marginLevelRow" style="display:none">
+        <span class="acct-label">Margin Level (%):</span>
+        <div class="acct-dots"></div>
+        <span class="acct-val" id="marginLevelDisplay">0.00</span>
       </div>
     </div>
-    <div class="trade-sections">
-      <div class="trade-section-header" id="positionsHeader" onclick="toggleSection('positions')">
-        <span>Positions <span class="section-badge" id="positionsBadge">0</span></span>
-        <svg class="section-arrow" id="positionsArrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><polyline points="6 9 12 15 18 9" stroke="white" stroke-width="2"/></svg>
+
+    <!-- Positions -->
+    <div class="trade-section" id="posSection" style="display:none">
+      <div class="trade-sec-header">
+        <span class="trade-sec-title">Positions</span>
+        <button class="sec-dots-btn">&#183;&#183;&#183;</button>
       </div>
-      <div class="trade-section-body" id="positionsBody">
-        <div class="empty-state" id="positionsEmpty">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" opacity="0.3"><rect x="2" y="7" width="20" height="14" rx="2" stroke="white" stroke-width="1.5"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" stroke="white" stroke-width="1.5"/></svg>
-          <p>No open positions</p>
-        </div>
-        <div id="positionsList"></div>
+      <div id="positionsList"></div>
+    </div>
+
+    <!-- Pending -->
+    <div class="trade-section" id="pendSection" style="display:none">
+      <div class="trade-sec-header">
+        <span class="trade-sec-title">Orders</span>
+        <button class="sec-dots-btn">&#183;&#183;&#183;</button>
       </div>
-      <div class="trade-section-header" id="pendingHeader" onclick="toggleSection('pending')">
-        <span>Pending Orders <span class="section-badge" id="pendingBadge">0</span></span>
-        <svg class="section-arrow" id="pendingArrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><polyline points="6 9 12 15 18 9" stroke="white" stroke-width="2"/></svg>
-      </div>
-      <div class="trade-section-body" id="pendingBody">
-        <div class="empty-state" id="pendingEmpty">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" opacity="0.3"><circle cx="12" cy="12" r="10" stroke="white" stroke-width="1.5"/><polyline points="12 6 12 12 16 14" stroke="white" stroke-width="1.5"/></svg>
-          <p>No pending orders</p>
-        </div>
-        <div id="pendingList"></div>
-      </div>
+      <div id="pendingList"></div>
     </div>
   </div>
 
-  <!-- ── HISTORY TAB ── -->
+  <!-- ── HISTORY ── -->
   <div class="tab-panel" id="tab-history">
-    <div class="history-summary" id="historySummary">
-      <div class="history-summary-item">
-        <span class="hs-label">Net P&L</span>
-        <span class="hs-value" id="histNetPL">$0.00</span>
-      </div>
-      <div class="history-summary-item">
-        <span class="hs-label">Trades</span>
-        <span class="hs-value" id="histTrades">0</span>
-      </div>
-      <div class="history-summary-item">
-        <span class="hs-label">Win Rate</span>
-        <span class="hs-value" id="histWinRate">—</span>
-      </div>
+    <div class="history-summary">
+      <div class="hs-item"><span class="hs-lbl">Net P&L</span><span class="hs-val" id="histNetPL">$0.00</span></div>
+      <div class="hs-item"><span class="hs-lbl">Trades</span><span class="hs-val" id="histTrades">0</span></div>
+      <div class="hs-item"><span class="hs-lbl">Win Rate</span><span class="hs-val" id="histWinRate">—</span></div>
     </div>
     <div class="history-filter">
-      <button class="hf-btn active" onclick="filterHistory('today')">Today</button>
-      <button class="hf-btn" onclick="filterHistory('week')">Week</button>
-      <button class="hf-btn" onclick="filterHistory('month')">Month</button>
-      <button class="hf-btn" onclick="filterHistory('all')">All</button>
+      <button class="hf-btn active" onclick="filterHistory('today',this)">Today</button>
+      <button class="hf-btn" onclick="filterHistory('week',this)">Week</button>
+      <button class="hf-btn" onclick="filterHistory('month',this)">Month</button>
+      <button class="hf-btn" onclick="filterHistory('all',this)">All</button>
     </div>
-    <div class="history-list" id="historyList">
-      <div class="empty-state">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" opacity="0.3"><circle cx="12" cy="12" r="10" stroke="white" stroke-width="1.5"/><line x1="12" y1="8" x2="12" y2="12" stroke="white" stroke-width="1.5"/><circle cx="12" cy="16" r="0.5" fill="white" stroke="white"/></svg>
-        <p>No trade history</p>
-      </div>
-    </div>
+    <div id="historyList"><div class="empty-state"><p>No trade history</p></div></div>
   </div>
 
-  <!-- ── MESSAGES TAB ── -->
+  <!-- ── MESSAGES ── -->
   <div class="tab-panel" id="tab-messages">
-    <div class="messages-list" id="messagesList">
-      <div class="msg-item system">
-        <div class="msg-icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#00b4d8" stroke-width="2"/><line x1="12" y1="8" x2="12" y2="12" stroke="#00b4d8" stroke-width="2"/><circle cx="12" cy="16" r="0.5" fill="#00b4d8" stroke="#00b4d8"/></svg>
-        </div>
+    <div id="messagesList">
+      <div class="msg-item">
+        <div class="msg-icon info-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#00b4d8" stroke-width="2"/><line x1="12" y1="8" x2="12" y2="12" stroke="#00b4d8" stroke-width="2"/><circle cx="12" cy="16" r="1" fill="#00b4d8"/></svg></div>
         <div class="msg-content">
           <div class="msg-title">Welcome to MT5 Platform</div>
-          <div class="msg-body">Demo account activated. Starting balance: $10,000.00</div>
+          <div class="msg-body">Demo account active. Balance: $10,000.00</div>
           <div class="msg-time">Today 09:00</div>
         </div>
       </div>
@@ -209,18 +218,18 @@
 
 </div>
 
-<!-- ═══════════ BOTTOM NAV ═══════════ -->
+<!-- ═══════ BOTTOM NAV ═══════ -->
 <nav class="bottom-nav">
   <button class="nav-item" id="nav-quotes" onclick="setTab('quotes')">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     <span>Quotes</span>
   </button>
   <button class="nav-item" id="nav-charts" onclick="setTab('charts')">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="2" y="4" width="5" height="16" rx="1" fill="none" stroke="currentColor" stroke-width="2"/><rect x="9.5" y="8" width="5" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="2"/><rect x="17" y="6" width="5" height="14" rx="1" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="5" height="15" rx="1" stroke="currentColor" stroke-width="2" fill="none"/><rect x="9.5" y="9" width="5" height="11" rx="1" stroke="currentColor" stroke-width="2" fill="none"/><rect x="17" y="7" width="5" height="13" rx="1" stroke="currentColor" stroke-width="2" fill="none"/></svg>
     <span>Charts</span>
   </button>
   <button class="nav-item active" id="nav-trade" onclick="setTab('trade')">
-    <div class="nav-trade-icon">
+    <div class="nav-trade-pill">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><polyline points="17 6 23 6 23 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
     <span>Trade</span>
@@ -238,7 +247,9 @@
   </button>
 </nav>
 
-<!-- ═══════════ NEW ORDER MODAL ═══════════ -->
+<!-- ═══════ MODALS ═══════ -->
+
+<!-- NEW ORDER -->
 <div class="modal-overlay" id="orderModal" onclick="closeOrderModal(event)">
   <div class="modal-sheet" id="orderSheet">
     <div class="modal-handle"></div>
@@ -253,7 +264,7 @@
       </div>
       <div class="form-group">
         <label>Order Type</label>
-        <div class="order-type-grid" id="orderTypeGrid">
+        <div class="order-type-grid">
           <button class="ot-btn buy active" data-type="market_buy" onclick="selectOrderType(this)">Market Buy</button>
           <button class="ot-btn sell" data-type="market_sell" onclick="selectOrderType(this)">Market Sell</button>
           <button class="ot-btn neutral" data-type="buy_limit" onclick="selectOrderType(this)">Buy Limit</button>
@@ -267,30 +278,30 @@
           <label>Volume (Lots)</label>
           <div class="number-input">
             <button onclick="adjustVolume(-0.01)">−</button>
-            <input type="number" id="orderVolume" value="0.01" min="0.01" max="100" step="0.01" />
+            <input type="number" id="orderVolume" value="0.01" min="0.01" max="100" step="0.01"/>
             <button onclick="adjustVolume(0.01)">+</button>
           </div>
         </div>
         <div class="form-group half" id="orderPriceGroup">
           <label>Price</label>
-          <input type="number" id="orderPrice" class="form-input" step="0.0001" />
+          <input type="number" id="orderPrice" class="form-input" step="0.0001"/>
         </div>
       </div>
       <div class="form-row">
         <div class="form-group half">
           <label>Stop Loss</label>
-          <input type="number" id="orderSL" class="form-input" placeholder="0 = none" step="0.0001" />
+          <input type="number" id="orderSL" class="form-input" placeholder="0 = none" step="0.0001"/>
         </div>
         <div class="form-group half">
           <label>Take Profit</label>
-          <input type="number" id="orderTP" class="form-input" placeholder="0 = none" step="0.0001" />
+          <input type="number" id="orderTP" class="form-input" placeholder="0 = none" step="0.0001"/>
         </div>
       </div>
       <div class="form-group">
         <label>Comment</label>
-        <input type="text" id="orderComment" class="form-input" placeholder="Optional comment..." maxlength="64" />
+        <input type="text" id="orderComment" class="form-input" placeholder="Optional..." maxlength="64"/>
       </div>
-      <div class="order-price-info" id="orderPriceInfo">
+      <div class="order-price-info">
         <div class="opi-row"><span>Bid</span><span id="opiBid">—</span></div>
         <div class="opi-row"><span>Ask</span><span id="opiAsk">—</span></div>
         <div class="opi-row"><span>Spread</span><span id="opiSpread">—</span></div>
@@ -303,9 +314,9 @@
   </div>
 </div>
 
-<!-- ═══════════ CLOSE POSITION MODAL ═══════════ -->
+<!-- CLOSE POSITION -->
 <div class="modal-overlay" id="closeModal" onclick="closeCloseModal(event)">
-  <div class="modal-sheet compact" id="closeSheet">
+  <div class="modal-sheet compact">
     <div class="modal-handle"></div>
     <div class="modal-header">
       <span class="modal-title">Close Position</span>
@@ -317,30 +328,30 @@
         <label>Volume to Close</label>
         <div class="number-input">
           <button onclick="adjustCloseVolume(-0.01)">−</button>
-          <input type="number" id="closeVolume" value="0.01" min="0.01" step="0.01" />
+          <input type="number" id="closeVolume" value="0.01" min="0.01" step="0.01"/>
           <button onclick="adjustCloseVolume(0.01)">+</button>
         </div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeCloseModal()">Cancel</button>
-      <button class="btn-close-pos" id="confirmCloseBtn" onclick="confirmClose()">Close Position</button>
+      <button class="btn-close-pos" onclick="confirmClose()">Close Position</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════ EDIT BALANCE MODAL ═══════════ -->
+<!-- EDIT BALANCE -->
 <div class="modal-overlay" id="balanceModal" onclick="closeBalanceModal(event)">
-  <div class="modal-sheet compact" id="balanceSheet">
+  <div class="modal-sheet compact">
     <div class="modal-handle"></div>
     <div class="modal-header">
-      <span class="modal-title">Edit Account Balance</span>
+      <span class="modal-title">Set Account Balance</span>
       <button class="modal-close" onclick="closeBalanceModal()">✕</button>
     </div>
     <div class="modal-body">
       <div class="form-group">
         <label>New Balance ($)</label>
-        <input type="number" id="newBalanceInput" class="form-input large" placeholder="10000.00" step="0.01" />
+        <input type="number" id="newBalanceInput" class="form-input large" placeholder="10000.00" step="0.01"/>
       </div>
       <div class="balance-presets">
         <button class="preset-btn" onclick="setBalancePreset(1000)">$1K</button>
@@ -358,9 +369,9 @@
   </div>
 </div>
 
-<!-- ═══════════ EDIT PENDING ORDER MODAL ═══════════ -->
+<!-- EDIT PENDING -->
 <div class="modal-overlay" id="editPendingModal" onclick="closeEditPending(event)">
-  <div class="modal-sheet compact" id="editPendingSheet">
+  <div class="modal-sheet compact">
     <div class="modal-handle"></div>
     <div class="modal-header">
       <span class="modal-title">Edit Pending Order</span>
@@ -369,24 +380,12 @@
     <div class="modal-body">
       <div id="editPendingInfo" class="close-info"></div>
       <div class="form-row">
-        <div class="form-group half">
-          <label>Price</label>
-          <input type="number" id="editPendingPrice" class="form-input" step="0.0001" />
-        </div>
-        <div class="form-group half">
-          <label>Volume</label>
-          <input type="number" id="editPendingVolume" class="form-input" step="0.01" />
-        </div>
+        <div class="form-group half"><label>Price</label><input type="number" id="editPendingPrice" class="form-input" step="0.0001"/></div>
+        <div class="form-group half"><label>Volume</label><input type="number" id="editPendingVolume" class="form-input" step="0.01"/></div>
       </div>
       <div class="form-row">
-        <div class="form-group half">
-          <label>Stop Loss</label>
-          <input type="number" id="editPendingSL" class="form-input" step="0.0001" />
-        </div>
-        <div class="form-group half">
-          <label>Take Profit</label>
-          <input type="number" id="editPendingTP" class="form-input" step="0.0001" />
-        </div>
+        <div class="form-group half"><label>Stop Loss</label><input type="number" id="editPendingSL" class="form-input" step="0.0001"/></div>
+        <div class="form-group half"><label>Take Profit</label><input type="number" id="editPendingTP" class="form-input" step="0.0001"/></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -396,26 +395,36 @@
   </div>
 </div>
 
-<!-- ═══════════ CHART SYMBOL PICKER ═══════════ -->
+<!-- SYMBOL PICKER -->
 <div class="modal-overlay" id="symbolPickerModal" onclick="closeSymbolPicker(event)">
-  <div class="modal-sheet compact" id="symbolPickerSheet">
+  <div class="modal-sheet compact">
     <div class="modal-handle"></div>
     <div class="modal-header">
       <span class="modal-title">Select Symbol</span>
       <button class="modal-close" onclick="closeSymbolPicker()">✕</button>
     </div>
     <div class="modal-body" style="padding:8px 12px;gap:0">
-      <div class="sym-search">
-        <input type="text" id="symSearchInput" class="form-input" placeholder="Search symbol..." oninput="filterSymbols(this.value)" />
-      </div>
+      <input type="text" id="symSearchInput" class="form-input" placeholder="Search..." oninput="filterSymbols(this.value)" style="margin-bottom:8px"/>
       <div class="sym-picker-list" id="symPickerList"></div>
     </div>
   </div>
 </div>
 
-<!-- ═══════════ TOAST ═══════════ -->
-<div class="toast" id="toast"></div>
+<!-- TF PICKER -->
+<div class="modal-overlay" id="tfPickerModal" onclick="closeTFPicker(event)">
+  <div class="modal-sheet compact">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <span class="modal-title">Timeframe</span>
+      <button class="modal-close" onclick="closeTFPicker()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:12px">
+      <div class="tf-grid" id="tfGrid"></div>
+    </div>
+  </div>
+</div>
 
-<script src="app.js"></script>
+<div class="toast" id="toast"></div>
+<script type="module" src="app.js"></script>
 </body>
 </html>
