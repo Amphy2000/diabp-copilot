@@ -820,9 +820,19 @@ function renderAdminAnalytics(summary, sessions) {
   }
 }
 
+function updateExportButtonLabel() {
+  if (!exportReportBtn) return;
+  const currentAcct = localStorage.getItem('deriv_acct') || "";
+  const adminAccounts = ['ROT91833970', 'DOT93132805'];
+  const isAdmin = adminAccounts.includes(currentAcct.trim().toUpperCase());
+  
+  exportReportBtn.innerHTML = isAdmin ? "📤 Copy Promo Report" : "📤 Share Stats";
+}
+
 // Developer Admin Panel logic
 function checkAdminStatus() {
   const currentAcct = localStorage.getItem('deriv_acct');
+  updateExportButtonLabel();
   if (!adminPanel) return;
 
   const adminAccounts = ['ROT91833970', 'DOT93132805'];
@@ -2133,15 +2143,31 @@ if (exportReportBtn) {
     const rate = stats.total > 0 ? ((stats.wins / stats.total) * 100).toFixed(1) : "0.0";
     const selectedTemplate = promoTemplateSelect ? promoTemplateSelect.value : 'raw';
     
-    const partnerLink = "https://amphybot.vercel.app/";
+    const currentAcct = localStorage.getItem('deriv_acct') || "";
+    const adminAccounts = ['ROT91833970', 'DOT93132805'];
+    const isAdmin = adminAccounts.includes(currentAcct.trim().toUpperCase());
+    
+    // Admins copy their affiliate link; standard users copy the organic app link
+    const affiliateLink = "https://deriv.partners/rx?sidi=9A373E8A-A450-487A-A419-064B4FE5B751&utm_campaign=dynamicworks&utm_medium=affiliate&utm_source=CU13329";
+    const partnerLink = isAdmin ? affiliateLink : "https://amphybot.vercel.app/";
     
     let reportText = "";
     
     if (selectedTemplate === 'social') {
-      reportText = 
-`⚡ V75 Scalper Bot Session Stats ⚡
+      const hookText = isAdmin 
+        ? "Chart setup doing the work while I go about my day. Here are the live stats from my current session:"
+        : "Just completed an automated V75 trading session. Here are the live stats:";
+      const actionText = isAdmin
+        ? "👉 Try the bot for free and start auto-trading here:"
+        : "👉 Try the V75 Scalper Bot for free:";
+      const runningText = isAdmin
+        ? "Set the parameters, turn on background running, and let it scan tick trends."
+        : "Runs securely inside the local browser. Zero server custody.";
 
-Just completed an automated V75 trading session. Here are the live stats:
+      reportText = 
+`${isAdmin ? "🤖 Automated V75 Scalper Bot Update" : "⚡ V75 Scalper Bot Session Stats ⚡"}
+
+${hookText}
 
 📈 Total Trades: ${stats.total}
 🟢 Wins: ${stats.wins} | 🔴 Losses: ${stats.losses}
@@ -2149,13 +2175,20 @@ Just completed an automated V75 trading session. Here are the live stats:
 💰 Session Profit: $${sessionProfit.toFixed(2)}
 💵 Lifetime Profit: $${(stats.totalProfit || 0).toFixed(2)}
 
-Runs securely inside the local browser. Zero server custody.
+${runningText}
 
-👉 Try the V75 Scalper Bot for free:
+${actionText}
 ${partnerLink}`;
     } else if (selectedTemplate === 'short') {
+      const headerText = isAdmin
+        ? "⚡ V75 Scalping Session Complete! ⚡"
+        : "📊 V75 Scalping Stats Update 📊";
+      const actionText = isAdmin
+        ? "👉 Get free bot access here:"
+        : "👉 Get free access to the bot:";
+
       reportText = 
-`📊 V75 Scalping Stats Update 📊
+`${headerText}
 
 📈 Trades: ${stats.total}
 🎯 Win Rate: ${rate}%
@@ -2163,21 +2196,31 @@ ${partnerLink}`;
 
 100% automated mean-reversion trading. Screen Wake Lock and background keep-alive active.
 
-👉 Get free access to the bot:
+${actionText}
 ${partnerLink}`;
     } else {
       // Default: Raw Stats
+      const headerText = isAdmin
+        ? "🔥 AMPHY V75 SCALPER BOT PERFORMANCE REPORT 🔥"
+        : "🔥 AMPHY V75 SCALPER BOT REPORT 🔥";
+      const actionText = isAdmin
+        ? "🚀 Join under my Deriv partner link:"
+        : "🚀 Try the V75 Scalper Bot for free:";
+      const profitLabel = isAdmin
+        ? "Net Session Profit"
+        : "Today's Net Profit";
+
       reportText = 
-`🔥 AMPHY V75 SCALPER BOT REPORT 🔥
+`${headerText}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📈 Total Trades: ${stats.total}
 🟢 Wins: ${stats.wins}
 🔴 Losses: ${stats.losses}
 🎯 Win Rate: ${rate}%
-💰 Today's Net Profit: $${sessionProfit.toFixed(2)}
+💰 ${profitLabel}: $${sessionProfit.toFixed(2)}
 💵 Lifetime Net Profit: $${(stats.totalProfit || 0).toFixed(2)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚀 Try the V75 Scalper Bot for free:
+${actionText}
 👉 ${partnerLink}`;
     }
     
