@@ -60,20 +60,188 @@ const stopLossInput = document.getElementById('stopLossInput');
 const martingaleStepsInput = document.getElementById('martingaleStepsInput');
 
 // ════════════════════════════════════════════
-//         OAUTH FLOW & AUTHENTICATION
+//         OAUTH FLOW & AUTHENTICATION (OIDC/PKCE & PAT)
 // ════════════════════════════════════════════
 
-// Check URL parameters on page load
-window.addEventListener('DOMContentLoaded', () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const token = urlParams.get('token1');
-  const acct = urlParams.get('acct1');
+// PKCE Cryptographic Helpers
+function dec2hex(dec) {
+  return ('0' + dec.toString(16)).slice(-2);
+}
 
-  if (token && acct) {
-    localStorage.setItem('deriv_token', token);
-    localStorage.setItem('deriv_acct', acct);
-    // Clean up URL parameters so they aren't visible in address bar
+function generateCodeVerifier() {
+  const array = new Uint32Array(56 / 2);
+  window.crypto.getRandomValues(array);
+  return Array.from(array, dec2hex).join('');
+}
+
+async function sha256(plain) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plain);
+  return window.crypto.subtle.digest('SHA-256', data);
+}
+
+function base64urlencode(a) {
+  let str = "";
+  const bytes = new Uint8Array(a);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    str += String.fromCharCode(bytes[i]);
+  }
+  return btoa(str)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+async function generateCodeChallenge(v) {
+  const hashed = await sha256(v);
+  return base64urlencode(hashed);
+}
+
+function generateRandomState() {
+  const array = new Uint32Array(28 / 2);
+  window.crypto.getRandomValues(array);
+  return Array.from(array, dec2hex).join('');
+}
+
+// Retrieve working App ID and fetch accounts from Options API REST endpoint
+async function fetchAccountsWithFallback(token) {
+  const candidates = [];
+  // Use the configured APP_ID if it is alphanumeric (non-numeric)
+  if (/^[a-zA-Z0-9]+$/.test(APP_ID) && !/^\d+$/.test(APP_ID)) {
+    candidates.push(APP_ID);
+  }
+  // Standard PAT/OAuth App ID fallbacks registered by the user
+  candidates.push('33xF1iFStFhUTRFup3ZQF'); // PAT Type App ID
+  candidates.push('33xCanrA7freeICOdpEoH'); // OAuth Type App ID
+
+  // Deduplicate candidates
+  const uniqueCandidates = [...new Set(candidates)];
+  let lastErrorMsg = "Failed to retrieve account list.";
+
+  for (const appId of uniqueCandidates) {
+    try {
+      addLog(`Attempting account list fetch with App ID: ${appId}...`, "info");
+      const res = await fetch('https://api.derivws.com/trading/v1/options/accounts', {
+        method: 'GET',
+        headers: {
+          'Deriv-App-ID': appId,
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.data && data.data.length > 0) {
+          localStorage.setItem('deriv_app_id', appId);
+          addLog(`Successful account retrieval using App ID: ${appId}`, "success");
+          return { accounts: data.data, appId: appId };
+        }
+      } else {
+        const errText = await res.text();
+        lastErrorMsg = `REST Accounts API failed (${res.status}): ${errText}`;
+        console.warn(`App ID ${appId} failed: ${res.status} - ${errText}`);
+      }
+    } catch (err) {
+      lastErrorMsg = `Connection error: ${err.message}`;
+      console.warn(`Fetch accounts error with App ID ${appId}:`, err);
+    }
+  }
+  throw new Error(lastErrorMsg);
+}
+
+// Check URL parameters on page load
+window.addEventListener('DOMContentLoaded', async () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  
+  // 1. Check for legacy OAuth credentials
+  const legacyToken = urlParams.get('token1');
+  const legacyAcct = urlParams.get('acct1');
+
+  if (legacyToken && legacyAcct) {
+    localStorage.setItem('deriv_token', legacyToken);
+    localStorage.setItem('deriv_acct', legacyAcct);
+    localStorage.removeItem('deriv_app_id'); // clear any OAuth-based App ID
     window.history.replaceState({}, document.title, window.location.pathname);
+    checkAuth();
+    return;
+  }
+
+  // 2. Check for new OIDC/OAuth 2.0 PKCE Authorization Code response
+  const code = urlParams.get('code');
+  const state = urlParams.get('state');
+
+  if (code && state) {
+    const storedState = sessionStorage.getItem('oauth_state');
+    const storedVerifier = sessionStorage.getItem('code_verifier');
+
+    if (!storedState || state !== storedState) {
+      alert("⚠️ CSRF verification failed. OAuth state mismatch.");
+      window.history.replaceState({}, document.title, window.location.pathname);
+      checkAuth();
+      return;
+    }
+
+    addLog("Authorization code received. Exchanging for access token...", "info");
+    
+    // Clean URL bar immediately so parameters aren't kept
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    try {
+      const redirectUri = window.location.origin + '/';
+      const tokenRes = await fetch('/api/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          code,
+          code_verifier: storedVerifier,
+          client_id: APP_ID,
+          redirect_uri: redirectUri
+        })
+      });
+
+      if (!tokenRes.ok) {
+        const errText = await tokenRes.text();
+        throw new Error(`Token exchange failed (${tokenRes.status}): ${errText}`);
+      }
+
+      const tokenData = await tokenRes.json();
+      if (!tokenData.access_token) {
+        throw new Error("Access token missing in exchange response.");
+      }
+
+      const accessToken = tokenData.access_token;
+      
+      // Fetch account details to verify and find account ID
+      const { accounts, appId } = await fetchAccountsWithFallback(accessToken);
+      
+      // Select preferred account: VRTC (demo) if present, otherwise the first account
+      const demoAcct = accounts.find(a => a.id.toUpperCase().startsWith('VRTC'));
+      const targetAcct = demoAcct || accounts[0];
+
+      // Check if whitelisted
+      const isApproved = await isAccountApproved(targetAcct.id);
+      if (!isApproved) {
+        alert(`⚠️ ACCESS DENIED\nYour account (${targetAcct.id}) is not white-listed.\n\nPlease contact the admin to activate access.`);
+        logout();
+        return;
+      }
+
+      localStorage.setItem('deriv_token', accessToken);
+      localStorage.setItem('deriv_acct', targetAcct.id);
+      localStorage.setItem('deriv_app_id', appId);
+
+      addLog(`OAuth login successful for account ${targetAcct.id}`, "success");
+    } catch (err) {
+      addLog(`OAuth error: ${err.message}`, "error");
+      alert(`OAuth login failed: ${err.message}`);
+    }
+
+    // Clear session storage
+    sessionStorage.removeItem('oauth_state');
+    sessionStorage.removeItem('code_verifier');
   }
 
   checkAuth();
@@ -150,25 +318,48 @@ async function checkAuth() {
   }
 }
 
-// Redirect to Deriv OAuth page
-loginBtn.addEventListener('click', () => {
-  let redirectUri = window.location.origin;
-  if (window.location.hostname === 'amphybot.vercel.app') {
-    redirectUri = 'https://amphybot.vercel.app/';
-  } else if (window.location.hostname === 'v75-scalper-bot.vercel.app') {
-    redirectUri = 'https://v75-scalper-bot.vercel.app';
+// Redirect to Deriv OIDC/OAuth 2.0 PKCE page
+loginBtn.addEventListener('click', async () => {
+  try {
+    loginBtn.innerText = "Connecting...";
+    loginBtn.disabled = true;
+
+    const verifier = generateCodeVerifier();
+    const state = generateRandomState();
+
+    sessionStorage.setItem('code_verifier', verifier);
+    sessionStorage.setItem('oauth_state', state);
+
+    const challenge = await generateCodeChallenge(verifier);
+    const redirectUri = window.location.origin + '/';
+
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: APP_ID,
+      redirect_uri: redirectUri,
+      scope: 'trade account_manage',
+      state: state,
+      code_challenge: challenge,
+      code_challenge_method: 'S256'
+    });
+
+    const authUrl = `https://auth.deriv.com/oauth2/auth?${params.toString()}`;
+    addLog("Redirecting to Deriv Authorization Center...", "info");
+    window.location.href = authUrl;
+  } catch (err) {
+    console.error("Failed to start login redirect:", err);
+    alert("Error initializing OAuth: " + err.message);
+    loginBtn.innerText = "Log In with Deriv";
+    loginBtn.disabled = false;
   }
-  
-  const oauthUrl = `https://oauth.deriv.com/oauth2/authorize?app_id=${APP_ID}&l=en&signup_device=mobile&redirect_uri=${encodeURIComponent(redirectUri)}`;
-  window.location.href = oauthUrl;
 });
 
-// Manual API Token connection
+// Manual API Token connection (supports both standard and new PAT tokens)
 const connectTokenBtn = document.getElementById('connectTokenBtn');
 const tokenInput = document.getElementById('tokenInput');
 
 if (connectTokenBtn && tokenInput) {
-  connectTokenBtn.addEventListener('click', () => {
+  connectTokenBtn.addEventListener('click', async () => {
     const token = tokenInput.value.trim();
     if (!token) {
       alert("Please enter a valid Deriv API Token.");
@@ -179,8 +370,43 @@ if (connectTokenBtn && tokenInput) {
     connectTokenBtn.innerText = "Connecting...";
     connectTokenBtn.disabled = true;
     
-    localStorage.setItem('deriv_token', token);
-    connectWebSocket(true); // pass true indicating it is a manual login attempt
+    // If it is a Personal Access Token (starts with pat_)
+    if (token.startsWith('pat_')) {
+      try {
+        addLog("Validating Personal Access Token (PAT)...", "info");
+        const { accounts, appId } = await fetchAccountsWithFallback(token);
+        
+        // Find preferred account
+        const demoAcct = accounts.find(a => a.id.toUpperCase().startsWith('VRTC'));
+        const targetAcct = demoAcct || accounts[0];
+
+        // Check whitelist
+        const isApproved = await isAccountApproved(targetAcct.id);
+        if (!isApproved) {
+          alert(`⚠️ ACCESS DENIED\nYour account (${targetAcct.id}) is not white-listed.\n\nPlease contact the admin to activate access.`);
+          connectTokenBtn.innerText = "Connect with Token";
+          connectTokenBtn.disabled = false;
+          return;
+        }
+
+        localStorage.setItem('deriv_token', token);
+        localStorage.setItem('deriv_acct', targetAcct.id);
+        localStorage.setItem('deriv_app_id', appId);
+
+        addLog(`PAT authenticated for account ${targetAcct.id}`, "success");
+        checkAuth();
+      } catch (err) {
+        addLog(`PAT Authentication Error: ${err.message}`, "error");
+        alert(`PAT authentication failed: ${err.message}`);
+        connectTokenBtn.innerText = "Connect with Token";
+        connectTokenBtn.disabled = false;
+      }
+    } else {
+      // Legacy API token
+      localStorage.setItem('deriv_token', token);
+      localStorage.removeItem('deriv_app_id'); // clear any OAuth-based App ID
+      connectWebSocket(true); // pass true indicating it is a manual login attempt
+    }
   });
 }
 
@@ -212,62 +438,155 @@ function logout() {
 // ════════════════════════════════════════════
 
 function connectWebSocket(isLoginAttempt = false) {
-  addLog("Connecting to Deriv WebSocket server...", "info");
-  
-  // Deriv WebSocket server strictly requires a numeric App ID.
-  // If the configured APP_ID is alphanumeric, we fallback to '61247' for the socket connection.
-  const wsAppId = /^\d+$/.test(APP_ID) ? APP_ID : '61247';
-  
-  const primaryUrl = `wss://ws.derivws.com/websockets/v3?app_id=${wsAppId}`;
-  let primaryFailed = false;
+  const token = localStorage.getItem('deriv_token');
+  const acct = localStorage.getItem('deriv_acct');
+  const appId = localStorage.getItem('deriv_app_id');
 
-  function attemptConnection(url) {
-    socket = new WebSocket(url);
+  // Determine if we are using the new Options API flow
+  // We use the new Options API flow if the token starts with 'pat_' OR we have an alphanumeric app_id stored.
+  const isNewApiFlow = (token && token.startsWith('pat_')) || (appId && /^[a-zA-Z0-9]+$/.test(appId) && !/^\d+$/.test(appId));
 
-    socket.onopen = () => {
-      addLog("Socket connected. Authorizing...", "info");
-      const token = localStorage.getItem('deriv_token');
-      socket.send(JSON.stringify({ authorize: token }));
-    };
+  if (isNewApiFlow) {
+    addLog("Connecting using new Options API flow...", "info");
+    
+    // Disable connectTokenBtn while connecting via manual token
+    if (isLoginAttempt && connectTokenBtn) {
+      connectTokenBtn.innerText = "Connecting...";
+      connectTokenBtn.disabled = true;
+    }
 
-    socket.onclose = () => {
-      // If primary connection failed, do not trigger trading halts or logs yet
-      if (!primaryFailed && url === primaryUrl) return;
-      
-      addLog("WebSocket disconnected.", "warn");
-      isAuthorized = false;
-      if (isTrading) {
-        stopTrading("Disconnect event detected.");
+    const otpAppId = appId || (token.startsWith('pat_') ? '33xF1iFStFhUTRFup3ZQF' : APP_ID);
+    addLog(`Requesting OTP for account ${acct} using App ID: ${otpAppId}...`, "info");
+    
+    fetch(`https://api.derivws.com/trading/v1/options/accounts/${acct}/otp`, {
+      method: 'POST',
+      headers: {
+        'Deriv-App-ID': otpAppId,
+        'Authorization': `Bearer ${token}`
       }
-    };
+    })
+    .then(async (otpRes) => {
+      if (!otpRes.ok) {
+        const errText = await otpRes.text();
+        throw new Error(`OTP request failed: ${otpRes.status} - ${errText}`);
+      }
+      return otpRes.json();
+    })
+    .then((otpData) => {
+      if (!otpData.data || !otpData.data.url) {
+        throw new Error("Invalid OTP response structure.");
+      }
 
-    socket.onerror = (error) => {
-      console.error(`WS Connection Error on ${url}:`, error);
-      
-      if (!primaryFailed && url === primaryUrl) {
-        primaryFailed = true;
-        addLog("Primary server connection failed. Retrying legacy server...", "warn");
-        const fallbackUrl = `wss://ws.binaryws.com/websockets/v3?app_id=${wsAppId}`;
-        attemptConnection(fallbackUrl);
-      } else {
-        addLog("Network connection error encountered.", "error");
-        if (isLoginAttempt) {
-          alert("Failed to connect to Deriv WebSocket server. Please check your network or try again.");
-          if (connectTokenBtn) {
-            connectTokenBtn.innerText = "Connect with Token";
-            connectTokenBtn.disabled = false;
+      const wsUrl = otpData.data.url;
+      addLog("OTP retrieved. Connecting to Options WebSocket...", "info");
+
+      socket = new WebSocket(wsUrl);
+      socket.isNewWSApi = true;
+
+      socket.onopen = () => {
+        addLog("Connected to Options WebSocket!", "success");
+        isAuthorized = true;
+        
+        // Fetch balance and subscribe to ticks
+        socket.send(JSON.stringify({
+          balance: 1,
+          subscribe: 1
+        }));
+
+        // Subscribe to V75 ticks
+        socket.send(JSON.stringify({
+          ticks: 'R_75',
+          subscribe: 1
+        }));
+
+        if (isLoginAttempt && connectTokenBtn) {
+          connectTokenBtn.innerText = "Connected";
+          connectTokenBtn.disabled = false;
+        }
+      };
+
+      socket.onclose = () => {
+        addLog("Options WebSocket disconnected.", "warn");
+        isAuthorized = false;
+        if (isTrading) {
+          stopTrading("Disconnect event detected.");
+        }
+      };
+
+      socket.onerror = (error) => {
+        console.error("Options WebSocket Error:", error);
+        addLog("Options WebSocket connection error.", "error");
+        if (isLoginAttempt && connectTokenBtn) {
+          connectTokenBtn.innerText = "Connect with Token";
+          connectTokenBtn.disabled = false;
+        }
+      };
+
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        handleMessage(data, isLoginAttempt);
+      };
+    })
+    .catch((err) => {
+      addLog(`Failed to connect using Options API: ${err.message}`, "error");
+      if (isLoginAttempt && connectTokenBtn) {
+        connectTokenBtn.innerText = "Connect with Token";
+        connectTokenBtn.disabled = false;
+      }
+      logout();
+    });
+  } else {
+    // Legacy flow
+    addLog("Connecting to legacy Deriv WebSocket server...", "info");
+    const wsAppId = /^\d+$/.test(APP_ID) ? APP_ID : '61247';
+    const primaryUrl = `wss://ws.derivws.com/websockets/v3?app_id=${wsAppId}`;
+    let primaryFailed = false;
+
+    function attemptConnection(url) {
+      socket = new WebSocket(url);
+      socket.isNewWSApi = false;
+
+      socket.onopen = () => {
+        addLog("Socket connected. Authorizing...", "info");
+        socket.send(JSON.stringify({ authorize: token }));
+      };
+
+      socket.onclose = () => {
+        if (!primaryFailed && url === primaryUrl) return;
+        addLog("WebSocket disconnected.", "warn");
+        isAuthorized = false;
+        if (isTrading) {
+          stopTrading("Disconnect event detected.");
+        }
+      };
+
+      socket.onerror = (error) => {
+        console.error(`WS Connection Error on ${url}:`, error);
+        if (!primaryFailed && url === primaryUrl) {
+          primaryFailed = true;
+          addLog("Primary server connection failed. Retrying legacy server...", "warn");
+          const fallbackUrl = `wss://ws.binaryws.com/websockets/v3?app_id=${wsAppId}`;
+          attemptConnection(fallbackUrl);
+        } else {
+          addLog("Network connection error encountered.", "error");
+          if (isLoginAttempt) {
+            alert("Failed to connect to Deriv WebSocket server. Please check your network or try again.");
+            if (connectTokenBtn) {
+              connectTokenBtn.innerText = "Connect with Token";
+              connectTokenBtn.disabled = false;
+            }
           }
         }
-      }
-    };
+      };
 
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      handleMessage(data, isLoginAttempt);
-    };
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        handleMessage(data, isLoginAttempt);
+      };
+    }
+
+    attemptConnection(primaryUrl);
   }
-
-  attemptConnection(primaryUrl);
 }
 
 // ════════════════════════════════════════════
@@ -474,17 +793,24 @@ function proposeTrade(type) {
   statusText.innerText = "Proposing Order...";
   statusIndicator.className = "status-bar status-running";
 
-  // Request proposal
-  socket.send(JSON.stringify({
+  const req = {
     proposal: 1,
     amount: currentStake,
     basis: "stake",
     contract_type: type,
     currency: "USD",
     duration: 1,
-    duration_unit: "t",
-    symbol: "R_75"
-  }));
+    duration_unit: "t"
+  };
+
+  if (socket.isNewWSApi) {
+    req.underlying_symbol = "R_75";
+  } else {
+    req.symbol = "R_75";
+  }
+
+  // Request proposal
+  socket.send(JSON.stringify(req));
 }
 
 function buyContract(proposalId) {
