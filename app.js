@@ -14,8 +14,8 @@ const APPROVED_ACCOUNTS = [
 ];
 
 // 3. Supabase Credentials (leave blank to use the hardcoded APPROVED_ACCOUNTS whitelist instead)
-const SUPABASE_URL = ''; // Paste your Supabase project URL here
-const SUPABASE_ANON_KEY = ''; // Paste your Supabase anon public key here
+const SUPABASE_URL = 'https://dqylesrwkgupnflyveth.supabase.co'; // Paste your Supabase project URL here
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRxeWxlc3J3a2d1cG5mbHl2ZXRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTcyMDIsImV4cCI6MjA5Njg3MzIwMn0.ll4lznpvJsSkXM6Z8Uf1kL6q-L5Mn3JAtx4QdxoXtyg'; // Paste your Supabase anon public key here
 
 
 // ════════════════════════════════════════════
