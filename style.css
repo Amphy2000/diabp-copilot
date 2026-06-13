@@ -481,3 +481,86 @@ body {
   margin-top: 1.5rem !important;
 }
 
+/* ════════════════════════════════════════════ */
+/*             DEVELOPER ADMIN PANEL            */
+/* ════════════════════════════════════════════ */
+.admin-panel {
+  background: rgba(56, 189, 248, 0.04);
+  border: 1px solid rgba(56, 189, 248, 0.15);
+  border-radius: 18px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.admin-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: -0.2px;
+}
+
+.admin-badge {
+  background: rgba(56, 189, 248, 0.15) !important;
+  color: var(--color-primary) !important;
+  border-color: rgba(56, 189, 248, 0.3) !important;
+}
+
+.admin-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-bottom: 1rem;
+}
+
+.admin-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.admin-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  color: var(--text-main);
+  font-family: var(--font-family-mono);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.admin-input:focus {
+  border-color: var(--color-primary);
+}
+
+.admin-btn {
+  white-space: nowrap;
+}
+
+.admin-feedback {
+  font-size: 0.8rem;
+  margin-top: 0.6rem;
+  font-weight: 500;
+  display: none;
+}
+
+.admin-feedback.success {
+  display: block;
+  color: var(--color-success);
+}
+
+.admin-feedback.error {
+  display: block;
+  color: var(--color-danger);
+}
+
+

@@ -105,6 +105,20 @@
         <span id="statusText">Bot is Idle</span>
       </div>
 
+      <!-- Developer Admin Panel -->
+      <div id="adminPanel" class="admin-panel hidden margin-top-lg">
+        <div class="admin-header">
+          <span class="admin-title">⚡ Developer Admin Panel</span>
+          <span class="badge admin-badge">Admin</span>
+        </div>
+        <p class="admin-desc">Whitelist client Deriv Account IDs (ROT, DOT, CR) instantly to the database.</p>
+        <div class="admin-form">
+          <input type="text" id="adminWhitelistInput" class="admin-input" placeholder="e.g. DOT93132805" />
+          <button id="adminWhitelistBtn" class="btn btn-primary btn-sm admin-btn">Whitelist</button>
+        </div>
+        <div id="adminFeedback" class="admin-feedback"></div>
+      </div>
+
       <!-- Live Log Console -->
       <div class="log-section">
         <h3>Activity Logs</h3>

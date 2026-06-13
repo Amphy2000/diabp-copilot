@@ -11,6 +11,7 @@ const APPROVED_ACCOUNTS = [
   'VRTC123456',  // Example Virtual account
   'CR123456',    // Example Real account
   'ROT91833970', // User account
+  'DOT93132805', // User demo account
   // Add your clients' account IDs here as they sign up under your link
 ];
 
@@ -59,6 +60,13 @@ const stakeInput = document.getElementById('stakeInput');
 const targetProfitInput = document.getElementById('targetProfitInput');
 const stopLossInput = document.getElementById('stopLossInput');
 const martingaleStepsInput = document.getElementById('martingaleStepsInput');
+
+// Developer Admin Panel Elements
+const adminPanel = document.getElementById('adminPanel');
+const adminWhitelistInput = document.getElementById('adminWhitelistInput');
+const adminWhitelistBtn = document.getElementById('adminWhitelistBtn');
+const adminFeedback = document.getElementById('adminFeedback');
+
 
 // ════════════════════════════════════════════
 //         OAUTH FLOW & AUTHENTICATION (OIDC/PKCE & PAT)
@@ -373,12 +381,130 @@ if (accountSelect) {
     
     localStorage.setItem('deriv_acct', selectedAcct);
     updateAccountLabelBadge(selectedAcct);
+    checkAdminStatus();
 
     if (socket) {
       socket.close();
     }
     connectWebSocket();
   });
+}
+
+// Developer Admin Panel logic
+function checkAdminStatus() {
+  const currentAcct = localStorage.getItem('deriv_acct');
+  if (!adminPanel) return;
+
+  const adminAccounts = ['ROT91833970', 'DOT93132805'];
+  if (currentAcct && adminAccounts.includes(currentAcct.trim().toUpperCase())) {
+    adminPanel.classList.remove('hidden');
+  } else {
+    adminPanel.classList.add('hidden');
+  }
+}
+
+if (adminWhitelistBtn) {
+  adminWhitelistBtn.addEventListener('click', async () => {
+    const accountToWhitelist = adminWhitelistInput.value.trim().toUpperCase();
+    if (!accountToWhitelist) {
+      showAdminFeedback("Please enter a valid Account ID.", "error");
+      return;
+    }
+
+    const adminAcct = localStorage.getItem('deriv_acct');
+    const adminToken = localStorage.getItem('deriv_token');
+
+    if (!adminAcct || !adminToken) {
+      showAdminFeedback("Developer session expired. Please log in again.", "error");
+      return;
+    }
+
+    adminWhitelistBtn.disabled = true;
+    adminWhitelistBtn.innerText = "Whitelisting...";
+    showAdminFeedback("Processing...", "info");
+
+    try {
+      addLog(`Sending whitelist request for account ${accountToWhitelist}...`, "info");
+      
+      let response;
+      try {
+        response = await fetch('/api/whitelist', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            account_to_whitelist: accountToWhitelist,
+            admin_account_id: adminAcct,
+            admin_token: adminToken
+          })
+        });
+      } catch (e) {
+        // Fetch failed (network or local dev without serverless backend)
+        response = { status: 404 };
+      }
+
+      // If Serverless function is not found (404), fallback to direct Supabase REST insert (using anon key)
+      if (response.status === 404) {
+        addLog("Vercel Serverless Function /api/whitelist not found (404). Falling back to direct Supabase insert...", "warn");
+        
+        if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+          throw new Error("Supabase credentials are not configured.");
+        }
+
+        const directRes = await fetch(`${SUPABASE_URL}/rest/v1/allowed_users`, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            account_id: accountToWhitelist
+          })
+        });
+
+        if (!directRes.ok) {
+          const errText = await directRes.text();
+          throw new Error(`Direct database insert failed: ${errText} (Note: Row-Level Security in Supabase might block anonymous writes. Set up SUPABASE_SERVICE_ROLE_KEY in Vercel to allow secure developer whitelisting)`);
+        }
+
+        showAdminFeedback(`Direct database insertion successful for ${accountToWhitelist}!`, "success");
+        addLog(`Database Whitelist Success (Direct): ${accountToWhitelist}`, "success");
+        adminWhitelistInput.value = "";
+        return;
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Server returned an error.');
+      }
+
+      showAdminFeedback(data.message || `Account ${accountToWhitelist} whitelisted successfully!`, "success");
+      addLog(`Database Whitelist Success: ${accountToWhitelist}`, "success");
+      adminWhitelistInput.value = "";
+    } catch (err) {
+      showAdminFeedback(err.message, "error");
+      addLog(`Database Whitelist Error: ${err.message}`, "error");
+    } finally {
+      adminWhitelistBtn.disabled = false;
+      adminWhitelistBtn.innerText = "Whitelist";
+    }
+  });
+}
+
+function showAdminFeedback(text, type) {
+  if (!adminFeedback) return;
+  adminFeedback.innerText = text;
+  adminFeedback.className = "admin-feedback " + type;
+  if (type === "info") {
+    adminFeedback.style.color = "var(--color-primary)";
+    adminFeedback.style.display = "block";
+  } else {
+    adminFeedback.style.color = ""; // fallback to CSS classes
+  }
 }
 
 async function checkAuth() {
@@ -401,6 +527,7 @@ async function checkAuth() {
     
     updateAccountLabelBadge(acct);
     await populateAccountSelector(token);
+    checkAdminStatus();
 
     connectWebSocket();
   } else {
@@ -667,6 +794,7 @@ async function handleMessage(data, isLoginAttempt = false) {
       updateAccountLabelBadge(acct);
       const token = localStorage.getItem('deriv_token');
       await populateAccountSelector(token);
+      checkAdminStatus();
       
       // Update Balance
       const balance = data.authorize.balance;
