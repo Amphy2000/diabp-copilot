@@ -1893,38 +1893,40 @@ function startPipMode() {
     const stream = captureMethod.call(pipCanvasElement);
     pipVideoElement.srcObject = stream;
 
-    // Play and then request PiP directly without waiting for loadedmetadata
-    pipVideoElement.play()
-      .then(() => {
-        if (typeof pipVideoElement.requestPictureInPicture === 'function') {
-          return pipVideoElement.requestPictureInPicture();
-        } else {
-          throw new Error("Picture-in-Picture API is not supported by your browser/device.");
-        }
-      })
-      .then((pipWindow) => {
-        addLog("Floating Bot active! You can now minimize the app.", "success");
-        sendPushNotification("📺 Floating Bot Active", "The bot will continue trading in background.");
-        
-        // Set up drawing interval
-        pipDrawInterval = setInterval(() => {
-          try {
-            drawPipCanvas(ctx);
-          } catch (e) {
-            console.error("Error drawing PiP Canvas:", e);
-          }
-        }, 200);
+    // Play video in the background without blocking the synchronous event gesture
+    pipVideoElement.play().catch((playErr) => {
+      console.warn("Video play warning:", playErr);
+    });
 
-        // Handle PiP Window close
-        pipVideoElement.addEventListener('leavepictureinpicture', () => {
+    // Request PiP synchronously within the user interaction call stack
+    if (typeof pipVideoElement.requestPictureInPicture === 'function') {
+      pipVideoElement.requestPictureInPicture()
+        .then((pipWindow) => {
+          addLog("Floating Bot active! You can now minimize the app.", "success");
+          sendPushNotification("📺 Floating Bot Active", "The bot will continue trading in background.");
+          
+          // Set up drawing interval
+          pipDrawInterval = setInterval(() => {
+            try {
+              drawPipCanvas(ctx);
+            } catch (e) {
+              console.error("Error drawing PiP Canvas:", e);
+            }
+          }, 200);
+
+          // Handle PiP Window close
+          pipVideoElement.addEventListener('leavepictureinpicture', () => {
+            cleanupPip();
+          });
+        })
+        .catch((err) => {
+          console.error("Failed to enter PiP:", err);
+          addLog(`Failed to enter Floating mode: ${err.message || err}`, "error");
           cleanupPip();
         });
-      })
-      .catch((err) => {
-        console.error("Failed to enter PiP:", err);
-        addLog(`Failed to enter Floating mode: ${err.message || err}`, "error");
-        cleanupPip();
-      });
+    } else {
+      throw new Error("Picture-in-Picture API is not supported by your browser/device.");
+    }
   } catch (err) {
     console.error("Failed to initialize PiP:", err);
     addLog(`Failed to initialize Floating mode: ${err.message || err}`, "error");
