@@ -47,6 +47,7 @@ let stats = {
   wins: 0,
   losses: 0,
   total: 0,
+  totalProfit: 0.0,
   history: []
 };
 
@@ -1780,6 +1781,9 @@ function loadStats() {
     const stored = localStorage.getItem('v75_bot_stats');
     if (stored) {
       stats = JSON.parse(stored);
+      if (stats.totalProfit === undefined) {
+        stats.totalProfit = stats.history.reduce((sum, t) => sum + (parseFloat(t.profit) || 0), 0);
+      }
       updateStatsUI();
     }
   } catch (e) {
@@ -1842,6 +1846,7 @@ function recordTrade(type, stake, profit, result) {
     stats.losses++;
   }
   stats.total++;
+  stats.totalProfit += profitNum;
   
   stats.history.unshift({
     time: timeStr,
@@ -1881,6 +1886,7 @@ if (resetStatsBtn) {
         wins: 0,
         losses: 0,
         total: 0,
+        totalProfit: 0.0,
         history: []
       };
       saveStats();
@@ -1901,6 +1907,7 @@ if (exportReportBtn) {
 🔴 Losses: ${stats.losses}
 🎯 Win Rate: ${rate}%
 💰 Net Session Profit: $${sessionProfit.toFixed(2)}
+💵 Lifetime Net Profit: $${(stats.totalProfit || 0).toFixed(2)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🚀 Join under my Deriv partner link:
 👉 https://deriv.partners/rx?sidi=9A373E8A-A450-487A-A419-064B4FE5B751&utm_campaign=dynamicworks&utm_medium=affiliate&utm_source=CU13329`;
