@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ibrahim Abdulmajid — Resume</title>
+  <style>
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+      color: #333;
+      margin: 0;
+      padding: 40px;
+      background-color: #fff;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    header {
+      border-bottom: 2px solid #333;
+      padding-bottom: 20px;
+      margin-bottom: 25px;
+    }
+    h1 {
+      margin: 0 0 5px 0;
+      font-size: 28px;
+      font-weight: 700;
+      color: #111;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 15px;
+    }
+    .contact-info {
+      font-size: 13px;
+      color: #666;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    .contact-info span {
+      display: inline-block;
+    }
+    h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #222;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 5px;
+      margin-top: 25px;
+      margin-bottom: 15px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .section-content {
+      margin-bottom: 20px;
+    }
+    .skills-grid {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 10px;
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+    .skills-label {
+      font-weight: 700;
+      color: #444;
+    }
+    .job {
+      margin-bottom: 20px;
+    }
+    .job-header {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 700;
+      font-size: 14px;
+      color: #222;
+      margin-bottom: 5px;
+    }
+    .job-title {
+      font-style: italic;
+      color: #555;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 13px;
+      color: #444;
+    }
+    li {
+      margin-bottom: 5px;
+    }
+    .education {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: #444;
+    }
+    @media print {
+      body {
+        padding: 0;
+        background-color: #fff;
+      }
+      .container {
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Ibrahim Abdulmajid</h1>
+      <div class="title">Full-Stack Software Developer &amp; Data Analyst</div>
+      <div class="contact-info">
+        <span>Abuja, Nigeria</span>
+        <span>|</span>
+        <span>ibrahim.abdulmajid@email.com</span> <!-- Update with your email -->
+        <span>|</span>
+        <span>github.com/Amphy2000</span>
+      </div>
+    </header>
+
+    <section>
+      <h2>Professional Summary</h2>
+      <div class="section-content" style="font-size: 13.5px; color: #444;">
+        Results-oriented Software Developer with hands-on experience designing, building, and deploying low-latency web applications, automated data scrapers, and serverless microservices. Strong command of backend engineering workflows, data normalization pipelines, and API integrations. Exceptionally skilled at validating datasets and optimizing application performance.
+      </div>
+    </section>
+
+    <section>
+      <h2>Technical Skills</h2>
+      <div class="section-content">
+        <div class="skills-grid">
+          <span class="skills-label">Languages:</span>
+          <span>JavaScript (ES6+), Node.js, Python, SQL, HTML5, CSS3</span>
+        </div>
+        <div class="skills-grid">
+          <span class="skills-label">Frameworks/Tools:</span>
+          <span>Vercel, Git, GitHub, Supabase, Express.js</span>
+        </div>
+        <div class="skills-grid">
+          <span class="skills-label">Databases:</span>
+          <span>PostgreSQL, SQLite</span>
+        </div>
+        <div class="skills-grid">
+          <span class="skills-label">Libraries:</span>
+          <span>Cheerio (HTML Parsing), Turndown, UA-Parser-JS, Bwip-js</span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Work Experience</h2>
+      <div class="section-content">
+        
+        <div class="job">
+          <div class="job-header">
+            <span>Independent Software Developer</span>
+            <span>2024 – Present</span>
+          </div>
+          <div class="job-title">Self-Employed / Remote Freelancing</div>
+          <ul>
+            <li>Engineered and deployed a consolidated portfolio of 19 serverless API endpoints hosted on Vercel.</li>
+            <li>Designed a catch-all gateway router mapping query strings dynamically to individual service modules, bypassing platform-level hobby runtime restrictions.</li>
+            <li>Implemented advanced validation tools including temporary email shields, real-time phone carrier detectors (VoIP mapping), IP geolocation threats parsers, and WHOIS registry scraping.</li>
+            <li>Designed asynchronous analytics trackers in Node.js connected to Supabase/PostgreSQL for fast redirect handling and visitor profiling.</li>
+          </ul>
+        </div>
+
+        <div class="job">
+          <div class="job-header">
+            <span>Technical Project Builder</span>
+            <span>2023 – 2024</span>
+          </div>
+          <div class="job-title">Personal Projects / Open Source Contributions</div>
+          <ul>
+            <li>Wrote custom web scraping engines in JavaScript (using Cheerio) to extract daily averages from public portals.</li>
+            <li>Implemented local caching mechanisms (memory caching with dynamic TTLs) to ensure sub-2ms API resolution times and protect target domains from rate limit flags.</li>
+            <li>Collaborated in testing and resolving routing bugs, building mock web fetch requests to validate schema parser integrations.</li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+    <section>
+      <h2>Education</h2>
+      <div class="section-content">
+        <div class="education">
+          <strong>Self-Taught / Open Source Development Certifications</strong>
+          <span>Ongoing</span>
+        </div>
+        <div style="font-size: 13px; color: #555; margin-top: 5px;">
+          Comprehensive studies in Backend System Design, Advanced Data Structures, API Development (REST), and Relational Database Administrations.
+        </div>
+      </div>
+    </section>
+  </div>
+
+</body>
+</html>
