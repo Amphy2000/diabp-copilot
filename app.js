@@ -99,6 +99,7 @@ const tradeHistorySection = document.getElementById('tradeHistorySection');
 const tradeHistoryBody = document.getElementById('tradeHistoryBody');
 const resetStatsBtn = document.getElementById('resetStatsBtn');
 const exportReportBtn = document.getElementById('exportReportBtn');
+const promoTemplateSelect = document.getElementById('promoTemplateSelect');
 
 // PWA Installation Elements
 let deferredPrompt = null;
@@ -1899,7 +1900,43 @@ if (resetStatsBtn) {
 if (exportReportBtn) {
   exportReportBtn.addEventListener('click', () => {
     const rate = stats.total > 0 ? ((stats.wins / stats.total) * 100).toFixed(1) : "0.0";
-    const reportText = 
+    const selectedTemplate = promoTemplateSelect ? promoTemplateSelect.value : 'raw';
+    
+    const partnerLink = "https://deriv.partners/rx?sidi=9A373E8A-A450-487A-A419-064B4FE5B751&utm_campaign=dynamicworks&utm_medium=affiliate&utm_source=CU13329";
+    
+    let reportText = "";
+    
+    if (selectedTemplate === 'social') {
+      reportText = 
+`🤖 Automated V75 Scalper Bot Update
+
+Chart setup doing the work while I go about my day. Here are the live stats from my current session:
+
+📈 Total Trades: ${stats.total}
+🟢 Wins: ${stats.wins} | 🔴 Losses: ${stats.losses}
+🎯 Win Rate: ${rate}%
+💰 Session Profit: $${sessionProfit.toFixed(2)}
+💵 Lifetime Profit: $${(stats.totalProfit || 0).toFixed(2)}
+
+Set the parameters, turn on background running, and let it scan tick trends.
+
+👉 Try the bot for free and start auto-trading here:
+${partnerLink}`;
+    } else if (selectedTemplate === 'short') {
+      reportText = 
+`⚡ V75 Scalping Session Complete! ⚡
+
+📈 Trades: ${stats.total}
+🎯 Win Rate: ${rate}%
+💰 Today's Profit: $${sessionProfit.toFixed(2)}
+
+100% automated trend scalping. Screen Wake Lock and silent background keep-alive active.
+
+👉 Get free bot access here:
+${partnerLink}`;
+    } else {
+      // Default: Raw Stats
+      reportText = 
 `🔥 AMPHY V75 SCALPER BOT PERFORMANCE REPORT 🔥
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📈 Total Trades: ${stats.total}
@@ -1910,13 +1947,14 @@ if (exportReportBtn) {
 💵 Lifetime Net Profit: $${(stats.totalProfit || 0).toFixed(2)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🚀 Join under my Deriv partner link:
-👉 https://deriv.partners/rx?sidi=9A373E8A-A450-487A-A419-064B4FE5B751&utm_campaign=dynamicworks&utm_medium=affiliate&utm_source=CU13329`;
+👉 ${partnerLink}`;
+    }
     
     navigator.clipboard.writeText(reportText).then(() => {
-      const originalText = exportReportBtn.innerText;
+      const originalText = exportReportBtn.innerHTML;
       exportReportBtn.innerText = "Copied! ✅";
       setTimeout(() => {
-        exportReportBtn.innerText = originalText;
+        exportReportBtn.innerHTML = originalText;
       }, 2000);
     }).catch(err => {
       console.error("Failed to copy report:", err);

@@ -241,9 +241,16 @@
         </div>
         
         <div id="tradeHistorySection" class="history-card hidden">
-          <div class="history-actions flex-row-between margin-bottom-sm" style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="history-actions flex-row-between margin-bottom-sm" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
             <h4 style="margin: 0; font-size: 0.85rem;">Trade History</h4>
-            <button id="exportReportBtn" class="btn btn-primary btn-xs" style="padding: 2px 6px; font-size: 10px;">📤 Copy Promo Report</button>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <select id="promoTemplateSelect" style="background: rgba(15, 23, 42, 0.6); color: var(--text-light); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 4px; padding: 2px 4px; font-size: 10px; cursor: pointer; outline: none; height: 22px;">
+                <option value="raw">Raw Stats 📊</option>
+                <option value="social">Social Hook 🤖</option>
+                <option value="short">Status Hook ⚡</option>
+              </select>
+              <button id="exportReportBtn" class="btn btn-primary btn-xs" style="padding: 2px 6px; font-size: 10px; height: 22px; display: flex; align-items: center;">📤 Copy Promo Report</button>
+            </div>
           </div>
           <div class="table-container">
             <table class="history-table">
