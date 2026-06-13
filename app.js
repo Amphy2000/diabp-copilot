@@ -742,7 +742,7 @@ async function loadAdminAnalytics() {
       });
       const sessions = sessionsRes.ok ? await sessionsRes.json() : [];
 
-      const allRes = await fetch(`${SUPABASE_URL}/rest/v1/bot_sessions?select=account_id,traded_volume,trades_count`, {
+      const allRes = await fetch(`${SUPABASE_URL}/rest/v1/bot_sessions?select=account_id,traded_volume,trades_count,is_demo`, {
         headers: {
           'apikey': SUPABASE_ANON_KEY,
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
@@ -755,8 +755,11 @@ async function loadAdminAnalytics() {
       const uniqueUsers = new Set();
 
       allData.forEach(row => {
-        totalVolume += parseFloat(row.traded_volume || 0);
-        totalTrades += parseInt(row.trades_count || 0);
+        // Only sum volume and trades for REAL accounts to prevent demo play money from polluting statistics
+        if (row.is_demo === false || row.is_demo === 'false') {
+          totalVolume += parseFloat(row.traded_volume || 0);
+          totalTrades += parseInt(row.trades_count || 0);
+        }
         if (row.account_id) {
           uniqueUsers.add(row.account_id.trim().toUpperCase());
         }
