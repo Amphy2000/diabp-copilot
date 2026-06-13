@@ -218,22 +218,22 @@ window.addEventListener('DOMContentLoaded', async () => {
       const { accounts, appId } = await fetchAccountsWithFallback(accessToken);
       
       // Select preferred account: VRTC (demo) if present, otherwise the first account
-      const demoAcct = accounts.find(a => a.id.toUpperCase().startsWith('VRTC'));
+      const demoAcct = accounts.find(a => a.account_id && a.account_id.toUpperCase().startsWith('VRTC'));
       const targetAcct = demoAcct || accounts[0];
 
       // Check if whitelisted
-      const isApproved = await isAccountApproved(targetAcct.id);
+      const isApproved = await isAccountApproved(targetAcct.account_id);
       if (!isApproved) {
-        alert(`⚠️ ACCESS DENIED\nYour account (${targetAcct.id}) is not white-listed.\n\nPlease contact the admin to activate access.`);
+        alert(`⚠️ ACCESS DENIED\nYour account (${targetAcct.account_id}) is not white-listed.\n\nPlease contact the admin to activate access.`);
         logout();
         return;
       }
 
       localStorage.setItem('deriv_token', accessToken);
-      localStorage.setItem('deriv_acct', targetAcct.id);
+      localStorage.setItem('deriv_acct', targetAcct.account_id);
       localStorage.setItem('deriv_app_id', appId);
 
-      addLog(`OAuth login successful for account ${targetAcct.id}`, "success");
+      addLog(`OAuth login successful for account ${targetAcct.account_id}`, "success");
     } catch (err) {
       addLog(`OAuth error: ${err.message}`, "error");
       alert(`OAuth login failed: ${err.message}`);
@@ -354,80 +354,20 @@ loginBtn.addEventListener('click', async () => {
   }
 });
 
-// Manual API Token connection (supports both standard and new PAT tokens)
-const connectTokenBtn = document.getElementById('connectTokenBtn');
-const tokenInput = document.getElementById('tokenInput');
-
-if (connectTokenBtn && tokenInput) {
-  connectTokenBtn.addEventListener('click', async () => {
-    const token = tokenInput.value.trim();
-    if (!token) {
-      alert("Please enter a valid Deriv API Token.");
-      return;
-    }
-    
-    // Disable button to show connecting state
-    connectTokenBtn.innerText = "Connecting...";
-    connectTokenBtn.disabled = true;
-    
-    // If it is a Personal Access Token (starts with pat_)
-    if (token.startsWith('pat_')) {
-      try {
-        addLog("Validating Personal Access Token (PAT)...", "info");
-        const { accounts, appId } = await fetchAccountsWithFallback(token);
-        
-        // Find preferred account
-        const demoAcct = accounts.find(a => a.id.toUpperCase().startsWith('VRTC'));
-        const targetAcct = demoAcct || accounts[0];
-
-        // Check whitelist
-        const isApproved = await isAccountApproved(targetAcct.id);
-        if (!isApproved) {
-          alert(`⚠️ ACCESS DENIED\nYour account (${targetAcct.id}) is not white-listed.\n\nPlease contact the admin to activate access.`);
-          connectTokenBtn.innerText = "Connect with Token";
-          connectTokenBtn.disabled = false;
-          return;
-        }
-
-        localStorage.setItem('deriv_token', token);
-        localStorage.setItem('deriv_acct', targetAcct.id);
-        localStorage.setItem('deriv_app_id', appId);
-
-        addLog(`PAT authenticated for account ${targetAcct.id}`, "success");
-        checkAuth();
-      } catch (err) {
-        addLog(`PAT Authentication Error: ${err.message}`, "error");
-        alert(`PAT authentication failed: ${err.message}`);
-        connectTokenBtn.innerText = "Connect with Token";
-        connectTokenBtn.disabled = false;
-      }
-    } else {
-      // Legacy API token
-      localStorage.setItem('deriv_token', token);
-      localStorage.removeItem('deriv_app_id'); // clear any OAuth-based App ID
-      connectWebSocket(true); // pass true indicating it is a manual login attempt
-    }
-  });
-}
+// Manual token connection fields (removed from index.html)
+const connectTokenBtn = null;
+const tokenInput = null;
 
 logoutBtn.addEventListener('click', logout);
 
 function logout() {
   localStorage.removeItem('deriv_token');
   localStorage.removeItem('deriv_acct');
+  localStorage.removeItem('deriv_app_id');
   isTrading = false;
   isAuthorized = false;
   if (socket) {
     socket.close();
-  }
-  
-  // Reset token button state in case we logged out
-  if (connectTokenBtn) {
-    connectTokenBtn.innerText = "Connect with Token";
-    connectTokenBtn.disabled = false;
-  }
-  if (tokenInput) {
-    tokenInput.value = "";
   }
   
   checkAuth();
