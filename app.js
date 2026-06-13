@@ -67,8 +67,14 @@ const adminWhitelistInput = document.getElementById('adminWhitelistInput');
 const adminWhitelistBtn = document.getElementById('adminWhitelistBtn');
 const adminFeedback = document.getElementById('adminFeedback');
 
+// PWA Installation Elements
+let deferredPrompt = null;
+const pwaInstallBanner = document.getElementById('pwaInstallBanner');
+const pwaInstallBtn = document.getElementById('pwaInstallBtn');
+
 // Push Notification Elements & Functions
 const notificationCheckbox = document.getElementById('notificationCheckbox');
+
 
 function requestNotificationPermission() {
   if (!("Notification" in window)) return;
@@ -82,16 +88,32 @@ function requestNotificationPermission() {
 }
 
 function sendPushNotification(title, body) {
-  if (!("Notification" in window)) return;
   const isEnabled = notificationCheckbox ? notificationCheckbox.checked : true;
-  if (isEnabled && Notification.permission === "granted") {
-    try {
-      new Notification(title, {
-        body: body,
-        icon: window.location.origin + '/favicon.svg'
+  if (!isEnabled) return;
+
+  if (Notification.permission === "granted") {
+    // 1. Attempt sending via Service Worker (required for Mobile support)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then(registration => {
+        registration.showNotification(title, {
+          body: body,
+          icon: window.location.origin + '/favicon.svg',
+          badge: window.location.origin + '/favicon.svg',
+          vibrate: [200, 100, 200]
+        });
+      }).catch(err => {
+        // Fallback to standard desktop notification if SW is not ready
+        if ("Notification" in window) {
+          new Notification(title, { body: body, icon: window.location.origin + '/favicon.svg' });
+        }
       });
-    } catch (err) {
-      console.warn("Failed to send notification:", err);
+    } else if ("Notification" in window) {
+      // 2. Direct browser fallback for desktops without SW support
+      try {
+        new Notification(title, { body: body, icon: window.location.origin + '/favicon.svg' });
+      } catch (err) {
+        console.warn("Direct Notification constructor failed:", err);
+      }
     }
   }
 }
@@ -193,11 +215,21 @@ async function fetchAccountsWithFallback(token) {
 window.addEventListener('DOMContentLoaded', async () => {
   const urlParams = new URLSearchParams(window.location.search);
   
-  // 1. Check for legacy OAuth credentials
+  // 1. Check for legacy OAuth credentials (and parse all account tokens in redirect)
   const legacyToken = urlParams.get('token1');
   const legacyAcct = urlParams.get('acct1');
 
   if (legacyToken && legacyAcct) {
+    const tokensMap = {};
+    let idx = 1;
+    while (urlParams.get(`acct${idx}`) && urlParams.get(`token${idx}`)) {
+      const acctId = urlParams.get(`acct${idx}`).trim().toUpperCase();
+      const tokenVal = urlParams.get(`token${idx}`).trim();
+      tokensMap[acctId] = tokenVal;
+      idx++;
+    }
+    localStorage.setItem('deriv_tokens_map', JSON.stringify(tokensMap));
+
     localStorage.setItem('deriv_token', legacyToken);
     localStorage.setItem('deriv_acct', legacyAcct);
     localStorage.removeItem('deriv_app_id'); // clear any OAuth-based App ID
@@ -296,6 +328,15 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Clear session storage
     sessionStorage.removeItem('oauth_state');
     sessionStorage.removeItem('code_verifier');
+  }
+
+  // Register service worker for PWA support and mobile push notifications
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').then(reg => {
+      console.log('Service Worker registered scope:', reg.scope);
+    }).catch(err => {
+      console.error('Service Worker registration failed:', err);
+    });
   }
 
   checkAuth();
@@ -407,6 +448,20 @@ if (accountSelect) {
     
     if (isTrading) {
       stopTrading("Account switched");
+    }
+
+    // Load account-specific token from map if it exists
+    try {
+      const storedMap = localStorage.getItem('deriv_tokens_map');
+      if (storedMap) {
+        const tokensMap = JSON.parse(storedMap);
+        const matchedToken = tokensMap[selectedAcct.trim().toUpperCase()];
+        if (matchedToken) {
+          localStorage.setItem('deriv_token', matchedToken);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to retrieve token from map:", err);
     }
     
     localStorage.setItem('deriv_acct', selectedAcct);
@@ -1164,3 +1219,42 @@ function updateProfitDisplay() {
     profitText.className = "metric-value profit-neutral";
   }
 }
+
+// ════════════════════════════════════════════
+//             PWA INSTALLATION LOGIC
+// ════════════════════════════════════════════
+window.addEventListener('beforeinstallprompt', (e) => {
+  // Prevent Chrome 67 and earlier from automatically showing the prompt
+  e.preventDefault();
+  // Stash the event so it can be triggered later.
+  deferredPrompt = e;
+  // Update UI notify the user they can install the PWA
+  if (pwaInstallBanner) {
+    pwaInstallBanner.classList.remove('hidden');
+  }
+});
+
+if (pwaInstallBtn) {
+  pwaInstallBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    // Show the install prompt
+    deferredPrompt.prompt();
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User response to install prompt: ${outcome}`);
+    // We've used the prompt, so we can't use it again
+    deferredPrompt = null;
+    // Hide the install banner
+    if (pwaInstallBanner) {
+      pwaInstallBanner.classList.add('hidden');
+    }
+  });
+}
+
+window.addEventListener('appinstalled', (evt) => {
+  console.log('Amphy V75 Scalper Bot installed successfully!');
+  if (pwaInstallBanner) {
+    pwaInstallBanner.classList.add('hidden');
+  }
+});
+

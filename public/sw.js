@@ -1,54 +1,72 @@
+const CACHE_NAME = 'amphy-v75-bot-cache-v1';
+const ASSETS_TO_CACHE = [
+  '/',
+  '/index.html',
+  '/style.css',
+  '/app.js',
+  '/favicon.svg',
+  '/manifest.json'
+];
 
-self.addEventListener('push', function(event) {
-  let data = { title: '🔥 ELITE PICK ALERT', body: 'New high-confidence banker available!' };
-  try {
-    data = event.data.json();
-  } catch (e) {
-    console.log('Push data is not JSON, using default');
-  }
-
-  const options = {
-    body: data.body,
-    icon: '/favicon.ico',
-    badge: '/favicon.ico',
-    vibrate: [200, 100, 200, 100, 200, 100, 400],
-    tag: 'elite-alert',
-    renotify: true,
-    requireInteraction: true,
-    data: {
-      url: 'https://amphyaipredictor.vercel.app'
-    },
-    actions: [
-      { action: 'open', title: 'VIEW BANKER 🚀' }
-    ]
-  };
-
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    self.registration.showNotification(data.title, options)
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(ASSETS_TO_CACHE).catch(err => {
+        console.warn('Caching assets during install failed:', err);
+      });
+    })
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
+      );
+    })
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET' || event.request.url.includes('/api/')) {
+    return;
+  }
+  event.respondWith(
+    fetch(event.request).catch(() => {
+      return caches.match(event.request);
+    })
   );
 });
 
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
-  if (event.action === 'open' || !event.action) {
-    event.waitUntil(
-      clients.openWindow(event.notification.data.url)
-    );
-  }
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+      if (clientList.length > 0) {
+        return clientList[0].focus();
+      }
+      return clients.openWindow('/');
+    })
+  );
 });
 
-// Logic for foreground notifications (when app is open)
+// Mobile Push Notifications Support
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
     const { title, body } = event.data;
     const options = {
       body,
-      icon: '/favicon.ico',
-      badge: '/favicon.ico',
+      icon: '/favicon.svg',
+      badge: '/favicon.svg',
       vibrate: [200, 100, 200],
-      tag: 'elite-alert',
-      requireInteraction: true,
-      data: { url: 'https://amphyaipredictor.vercel.app' }
+      tag: 'v75-bot-alert'
     };
     self.registration.showNotification(title, options);
   }

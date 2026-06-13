@@ -9,9 +9,17 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 </head>
 <body>
   <div class="app-container">
+    
+    <!-- PWA Install Banner -->
+    <div id="pwaInstallBanner" class="pwa-banner hidden">
+      <span>📱 Install Amphy Bot on your home screen for quick access!</span>
+      <button id="pwaInstallBtn" class="btn btn-sm">Install</button>
+    </div>
     
     <!-- ═══════ LOGIN PANEL ═══════ -->
     <div id="loginPanel" class="glass-panel active">
