@@ -91,6 +91,7 @@ const statsLosses = document.getElementById('statsLosses');
 const statsWinRate = document.getElementById('statsWinRate');
 const statsTotal = document.getElementById('statsTotal');
 const toggleHistoryBtn = document.getElementById('toggleHistoryBtn');
+const pipBtn = document.getElementById('pipBtn');
 const tradeHistorySection = document.getElementById('tradeHistorySection');
 const tradeHistoryBody = document.getElementById('tradeHistoryBody');
 const resetStatsBtn = document.getElementById('resetStatsBtn');
@@ -1838,11 +1839,171 @@ if (exportReportBtn) {
       setTimeout(() => {
         exportReportBtn.innerText = originalText;
       }, 2000);
-      addLog("Promo report copied to clipboard!", "success");
     }).catch(err => {
       console.error("Failed to copy report:", err);
     });
   });
 }
 
+function startPipMode() {
+  addLog("Initializing Floating Bot (Picture-in-Picture)...", "info");
 
+  // Create Canvas
+  pipCanvasElement = document.createElement('canvas');
+  pipCanvasElement.width = 320;
+  pipCanvasElement.height = 180;
+  const ctx = pipCanvasElement.getContext('2d');
+
+  // Draw initial state
+  drawPipCanvas(ctx);
+
+  // Setup video element
+  pipVideoElement = document.createElement('video');
+  pipVideoElement.width = 320;
+  pipVideoElement.height = 180;
+  pipVideoElement.autoplay = true;
+  pipVideoElement.muted = true;
+  pipVideoElement.playsInline = true;
+  
+  // Hide video off-screen
+  pipVideoElement.style.position = 'absolute';
+  pipVideoElement.style.left = '-9999px';
+  pipVideoElement.style.top = '-9999px';
+  pipVideoElement.style.width = '1px';
+  pipVideoElement.style.height = '1px';
+  pipVideoElement.style.pointerEvents = 'none';
+  document.body.appendChild(pipVideoElement);
+
+  // Capture stream from canvas (5 FPS is battery-friendly)
+  const stream = pipCanvasElement.captureStream(5);
+  pipVideoElement.srcObject = stream;
+
+  pipVideoElement.onloadedmetadata = () => {
+    pipVideoElement.play()
+      .then(() => {
+        pipVideoElement.requestPictureInPicture()
+          .then((pipWindow) => {
+            addLog("Floating Bot active! You can now minimize the app.", "success");
+            sendPushNotification("📺 Floating Bot Active", "The bot will continue trading in background.");
+            
+            // Set up drawing interval
+            pipDrawInterval = setInterval(() => {
+              drawPipCanvas(ctx);
+            }, 200);
+
+            // Handle PiP Window close
+            pipVideoElement.addEventListener('leavepictureinpicture', () => {
+              cleanupPip();
+            });
+          })
+          .catch((err) => {
+            console.error("Failed to enter PiP:", err);
+            addLog(`Failed to enter Floating mode: ${err.message}`, "error");
+            cleanupPip();
+          });
+      })
+      .catch((err) => {
+        console.error("Failed to play PiP video:", err);
+        addLog("Failed to play background stream.", "error");
+        cleanupPip();
+      });
+  };
+}
+
+function drawPipCanvas(ctx) {
+  // Draw background (dark-blue)
+  ctx.fillStyle = '#0a0e17';
+  ctx.fillRect(0, 0, 320, 180);
+
+  // Draw border
+  ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(2, 2, 316, 176);
+
+  // 1. Header: Bot Title & Status Dot
+  ctx.font = 'bold 15px sans-serif';
+  ctx.fillStyle = '#38bdf8'; // Cyan
+  ctx.fillText('⚡ AMPHY BOT V75', 20, 30);
+
+  // Draw status dot
+  const isActive = isTrading;
+  ctx.fillStyle = isActive ? '#10b981' : '#94a3b8'; // Green if trading, gray if idle
+  ctx.beginPath();
+  ctx.arc(290, 25, 6, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  // Status label
+  ctx.font = 'bold 10px sans-serif';
+  ctx.fillStyle = isActive ? '#10b981' : '#94a3b8';
+  ctx.fillText(isActive ? 'RUNNING' : 'IDLE', 240, 28);
+
+  // Divider line
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+  ctx.beginPath();
+  ctx.moveTo(20, 42);
+  ctx.lineTo(300, 42);
+  ctx.stroke();
+
+  // 2. Price Section
+  ctx.font = '12px sans-serif';
+  ctx.fillStyle = '#94a3b8';
+  ctx.fillText('Live V75 Price:', 20, 65);
+
+  const priceStr = livePrice ? livePrice.innerText : '—';
+  const priceColor = livePrice && livePrice.classList.contains('up') ? '#10b981' : (livePrice && livePrice.classList.contains('down') ? '#f43f5e' : '#f8fafc');
+  ctx.font = 'bold 22px monospace';
+  ctx.fillStyle = priceColor;
+  ctx.fillText(priceStr, 20, 92);
+
+  // 3. Profit Section
+  ctx.font = '12px sans-serif';
+  ctx.fillStyle = '#94a3b8';
+  ctx.fillText('Session Profit:', 180, 65);
+
+  const profitStr = profitText ? profitText.innerText : '$0.00';
+  const profitColor = sessionProfit > 0 ? '#10b981' : (sessionProfit < 0 ? '#f43f5e' : '#f8fafc');
+  ctx.font = 'bold 18px sans-serif';
+  ctx.fillStyle = profitColor;
+  ctx.fillText(profitStr, 180, 90);
+
+  // 4. Trend & RSI Indicator Info
+  const trendStr = trendLabel ? trendLabel.innerText.replace('Trend: ', '') : 'Analyzing...';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.fillStyle = '#e2e8f0';
+  ctx.fillText(`📊 ${trendStr}`, 20, 122);
+
+  // 5. Bot State / Execution status
+  const botStateStr = statusText ? statusText.innerText : 'Idle';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.fillStyle = botStateStr.includes('Executing') || botStateStr.includes('Proposing') ? '#fbbf24' : '#94a3b8';
+  ctx.fillText(`🤖 State: ${botStateStr}`, 20, 142);
+
+  // 6. Stats Summary
+  const winRateStr = statsWinRate ? statsWinRate.innerText : '0%';
+  const totalTradesStr = statsTotal ? statsTotal.innerText : '0';
+  ctx.font = '10px sans-serif';
+  ctx.fillStyle = '#94a3b8';
+  ctx.fillText(`Wins: ${statsWins?.innerText || 0} | Losses: ${statsLosses?.innerText || 0} | WR: ${winRateStr} | Trades: ${totalTradesStr}`, 20, 162);
+}
+
+function cleanupPip() {
+  addLog("Exited Floating Bot mode.", "info");
+  if (pipDrawInterval) {
+    clearInterval(pipDrawInterval);
+    pipDrawInterval = null;
+  }
+  if (pipVideoElement) {
+    if (pipVideoElement.parentNode) {
+      pipVideoElement.parentNode.removeChild(pipVideoElement);
+    }
+    pipVideoElement = null;
+  }
+  pipCanvasElement = null;
+}
+
+// Bind PiP triggers if supported
+const supportsPiP = 'pictureInPictureEnabled' in document && typeof HTMLVideoElement.prototype.requestPictureInPicture === 'function';
+if (supportsPiP && pipBtn) {
+  pipBtn.classList.remove('hidden');
+  pipBtn.addEventListener('click', startPipMode);
+}
