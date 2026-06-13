@@ -218,42 +218,56 @@ function connectWebSocket(isLoginAttempt = false) {
   // If the configured APP_ID is alphanumeric (e.g. '33xCanrA7...'), we fallback to '61247' for the socket connection.
   const wsAppId = /^\d+$/.test(APP_ID) ? APP_ID : '61247';
   
-  socket = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${wsAppId}`);
+  const primaryUrl = `wss://ws.derivws.com/websockets/v3?app_id=${wsAppId}`;
+  let primaryFailed = false;
 
-  socket.onopen = () => {
-    addLog("Socket connected. Authorizing...", "info");
-    const token = localStorage.getItem('deriv_token');
-    
-    // Authorize socket connection
-    socket.send(JSON.stringify({
-      authorize: token
-    }));
-  };
+  function attemptConnection(url) {
+    socket = new WebSocket(url);
 
-  socket.onclose = () => {
-    addLog("WebSocket disconnected.", "warn");
-    isAuthorized = false;
-    if (isTrading) {
-      stopTrading("Disconnect event detected.");
-    }
-  };
+    socket.onopen = () => {
+      addLog("Socket connected. Authorizing...", "info");
+      const token = localStorage.getItem('deriv_token');
+      socket.send(JSON.stringify({ authorize: token }));
+    };
 
-  socket.onerror = (error) => {
-    console.error("WS Error:", error);
-    addLog("Network connection error encountered.", "error");
-    if (isLoginAttempt) {
-      alert("Failed to connect to Deriv WebSocket server.");
-      if (connectTokenBtn) {
-        connectTokenBtn.innerText = "Connect with Token";
-        connectTokenBtn.disabled = false;
+    socket.onclose = () => {
+      // If primary connection failed, do not trigger trading halts or logs yet
+      if (!primaryFailed && url === primaryUrl) return;
+      
+      addLog("WebSocket disconnected.", "warn");
+      isAuthorized = false;
+      if (isTrading) {
+        stopTrading("Disconnect event detected.");
       }
-    }
-  };
+    };
 
-  socket.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    handleMessage(data, isLoginAttempt);
-  };
+    socket.onerror = (error) => {
+      console.error(`WS Connection Error on ${url}:`, error);
+      
+      if (!primaryFailed && url === primaryUrl) {
+        primaryFailed = true;
+        addLog("Primary server connection failed. Retrying legacy server...", "warn");
+        const fallbackUrl = `wss://ws.binaryws.com/websockets/v3?app_id=${wsAppId}`;
+        attemptConnection(fallbackUrl);
+      } else {
+        addLog("Network connection error encountered.", "error");
+        if (isLoginAttempt) {
+          alert("Failed to connect to Deriv WebSocket server. Please check your network or try again.");
+          if (connectTokenBtn) {
+            connectTokenBtn.innerText = "Connect with Token";
+            connectTokenBtn.disabled = false;
+          }
+        }
+      }
+    };
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      handleMessage(data, isLoginAttempt);
+    };
+  }
+
+  attemptConnection(primaryUrl);
 }
 
 // ════════════════════════════════════════════
