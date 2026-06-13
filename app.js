@@ -214,11 +214,7 @@ function logout() {
 function connectWebSocket(isLoginAttempt = false) {
   addLog("Connecting to Deriv WebSocket server...", "info");
   
-  // Deriv WebSocket server strictly requires a numeric App ID.
-  // If the configured APP_ID is alphanumeric (e.g. '33xCanrA7...'), we fallback to '61247' for the socket connection.
-  const wsAppId = /^\d+$/.test(APP_ID) ? APP_ID : '61247';
-  
-  const primaryUrl = `wss://ws.derivws.com/websockets/v3?app_id=${wsAppId}`;
+  const primaryUrl = `wss://ws.derivws.com/websockets/v3?app_id=${APP_ID}`;
   let primaryFailed = false;
 
   function attemptConnection(url) {
@@ -247,7 +243,7 @@ function connectWebSocket(isLoginAttempt = false) {
       if (!primaryFailed && url === primaryUrl) {
         primaryFailed = true;
         addLog("Primary server connection failed. Retrying legacy server...", "warn");
-        const fallbackUrl = `wss://ws.binaryws.com/websockets/v3?app_id=${wsAppId}`;
+        const fallbackUrl = `wss://ws.binaryws.com/websockets/v3?app_id=${APP_ID}`;
         attemptConnection(fallbackUrl);
       } else {
         addLog("Network connection error encountered.", "error");
