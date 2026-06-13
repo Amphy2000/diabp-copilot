@@ -10,6 +10,7 @@ const APP_ID = import.meta.env.VITE_DERIV_APP_ID || '61247';
 const APPROVED_ACCOUNTS = [
   'VRTC123456',  // Example Virtual account
   'CR123456',    // Example Real account
+  'ROT91833970', // User account
   // Add your clients' account IDs here as they sign up under your link
 ];
 
