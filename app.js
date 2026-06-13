@@ -58,6 +58,7 @@ const accountSelect = document.getElementById('accountSelect');
 const balanceText = document.getElementById('balanceText');
 const profitText = document.getElementById('profitText');
 const livePrice = document.getElementById('livePrice');
+const trendLabel = document.getElementById('trendLabel');
 const tickDirection = document.getElementById('tickDirection');
 const logConsole = document.getElementById('logConsole');
 const startBotBtn = document.getElementById('startBotBtn');
@@ -1258,7 +1259,6 @@ function processTick(tick) {
     trendStr += ` | RSI: ${rsi14.toFixed(1)}${rsiCondition}`;
   }
   
-  const trendLabel = document.getElementById('trendLabel');
   if (trendLabel) {
     trendLabel.innerText = `Trend: ${trendStr}`;
     trendLabel.style.color = trendColor;
@@ -1848,60 +1848,85 @@ if (exportReportBtn) {
 function startPipMode() {
   addLog("Initializing Floating Bot (Picture-in-Picture)...", "info");
 
-  // Create Canvas
-  pipCanvasElement = document.createElement('canvas');
-  pipCanvasElement.width = 320;
-  pipCanvasElement.height = 180;
-  const ctx = pipCanvasElement.getContext('2d');
+  try {
+    // Create Canvas
+    pipCanvasElement = document.createElement('canvas');
+    pipCanvasElement.width = 320;
+    pipCanvasElement.height = 180;
+    const ctx = pipCanvasElement.getContext('2d');
 
-  // Draw initial state
-  drawPipCanvas(ctx);
+    // Draw initial state
+    drawPipCanvas(ctx);
 
-  // Setup video element
-  pipVideoElement = document.createElement('video');
-  pipVideoElement.width = 320;
-  pipVideoElement.height = 180;
-  pipVideoElement.autoplay = true;
-  pipVideoElement.muted = true;
-  pipVideoElement.playsInline = true;
-  
-  // Hide video off-screen
-  pipVideoElement.style.position = 'absolute';
-  pipVideoElement.style.left = '-9999px';
-  pipVideoElement.style.top = '-9999px';
-  pipVideoElement.style.width = '1px';
-  pipVideoElement.style.height = '1px';
-  pipVideoElement.style.pointerEvents = 'none';
-  document.body.appendChild(pipVideoElement);
+    // Setup video element
+    pipVideoElement = document.createElement('video');
+    pipVideoElement.width = 320;
+    pipVideoElement.height = 180;
+    pipVideoElement.autoplay = true;
+    pipVideoElement.muted = true;
+    pipVideoElement.playsInline = true;
+    
+    // Hide video off-screen
+    pipVideoElement.style.position = 'absolute';
+    pipVideoElement.style.left = '-9999px';
+    pipVideoElement.style.top = '-9999px';
+    pipVideoElement.style.width = '320px';
+    pipVideoElement.style.height = '180px';
+    pipVideoElement.style.pointerEvents = 'none';
+    document.body.appendChild(pipVideoElement);
 
-  // Capture stream from canvas (5 FPS is battery-friendly)
-  const stream = pipCanvasElement.captureStream(5);
-  pipVideoElement.srcObject = stream;
+    // Capture stream from canvas (fallback to webkitCaptureStream if needed)
+    let captureMethod = null;
+    if (typeof pipCanvasElement.captureStream === 'function') {
+      captureMethod = pipCanvasElement.captureStream;
+    } else if (typeof pipCanvasElement.webkitCaptureStream === 'function') {
+      captureMethod = pipCanvasElement.webkitCaptureStream;
+    }
 
-  // Play and then request PiP directly without waiting for loadedmetadata
-  pipVideoElement.play()
-    .then(() => {
-      return pipVideoElement.requestPictureInPicture();
-    })
-    .then((pipWindow) => {
-      addLog("Floating Bot active! You can now minimize the app.", "success");
-      sendPushNotification("📺 Floating Bot Active", "The bot will continue trading in background.");
-      
-      // Set up drawing interval
-      pipDrawInterval = setInterval(() => {
-        drawPipCanvas(ctx);
-      }, 200);
+    if (!captureMethod) {
+      throw new Error("Your browser does not support canvas video streaming.");
+    }
 
-      // Handle PiP Window close
-      pipVideoElement.addEventListener('leavepictureinpicture', () => {
+    const stream = captureMethod.call(pipCanvasElement);
+    pipVideoElement.srcObject = stream;
+
+    // Play and then request PiP directly without waiting for loadedmetadata
+    pipVideoElement.play()
+      .then(() => {
+        if (typeof pipVideoElement.requestPictureInPicture === 'function') {
+          return pipVideoElement.requestPictureInPicture();
+        } else {
+          throw new Error("Picture-in-Picture API is not supported by your browser/device.");
+        }
+      })
+      .then((pipWindow) => {
+        addLog("Floating Bot active! You can now minimize the app.", "success");
+        sendPushNotification("📺 Floating Bot Active", "The bot will continue trading in background.");
+        
+        // Set up drawing interval
+        pipDrawInterval = setInterval(() => {
+          try {
+            drawPipCanvas(ctx);
+          } catch (e) {
+            console.error("Error drawing PiP Canvas:", e);
+          }
+        }, 200);
+
+        // Handle PiP Window close
+        pipVideoElement.addEventListener('leavepictureinpicture', () => {
+          cleanupPip();
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to enter PiP:", err);
+        addLog(`Failed to enter Floating mode: ${err.message || err}`, "error");
         cleanupPip();
       });
-    })
-    .catch((err) => {
-      console.error("Failed to enter PiP:", err);
-      addLog(`Failed to enter Floating mode: ${err.message}`, "error");
-      cleanupPip();
-    });
+  } catch (err) {
+    console.error("Failed to initialize PiP:", err);
+    addLog(`Failed to initialize Floating mode: ${err.message || err}`, "error");
+    cleanupPip();
+  }
 }
 
 function drawPipCanvas(ctx) {
