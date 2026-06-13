@@ -163,6 +163,27 @@ loginBtn.addEventListener('click', () => {
   window.location.href = oauthUrl;
 });
 
+// Manual API Token connection
+const connectTokenBtn = document.getElementById('connectTokenBtn');
+const tokenInput = document.getElementById('tokenInput');
+
+if (connectTokenBtn && tokenInput) {
+  connectTokenBtn.addEventListener('click', () => {
+    const token = tokenInput.value.trim();
+    if (!token) {
+      alert("Please enter a valid Deriv API Token.");
+      return;
+    }
+    
+    // Disable button to show connecting state
+    connectTokenBtn.innerText = "Connecting...";
+    connectTokenBtn.disabled = true;
+    
+    localStorage.setItem('deriv_token', token);
+    connectWebSocket(true); // pass true indicating it is a manual login attempt
+  });
+}
+
 logoutBtn.addEventListener('click', logout);
 
 function logout() {
@@ -173,6 +194,16 @@ function logout() {
   if (socket) {
     socket.close();
   }
+  
+  // Reset token button state in case we logged out
+  if (connectTokenBtn) {
+    connectTokenBtn.innerText = "Connect with Token";
+    connectTokenBtn.disabled = false;
+  }
+  if (tokenInput) {
+    tokenInput.value = "";
+  }
+  
   checkAuth();
 }
 
@@ -180,7 +211,7 @@ function logout() {
 //             WEBSOCKET CLIENT
 // ════════════════════════════════════════════
 
-function connectWebSocket() {
+function connectWebSocket(isLoginAttempt = false) {
   addLog("Connecting to Deriv WebSocket server...", "info");
   
   socket = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${APP_ID}`);
@@ -206,11 +237,18 @@ function connectWebSocket() {
   socket.onerror = (error) => {
     console.error("WS Error:", error);
     addLog("Network connection error encountered.", "error");
+    if (isLoginAttempt) {
+      alert("Failed to connect to Deriv WebSocket server.");
+      if (connectTokenBtn) {
+        connectTokenBtn.innerText = "Connect with Token";
+        connectTokenBtn.disabled = false;
+      }
+    }
   };
 
   socket.onmessage = (event) => {
     const data = JSON.parse(event.data);
-    handleMessage(data);
+    handleMessage(data, isLoginAttempt);
   };
 }
 
@@ -218,16 +256,55 @@ function connectWebSocket() {
 //             INCOMING MESSAGES
 // ════════════════════════════════════════════
 
-function handleMessage(data) {
+async function handleMessage(data, isLoginAttempt = false) {
   const msgType = data.msg_type;
 
   if (msgType === 'authorize') {
     if (data.error) {
       addLog(`Authorization failed: ${data.error.message}`, "error");
+      if (isLoginAttempt) {
+        alert(`Failed to authorize: ${data.error.message}`);
+        if (connectTokenBtn) {
+          connectTokenBtn.innerText = "Connect with Token";
+          connectTokenBtn.disabled = false;
+        }
+      }
       logout();
     } else {
+      const acct = data.authorize.loginid;
+      
+      // Check if account is in the white-list (via Supabase or local fallback)
+      const isApproved = await isAccountApproved(acct);
+
+      if (!isApproved) {
+        alert(`⚠️ ACCESS DENIED\nYour account (${acct}) is not white-listed.\n\nPlease contact the admin to activate access.`);
+        if (isLoginAttempt && connectTokenBtn) {
+          connectTokenBtn.innerText = "Connect with Token";
+          connectTokenBtn.disabled = false;
+        }
+        logout();
+        return;
+      }
+
+      // Successfully authorized & whitelisted
+      localStorage.setItem('deriv_acct', acct);
       isAuthorized = true;
       addLog("Successfully Authorized!", "success");
+      
+      // Display trading console
+      loginPanel.classList.remove('active');
+      consolePanel.classList.add('active');
+      
+      accountID.innerText = acct;
+      if (acct.toUpperCase().startsWith('VRTC')) {
+        accountLabel.innerText = "Virtual Account";
+        accountLabel.style.background = "rgba(56, 189, 248, 0.1)";
+        accountLabel.style.color = "var(--color-primary)";
+      } else {
+        accountLabel.innerText = "Real Account";
+        accountLabel.style.background = "rgba(16, 185, 129, 0.1)";
+        accountLabel.style.color = "var(--color-success)";
+      }
       
       // Update Balance
       const balance = data.authorize.balance;
@@ -247,6 +324,7 @@ function handleMessage(data) {
       }));
     }
   }
+
 
   else if (msgType === 'balance') {
     if (!data.error && data.balance) {
