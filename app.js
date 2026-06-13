@@ -987,6 +987,13 @@ async function handleMessage(data, isLoginAttempt = false) {
         buyContract(currentProposalId);
       } else {
         console.warn("Proposal response received, but mismatch or missing echo_req", data);
+        addLog("Proposal error: mismatch or missing echo request.", "error");
+        activePurchaseProposal = null;
+        currentProposalId = null;
+        if (isTrading) {
+          statusText.innerText = "Bot is Active";
+          statusIndicator.className = "status-bar status-running";
+        }
       }
     }
   }
@@ -1021,6 +1028,7 @@ async function handleMessage(data, isLoginAttempt = false) {
       activePurchaseProposal = null;
       currentProposalId = null;
       currentContractId = null;
+      currentSubscriptionId = null;
       if (isTrading) {
         statusText.innerText = "Bot is Active";
         statusIndicator.className = "status-bar status-running";
@@ -1028,14 +1036,20 @@ async function handleMessage(data, isLoginAttempt = false) {
     } else if (data.proposal_open_contract) {
       const contract = data.proposal_open_contract;
       
+      // Store subscription ID on the first message
+      if (data.subscription && data.subscription.id) {
+        currentSubscriptionId = data.subscription.id;
+      }
+      
       // Check if trade is complete
       if (contract.is_expired === 1 || contract.status !== 'open') {
-        // Unsubscribe from this contract
-        socket.send(JSON.stringify({
-          proposal_open_contract: 1,
-          contract_id: contract.contract_id,
-          unsubscribe: 1
-        }));
+        // Unsubscribe using forget request
+        if (currentSubscriptionId) {
+          socket.send(JSON.stringify({
+            forget: currentSubscriptionId
+          }));
+          currentSubscriptionId = null;
+        }
 
         handleTradeOutcome(contract);
       }
@@ -1052,6 +1066,29 @@ function calculateSMA(period) {
   const slice = ticksHistory.slice(-period);
   const sum = slice.reduce((a, b) => a + b, 0);
   return sum / period;
+}
+
+function calculateRSI(period) {
+  if (ticksHistory.length < period + 1) return null;
+  
+  let gains = 0;
+  let losses = 0;
+  
+  for (let i = ticksHistory.length - period - 1; i < ticksHistory.length - 1; i++) {
+    const diff = ticksHistory[i+1] - ticksHistory[i];
+    if (diff > 0) {
+      gains += diff;
+    } else {
+      losses -= diff;
+    }
+  }
+  
+  const avgGain = gains / period;
+  const avgLoss = losses / period;
+  
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  return 100 - (100 / (1 + rs));
 }
 
 function processTick(tick) {
@@ -1084,6 +1121,7 @@ function processTick(tick) {
   // Calculate moving averages for trend filtering
   const sma10 = calculateSMA(10);
   const sma20 = calculateSMA(20);
+  const rsi14 = calculateRSI(14);
   
   let trendStr = "Analyzing...";
   let trendColor = "var(--text-muted)";
@@ -1099,6 +1137,16 @@ function processTick(tick) {
       trendStr = "Neutral ➡️";
       trendColor = "var(--text-muted)";
     }
+  }
+  
+  if (rsi14 !== null) {
+    let rsiCondition = "";
+    if (rsi14 < 40) {
+      rsiCondition = " (Oversold 🟢)";
+    } else if (rsi14 > 60) {
+      rsiCondition = " (Overbought 🔴)";
+    }
+    trendStr += ` | RSI: ${rsi14.toFixed(1)}${rsiCondition}`;
   }
   
   const trendLabel = document.getElementById('trendLabel');
@@ -1118,7 +1166,8 @@ function evaluateStrategyPattern() {
 
   const sma10 = calculateSMA(10);
   const sma20 = calculateSMA(20);
-  if (!sma10 || !sma20) return;
+  const rsi14 = calculateRSI(14);
+  if (!sma10 || !sma20 || rsi14 === null) return;
 
   const len = ticksHistory.length;
   const t0 = ticksHistory[len - 4];
@@ -1129,14 +1178,14 @@ function evaluateStrategyPattern() {
   const trendIsBullish = sma10 > sma20;
   const trendIsBearish = sma10 < sma20;
 
-  // 1. Trend-Following Bullish Pullback: Trend is Bullish, last 3 ticks were consecutive drops -> Buy Rise (CALL)
-  if (trendIsBullish && t1 < t0 && t2 < t1 && t3 < t2) {
-    addLog(`Trend: Bullish | Pullback: 3 consecutive drops. Buying RISE...`, "info");
+  // 1. Trend-Following Bullish Pullback: Trend is Bullish, RSI is oversold (< 40), last 3 ticks were consecutive drops -> Buy Rise (CALL)
+  if (trendIsBullish && rsi14 < 40 && t1 < t0 && t2 < t1 && t3 < t2) {
+    addLog(`Trend: Bullish | RSI: ${rsi14.toFixed(1)} (Oversold) | Pullback detected. Buying RISE...`, "info");
     proposeTrade("CALL");
   }
-  // 2. Trend-Following Bearish Pullback: Trend is Bearish, last 3 consecutive rises -> Buy Fall (PUT)
-  else if (trendIsBearish && t1 > t0 && t2 > t1 && t3 > t2) {
-    addLog(`Trend: Bearish | Pullback: 3 consecutive rises. Buying FALL...`, "info");
+  // 2. Trend-Following Bearish Pullback: Trend is Bearish, RSI is overbought (> 60), last 3 consecutive rises -> Buy Fall (PUT)
+  else if (trendIsBearish && rsi14 > 60 && t1 > t0 && t2 > t1 && t3 > t2) {
+    addLog(`Trend: Bearish | RSI: ${rsi14.toFixed(1)} (Overbought) | Pullback detected. Buying FALL...`, "info");
     proposeTrade("PUT");
   }
 }
