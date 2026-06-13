@@ -43,7 +43,7 @@ const consolePanel = document.getElementById('consolePanel');
 const loginBtn = document.getElementById('loginBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const accountLabel = document.getElementById('accountLabel');
-const accountID = document.getElementById('accountID');
+const accountSelect = document.getElementById('accountSelect');
 const balanceText = document.getElementById('balanceText');
 const profitText = document.getElementById('profitText');
 const livePrice = document.getElementById('livePrice');
@@ -218,9 +218,24 @@ window.addEventListener('DOMContentLoaded', async () => {
       // Fetch account details to verify and find account ID
       const { accounts, appId } = await fetchAccountsWithFallback(accessToken);
       
-      // Select preferred account: VRTC (demo) if present, otherwise the first account
-      const demoAcct = accounts.find(a => a.account_id && a.account_id.toUpperCase().startsWith('VRTC'));
-      const targetAcct = demoAcct || accounts[0];
+      // Store all accounts in localStorage
+      localStorage.setItem('deriv_all_accounts', JSON.stringify(accounts));
+      
+      // Intelligently select the first whitelisted account to log in automatically
+      let targetAcct = null;
+      for (const a of accounts) {
+        const approved = await isAccountApproved(a.account_id);
+        if (approved) {
+          targetAcct = a;
+          break;
+        }
+      }
+
+      // If none are whitelisted, default to demo (VRTC/DOT) to show whitelist warning, otherwise fallback to first
+      if (!targetAcct) {
+        const demoAcct = accounts.find(a => a.account_id && (a.account_id.toUpperCase().startsWith('VRTC') || a.account_id.toUpperCase().startsWith('DOT')));
+        targetAcct = demoAcct || accounts[0];
+      }
 
       // Check if whitelisted
       const isApproved = await isAccountApproved(targetAcct.account_id);
@@ -289,6 +304,83 @@ async function isAccountApproved(acct) {
   }
 }
 
+function updateAccountLabelBadge(acct) {
+  if (!accountLabel) return;
+  if (acct.toUpperCase().startsWith('VRTC') || acct.toUpperCase().startsWith('DOT')) {
+    accountLabel.innerText = "Virtual Account";
+    accountLabel.style.background = "rgba(56, 189, 248, 0.1)";
+    accountLabel.style.color = "var(--color-primary)";
+  } else {
+    accountLabel.innerText = "Real Account";
+    accountLabel.style.background = "rgba(16, 185, 129, 0.1)";
+    accountLabel.style.color = "var(--color-success)";
+  }
+}
+
+async function populateAccountSelector(token) {
+  if (!accountSelect) return;
+  
+  let accounts = [];
+  try {
+    const stored = localStorage.getItem('deriv_all_accounts');
+    if (stored) {
+      accounts = JSON.parse(stored);
+    } else {
+      const result = await fetchAccountsWithFallback(token);
+      accounts = result.accounts;
+      localStorage.setItem('deriv_all_accounts', JSON.stringify(accounts));
+    }
+  } catch (err) {
+    console.error("Failed to populate account list:", err);
+    addLog("Error loading account list.", "error");
+  }
+
+  // Clear existing options
+  accountSelect.innerHTML = '';
+
+  const currentAcct = localStorage.getItem('deriv_acct');
+
+  for (const a of accounts) {
+    const opt = document.createElement('option');
+    opt.value = a.account_id;
+    const typeStr = a.account_id.toUpperCase().startsWith('DOT') || a.account_id.toUpperCase().startsWith('VRTC') ? 'Demo' : 'Real';
+    opt.textContent = `${a.account_id} (${typeStr})`;
+    if (a.account_id === currentAcct) {
+      opt.selected = true;
+    }
+    accountSelect.appendChild(opt);
+  }
+}
+
+// Add event listener for account Select box change
+if (accountSelect) {
+  accountSelect.addEventListener('change', async () => {
+    const selectedAcct = accountSelect.value;
+    const isApproved = await isAccountApproved(selectedAcct);
+    
+    if (!isApproved) {
+      alert(`⚠️ ACCESS DENIED\nYour account (${selectedAcct}) is not white-listed.\n\nPlease contact the admin to activate access.`);
+      // Revert select box value
+      accountSelect.value = localStorage.getItem('deriv_acct');
+      return;
+    }
+
+    addLog(`Switching to account ${selectedAcct}...`, "info");
+    
+    if (isTrading) {
+      stopTrading("Account switched");
+    }
+    
+    localStorage.setItem('deriv_acct', selectedAcct);
+    updateAccountLabelBadge(selectedAcct);
+
+    if (socket) {
+      socket.close();
+    }
+    connectWebSocket();
+  });
+}
+
 async function checkAuth() {
   const token = localStorage.getItem('deriv_token');
   const acct = localStorage.getItem('deriv_acct');
@@ -307,16 +399,8 @@ async function checkAuth() {
     loginPanel.classList.remove('active');
     consolePanel.classList.add('active');
     
-    accountID.innerText = acct;
-    if (acct.toUpperCase().startsWith('VRTC')) {
-      accountLabel.innerText = "Virtual Account";
-      accountLabel.style.background = "rgba(56, 189, 248, 0.1)";
-      accountLabel.style.color = "var(--color-primary)";
-    } else {
-      accountLabel.innerText = "Real Account";
-      accountLabel.style.background = "rgba(16, 185, 129, 0.1)";
-      accountLabel.style.color = "var(--color-success)";
-    }
+    updateAccountLabelBadge(acct);
+    await populateAccountSelector(token);
 
     connectWebSocket();
   } else {
@@ -580,16 +664,9 @@ async function handleMessage(data, isLoginAttempt = false) {
       loginPanel.classList.remove('active');
       consolePanel.classList.add('active');
       
-      accountID.innerText = acct;
-      if (acct.toUpperCase().startsWith('VRTC')) {
-        accountLabel.innerText = "Virtual Account";
-        accountLabel.style.background = "rgba(56, 189, 248, 0.1)";
-        accountLabel.style.color = "var(--color-primary)";
-      } else {
-        accountLabel.innerText = "Real Account";
-        accountLabel.style.background = "rgba(16, 185, 129, 0.1)";
-        accountLabel.style.color = "var(--color-success)";
-      }
+      updateAccountLabelBadge(acct);
+      const token = localStorage.getItem('deriv_token');
+      await populateAccountSelector(token);
       
       // Update Balance
       const balance = data.authorize.balance;
