@@ -959,9 +959,13 @@ async function handleMessage(data, isLoginAttempt = false) {
         statusIndicator.className = "status-bar status-running";
       }
     } else if (data.proposal) {
-      if (isTrading && activePurchaseProposal === data.proposal.echo_req.contract_type) {
+      const echoReq = data.echo_req || (data.proposal && data.proposal.echo_req);
+      const contractType = echoReq ? echoReq.contract_type : null;
+      if (isTrading && contractType && activePurchaseProposal === contractType) {
         currentProposalId = data.proposal.id;
         buyContract(currentProposalId);
+      } else {
+        console.warn("Proposal response received, but mismatch or missing echo_req", data);
       }
     }
   }
