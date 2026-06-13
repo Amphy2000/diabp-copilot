@@ -42,6 +42,13 @@ let currentSubscriptionId = null;
 let keepAliveAudioContext = null;
 let keepAliveOscillator = null;
 
+// Session Database Analytics Tracking
+let activeSessionDbId = null;
+let sessionTradedVolume = 0.0;
+let sessionWins = 0;
+let sessionLosses = 0;
+let sessionTradesCount = 0;
+
 // Performance Stats Object
 let stats = {
   wins: 0,
@@ -616,6 +623,203 @@ setTimeout(() => {
   applyPreset('moderate');
 }, 500);
 
+// Bot Database Analytics Reporting and Retrieving
+async function reportSessionAnalytics() {
+  const acct = localStorage.getItem('deriv_acct');
+  if (!acct) return;
+
+  const isDemo = acct.startsWith('VRTC') || acct.startsWith('DOT');
+  
+  const payload = {
+    account_id: acct,
+    is_demo: isDemo,
+    trades_count: sessionTradesCount,
+    wins_count: sessionWins,
+    losses_count: sessionLosses,
+    traded_volume: sessionTradedVolume,
+    net_profit: sessionProfit,
+    updated_at: new Date().toISOString()
+  };
+
+  try {
+    const response = await fetch('/api/analytics', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        session_id: activeSessionDbId,
+        ...payload
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.session_id) {
+        activeSessionDbId = data.session_id;
+      }
+      return;
+    }
+  } catch (err) {
+    console.warn("Serverless analytics endpoint failed, attempting direct Supabase fallback:", err);
+  }
+
+  // Fallback direct REST write if Vercel serverless is not running (e.g. local vite dev server)
+  if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+    try {
+      let resUrl = `${SUPABASE_URL}/rest/v1/bot_sessions`;
+      let fetchOptions = {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(payload)
+      };
+
+      if (activeSessionDbId) {
+        resUrl += `?id=eq.${activeSessionDbId}`;
+        fetchOptions.method = 'PATCH';
+      } else {
+        fetchOptions.method = 'POST';
+      }
+
+      const dbRes = await fetch(resUrl, {
+        method: fetchOptions.method,
+        headers: fetchOptions.headers,
+        body: fetchOptions.body
+      });
+
+      if (dbRes.ok) {
+        const dbData = await dbRes.json();
+        if (dbData && dbData.length > 0) {
+          activeSessionDbId = dbData[0].id;
+        }
+      }
+    } catch (dbErr) {
+      console.warn("Direct Supabase fallback also failed:", dbErr);
+    }
+  }
+}
+
+async function loadAdminAnalytics() {
+  const adminAcct = localStorage.getItem('deriv_acct');
+  const adminToken = localStorage.getItem('deriv_token');
+  if (!adminAcct || !adminToken) return;
+
+  const refreshBtn = document.getElementById('refreshAnalyticsBtn');
+  if (refreshBtn) {
+    refreshBtn.disabled = true;
+    refreshBtn.innerText = "🔄 Loading...";
+  }
+
+  try {
+    const response = await fetch(`/api/analytics?admin_account_id=${adminAcct}&admin_token=${adminToken}`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success) {
+        renderAdminAnalytics(data.summary, data.sessions);
+        if (refreshBtn) {
+          refreshBtn.disabled = false;
+          refreshBtn.innerText = "🔄 Refresh";
+        }
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn("Serverless analytics retrieval failed, attempting direct Supabase fallback:", err);
+  }
+
+  // Direct Supabase REST fallback if serverless API is not active (local dev)
+  if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+    try {
+      const sessionsRes = await fetch(`${SUPABASE_URL}/rest/v1/bot_sessions?order=updated_at.desc&limit=30`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        }
+      });
+      const sessions = sessionsRes.ok ? await sessionsRes.json() : [];
+
+      const allRes = await fetch(`${SUPABASE_URL}/rest/v1/bot_sessions?select=account_id,traded_volume,trades_count`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        }
+      });
+      const allData = allRes.ok ? await allRes.json() : [];
+
+      let totalVolume = 0.0;
+      let totalTrades = 0;
+      const uniqueUsers = new Set();
+
+      allData.forEach(row => {
+        totalVolume += parseFloat(row.traded_volume || 0);
+        totalTrades += parseInt(row.trades_count || 0);
+        if (row.account_id) {
+          uniqueUsers.add(row.account_id.trim().toUpperCase());
+        }
+      });
+
+      renderAdminAnalytics({
+        totalVolume,
+        totalTrades,
+        uniqueUsersCount: uniqueUsers.size,
+        estimatedCommission: totalVolume * 0.01,
+        totalSessions: allData.length
+      }, sessions);
+    } catch (dbErr) {
+      console.warn("Direct Supabase fallback retrieval failed:", dbErr);
+    }
+  }
+
+  if (refreshBtn) {
+    refreshBtn.disabled = false;
+    refreshBtn.innerText = "🔄 Refresh";
+  }
+}
+
+function renderAdminAnalytics(summary, sessions) {
+  const activeUsersEl = document.getElementById('adminActiveUsers');
+  const sessionsEl = document.getElementById('adminTotalSessions');
+  const volumeEl = document.getElementById('adminTradedVolume');
+  const commissionEl = document.getElementById('adminCommission');
+  const sessionsBody = document.getElementById('adminSessionsBody');
+
+  if (activeUsersEl) activeUsersEl.innerText = summary.uniqueUsersCount;
+  
+  const totalSessions = summary.totalSessions || sessions.length || 0;
+  if (sessionsEl) sessionsEl.innerText = totalSessions;
+
+  if (volumeEl) volumeEl.innerText = `$${summary.totalVolume.toFixed(2)}`;
+  if (commissionEl) commissionEl.innerText = `$${summary.estimatedCommission.toFixed(2)}`;
+
+  if (sessionsBody) {
+    if (!sessions || sessions.length === 0) {
+      sessionsBody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 8px 0;">No active sessions found.</td></tr>`;
+      return;
+    }
+
+    sessionsBody.innerHTML = sessions.map(s => {
+      const typeLabel = s.is_demo ? "Demo" : "Real";
+      const typeClass = s.is_demo ? "text-muted" : "win-color";
+      const profitVal = parseFloat(s.net_profit || 0);
+      const profitClass = profitVal >= 0 ? "win-color" : "loss-color";
+      const profitPrefix = profitVal >= 0 ? "+" : "";
+      
+      return `
+        <tr>
+          <td style="padding: 4px 6px; font-family: var(--font-family-mono); font-weight: 500;">${s.account_id}</td>
+          <td style="padding: 4px 6px; font-weight: 600;" class="${typeClass}">${typeLabel}</td>
+          <td style="padding: 4px 6px;">${s.trades_count} (${s.wins_count}/${s.losses_count})</td>
+          <td style="padding: 4px 6px; font-weight: 700;" class="${profitClass}">${profitPrefix}$${profitVal.toFixed(2)}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+}
+
 // Developer Admin Panel logic
 function checkAdminStatus() {
   const currentAcct = localStorage.getItem('deriv_acct');
@@ -624,9 +828,16 @@ function checkAdminStatus() {
   const adminAccounts = ['ROT91833970', 'DOT93132805'];
   if (currentAcct && adminAccounts.includes(currentAcct.trim().toUpperCase())) {
     adminPanel.classList.remove('hidden');
+    loadAdminAnalytics();
   } else {
     adminPanel.classList.add('hidden');
   }
+}
+
+// Hook refresh button
+const refreshAnalyticsBtn = document.getElementById('refreshAnalyticsBtn');
+if (refreshAnalyticsBtn) {
+  refreshAnalyticsBtn.addEventListener('click', loadAdminAnalytics);
 }
 
 if (adminWhitelistBtn) {
@@ -1351,6 +1562,17 @@ function handleTradeOutcome(contract) {
   sessionProfit += profit;
   updateProfitDisplay();
 
+  // Update session database analytics tracking variables
+  const tradeStake = parseFloat(contract.buy_price || currentStake) || 0;
+  sessionTradedVolume += tradeStake;
+  sessionTradesCount++;
+  if (status === 'won') {
+    sessionWins++;
+  } else {
+    sessionLosses++;
+  }
+  reportSessionAnalytics(); // report live session update to database
+
   const result = status === 'won' ? 'win' : 'loss';
   const displayType = contractType === 'CALL' ? 'RISE 🟢' : (contractType === 'PUT' ? 'FALL 🔴' : contractType);
   recordTrade(displayType, contract.buy_price || currentStake, profit, result);
@@ -1422,6 +1644,14 @@ startBotBtn.addEventListener('click', () => {
   currentMartingaleStep = 0;
   sessionProfit = 0.0;
 
+  // Reset session database analytics tracking variables
+  activeSessionDbId = null;
+  sessionTradedVolume = 0.0;
+  sessionWins = 0;
+  sessionLosses = 0;
+  sessionTradesCount = 0;
+  reportSessionAnalytics(); // report start of session
+
   updateProfitDisplay();
 
   // Request notifications permission if enabled
@@ -1475,6 +1705,7 @@ function stopTrading(reason) {
 
   if (wasTrading) {
     sendPushNotification("🤖 Bot Halted", `Reason: ${reason}`);
+    reportSessionAnalytics(); // report final session updates on halt
   }
 }
 
@@ -1902,15 +2133,15 @@ if (exportReportBtn) {
     const rate = stats.total > 0 ? ((stats.wins / stats.total) * 100).toFixed(1) : "0.0";
     const selectedTemplate = promoTemplateSelect ? promoTemplateSelect.value : 'raw';
     
-    const partnerLink = window.location.origin;
+    const partnerLink = "https://amphybot.vercel.app/";
     
     let reportText = "";
     
     if (selectedTemplate === 'social') {
       reportText = 
-`🤖 Automated V75 Scalper Bot Update
+`⚡ V75 Scalper Bot Session Stats ⚡
 
-Chart setup doing the work while I go about my day. Here are the live stats from my current session:
+Just completed an automated V75 trading session. Here are the live stats:
 
 📈 Total Trades: ${stats.total}
 🟢 Wins: ${stats.wins} | 🔴 Losses: ${stats.losses}
@@ -1918,35 +2149,35 @@ Chart setup doing the work while I go about my day. Here are the live stats from
 💰 Session Profit: $${sessionProfit.toFixed(2)}
 💵 Lifetime Profit: $${(stats.totalProfit || 0).toFixed(2)}
 
-Set the parameters, turn on background running, and let it scan tick trends.
+Runs securely inside the local browser. Zero server custody.
 
-👉 Try the bot for free and start auto-trading here:
+👉 Try the V75 Scalper Bot for free:
 ${partnerLink}`;
     } else if (selectedTemplate === 'short') {
       reportText = 
-`⚡ V75 Scalping Session Complete! ⚡
+`📊 V75 Scalping Stats Update 📊
 
 📈 Trades: ${stats.total}
 🎯 Win Rate: ${rate}%
 💰 Today's Profit: $${sessionProfit.toFixed(2)}
 
-100% automated trend scalping. Screen Wake Lock and silent background keep-alive active.
+100% automated mean-reversion trading. Screen Wake Lock and background keep-alive active.
 
-👉 Get free bot access here:
+👉 Get free access to the bot:
 ${partnerLink}`;
     } else {
       // Default: Raw Stats
       reportText = 
-`🔥 AMPHY V75 SCALPER BOT PERFORMANCE REPORT 🔥
+`🔥 AMPHY V75 SCALPER BOT REPORT 🔥
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📈 Total Trades: ${stats.total}
 🟢 Wins: ${stats.wins}
 🔴 Losses: ${stats.losses}
 🎯 Win Rate: ${rate}%
-💰 Net Session Profit: $${sessionProfit.toFixed(2)}
+💰 Today's Net Profit: $${sessionProfit.toFixed(2)}
 💵 Lifetime Net Profit: $${(stats.totalProfit || 0).toFixed(2)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚀 Get free bot access & start trading:
+🚀 Try the V75 Scalper Bot for free:
 👉 ${partnerLink}`;
     }
     

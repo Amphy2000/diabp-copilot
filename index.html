@@ -237,7 +237,7 @@
         
         <!-- Collapsible Trade History -->
         <div class="history-toggle-container margin-top-sm">
-          <button id="toggleHistoryBtn" class="btn btn-outline btn-sm width-full" style="font-size: 11px; padding: 6px;">📋 View Trade History & Export Report</button>
+          <button id="toggleHistoryBtn" class="btn btn-outline btn-sm width-full" style="font-size: 11px; padding: 6px;">📋 View Trade History & Share Stats</button>
         </div>
         
         <div id="tradeHistorySection" class="history-card hidden">
@@ -249,7 +249,7 @@
                 <option value="social">Social Hook 🤖</option>
                 <option value="short">Status Hook ⚡</option>
               </select>
-              <button id="exportReportBtn" class="btn btn-primary btn-xs" style="padding: 2px 6px; font-size: 10px; height: 22px; display: flex; align-items: center;">📤 Copy Promo Report</button>
+              <button id="exportReportBtn" class="btn btn-primary btn-xs" style="padding: 2px 6px; font-size: 10px; height: 22px; display: flex; align-items: center;">📤 Share Stats</button>
             </div>
           </div>
           <div class="table-container">
@@ -285,6 +285,52 @@
           <button id="adminWhitelistBtn" class="btn btn-primary btn-sm admin-btn">Whitelist</button>
         </div>
         <div id="adminFeedback" class="admin-feedback"></div>
+
+        <!-- Analytics Dashboard section inside Admin Panel -->
+        <div class="admin-analytics-section margin-top-lg" style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 1.25rem;">
+          <div class="flex-row-between margin-bottom-sm">
+            <span class="admin-title" style="font-size: 0.85rem;">📊 Bot Activity Analytics</span>
+            <button id="refreshAnalyticsBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; border-color: rgba(56, 189, 248, 0.2); color: var(--color-primary); height: 22px; display: flex; align-items: center; justify-content: center; width: auto; font-family: var(--font-family-sans); font-weight: 600;">🔄 Refresh</button>
+          </div>
+          
+          <div class="analytics-metrics-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-bottom: 1rem;">
+            <div class="perf-card" style="background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+              <span class="perf-label" style="font-size: 0.6rem;">Active Users</span>
+              <span id="adminActiveUsers" class="perf-value" style="font-size: 0.95rem; color: var(--color-primary);">0</span>
+            </div>
+            <div class="perf-card" style="background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+              <span class="perf-label" style="font-size: 0.6rem;">Sessions Run</span>
+              <span id="adminTotalSessions" class="perf-value" style="font-size: 0.95rem; color: var(--text-main);">0</span>
+            </div>
+            <div class="perf-card" style="background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+              <span class="perf-label" style="font-size: 0.6rem;">Traded Volume</span>
+              <span id="adminTradedVolume" class="perf-value" style="font-size: 0.95rem; color: var(--color-success);">$0.00</span>
+            </div>
+            <div class="perf-card" style="background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+              <span class="perf-label" style="font-size: 0.6rem;">Est. Commission (1%)</span>
+              <span id="adminCommission" class="perf-value" style="font-size: 0.95rem; color: #fbbf24;">$0.00</span>
+            </div>
+          </div>
+
+          <span class="perf-label" style="display: block; margin-bottom: 0.35rem; font-size: 0.65rem; color: var(--text-muted); font-weight: 600;">Recent User Sessions</span>
+          <div class="table-container" style="max-height: 150px; background: rgba(0,0,0,0.25);">
+            <table class="history-table" style="font-size: 0.7rem;">
+              <thead>
+                <tr>
+                  <th style="font-size: 0.65rem; padding: 4px 6px;">User ID</th>
+                  <th style="font-size: 0.65rem; padding: 4px 6px;">Type</th>
+                  <th style="font-size: 0.65rem; padding: 4px 6px;">Trades (W/L)</th>
+                  <th style="font-size: 0.65rem; padding: 4px 6px;">Net Profit</th>
+                </tr>
+              </thead>
+              <tbody id="adminSessionsBody">
+                <tr>
+                  <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 8px 0;">No active sessions found.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <!-- Toggleable User Guide -->
