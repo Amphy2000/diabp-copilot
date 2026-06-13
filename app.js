@@ -153,7 +153,7 @@ async function checkAuth() {
 // Redirect to Deriv OAuth page
 loginBtn.addEventListener('click', () => {
   const redirectUri = window.location.href.split('?')[0];
-  const oauthUrl = `https://oauth.deriv.com/oauth?app_id=${APP_ID}&l=en&signup_device=mobile`;
+  const oauthUrl = `https://oauth.deriv.com/oauth2/authorize?app_id=${APP_ID}&l=en&signup_device=mobile`;
   window.location.href = oauthUrl;
 });
 
