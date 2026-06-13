@@ -563,4 +563,16 @@ body {
   color: var(--color-danger);
 }
 
+.grid-span-2 {
+  grid-column: span 2;
+}
+
+.flex-row-between {
+  display: flex;
+  flex-direction: row !important;
+  justify-content: space-between;
+  align-items: center;
+}
+
+
 

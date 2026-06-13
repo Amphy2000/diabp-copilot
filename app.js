@@ -67,6 +67,36 @@ const adminWhitelistInput = document.getElementById('adminWhitelistInput');
 const adminWhitelistBtn = document.getElementById('adminWhitelistBtn');
 const adminFeedback = document.getElementById('adminFeedback');
 
+// Push Notification Elements & Functions
+const notificationCheckbox = document.getElementById('notificationCheckbox');
+
+function requestNotificationPermission() {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "default") {
+    Notification.requestPermission().then(permission => {
+      if (permission === "granted") {
+        addLog("System notifications enabled.", "success");
+      }
+    });
+  }
+}
+
+function sendPushNotification(title, body) {
+  if (!("Notification" in window)) return;
+  const isEnabled = notificationCheckbox ? notificationCheckbox.checked : true;
+  if (isEnabled && Notification.permission === "granted") {
+    try {
+      new Notification(title, {
+        body: body,
+        icon: window.location.origin + '/favicon.svg'
+      });
+    } catch (err) {
+      console.warn("Failed to send notification:", err);
+    }
+  }
+}
+
+
 
 // ════════════════════════════════════════════
 //         OAUTH FLOW & AUTHENTICATION (OIDC/PKCE & PAT)
@@ -840,6 +870,7 @@ async function handleMessage(data, isLoginAttempt = false) {
   else if (msgType === 'buy') {
     if (data.error) {
       addLog(`Failed to place order: ${data.error.message}`, "error");
+      sendPushNotification("❌ Order Failed", `Error: ${data.error.message}`);
       activePurchaseProposal = null;
       currentProposalId = null;
       if (isTrading) {
@@ -849,6 +880,7 @@ async function handleMessage(data, isLoginAttempt = false) {
     } else {
       currentContractId = data.buy.contract_id;
       addLog(`Order placed successfully. ID: ${currentContractId}`, "info");
+      sendPushNotification("📈 Trade Placed", `${activePurchaseProposal === 'CALL' ? 'RISE 🟢' : 'FALL 🔴'} order executed with stake $${currentStake.toFixed(2)}.`);
       
       // Subscribe to this specific contract's updates to check outcome
       socket.send(JSON.stringify({
@@ -985,6 +1017,7 @@ function handleTradeOutcome(contract) {
 
   if (status === 'won') {
     addLog(`🎉 WIN! Profit: +$${profit.toFixed(2)}`, "success");
+    sendPushNotification("🎉 Trade WON!", `Profit: +$${profit.toFixed(2)} | Session Profit: ${sessionProfit >= 0 ? '+' : ''}$${sessionProfit.toFixed(2)}`);
     
     // Reset martingale steps
     currentStake = initialStake;
@@ -996,11 +1029,13 @@ function handleTradeOutcome(contract) {
     currentMartingaleStep++;
     if (currentMartingaleStep >= maxMartingaleSteps) {
       addLog(`⚠️ Max Martingale Steps (${maxMartingaleSteps}) reached. Resetting stake.`, "warn");
+      sendPushNotification("🚨 Trade LOST", `Loss: -$${Math.abs(profit).toFixed(2)} (Max steps hit, stake reset) | Session: $${sessionProfit.toFixed(2)}`);
       currentStake = initialStake;
       currentMartingaleStep = 0;
     } else {
       currentStake = currentStake * parseFloat(martingaleStepsInput.value === '1' ? 1.0 : 2.0); // Multiply by 2
       addLog(`🔄 Martingale Multiplier applied. Next stake: $${currentStake.toFixed(2)}`, "warn");
+      sendPushNotification("🚨 Trade LOST", `Loss: -$${Math.abs(profit).toFixed(2)} (Martingale Step ${currentMartingaleStep} next: $${currentStake.toFixed(2)}) | Session: $${sessionProfit.toFixed(2)}`);
     }
   }
 
@@ -1012,10 +1047,12 @@ function handleTradeOutcome(contract) {
   // Check safety targets
   if (sessionProfit >= targetProfit) {
     addLog(`🏆 TARGET PROFIT REACHED! Session Profit: $${sessionProfit.toFixed(2)}`, "success");
+    sendPushNotification("🏆 Target Profit Reached!", `Session Profit: +$${sessionProfit.toFixed(2)}`);
     stopTrading("Target Profit Reached");
     alert(`🏆 Target Profit ($${targetProfit.toFixed(2)}) reached!\nTrading halted to secure profits.`);
   } else if (sessionProfit <= -stopLoss) {
     addLog(`❌ STOP LOSS HIT! Session Loss: -$${Math.abs(sessionProfit).toFixed(2)}`, "error");
+    sendPushNotification("❌ Stop Loss Hit!", `Session Loss: -$${Math.abs(sessionProfit).toFixed(2)}`);
     stopTrading("Stop Loss Hit");
     alert(`❌ Stop Loss (-$${stopLoss.toFixed(2)}) hit!\nTrading halted to protect your account.`);
   } else {
@@ -1047,6 +1084,12 @@ startBotBtn.addEventListener('click', () => {
 
   updateProfitDisplay();
 
+  // Request notifications permission if enabled
+  const isNotificationsEnabled = notificationCheckbox ? notificationCheckbox.checked : true;
+  if (isNotificationsEnabled) {
+    requestNotificationPermission();
+  }
+
   // Disable Inputs
   toggleInputs(true);
 
@@ -1060,6 +1103,8 @@ startBotBtn.addEventListener('click', () => {
   
   addLog("🤖 V75 Scalper Bot Started.", "success");
   addLog(`Params: Stake=$${initialStake.toFixed(2)}, Target=$${targetProfit.toFixed(2)}, Stop=$${stopLoss.toFixed(2)}, MaxSteps=${maxMartingaleSteps}`, "info");
+  
+  sendPushNotification("🤖 Bot Started", `Monitoring V75 tick patterns...\nStake: $${initialStake.toFixed(2)} | Target: $${targetProfit.toFixed(2)}`);
 });
 
 stopBotBtn.addEventListener('click', () => {
@@ -1067,6 +1112,7 @@ stopBotBtn.addEventListener('click', () => {
 });
 
 function stopTrading(reason) {
+  const wasTrading = isTrading;
   isTrading = false;
   activePurchaseProposal = null;
   currentProposalId = null;
@@ -1080,6 +1126,10 @@ function stopTrading(reason) {
   
   toggleInputs(false);
   addLog(`🤖 Bot Halted. Reason: ${reason}`, "warn");
+
+  if (wasTrading) {
+    sendPushNotification("🤖 Bot Halted", `Reason: ${reason}`);
+  }
 }
 
 function toggleInputs(disabled) {
