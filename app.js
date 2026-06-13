@@ -3,7 +3,7 @@
 // ════════════════════════════════════════════
 
 // 1. Deriv App ID (Use a registered App ID for OAuth, or 61247 for general testing)
-const APP_ID = '61247'; 
+const APP_ID = import.meta.env.VITE_DERIV_APP_ID || '61247'; 
 
 // 2. White-listed Accounts list. Add CR numbers here to grant access.
 // Both Virtual (VRTC) and Real (CR) accounts can be added here.
