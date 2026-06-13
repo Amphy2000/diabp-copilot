@@ -152,8 +152,14 @@ async function checkAuth() {
 
 // Redirect to Deriv OAuth page
 loginBtn.addEventListener('click', () => {
-  const redirectUri = window.location.href.split('?')[0];
-  const oauthUrl = `https://oauth.deriv.com/oauth2/authorize?app_id=${APP_ID}&l=en&signup_device=mobile`;
+  let redirectUri = window.location.origin;
+  if (window.location.hostname === 'amphybot.vercel.app') {
+    redirectUri = 'https://amphybot.vercel.app/';
+  } else if (window.location.hostname === 'v75-scalper-bot.vercel.app') {
+    redirectUri = 'https://v75-scalper-bot.vercel.app';
+  }
+  
+  const oauthUrl = `https://oauth.deriv.com/oauth2/authorize?app_id=${APP_ID}&l=en&signup_device=mobile&redirect_uri=${encodeURIComponent(redirectUri)}`;
   window.location.href = oauthUrl;
 });
 
