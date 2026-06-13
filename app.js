@@ -273,7 +273,14 @@ async function isAccountApproved(acct) {
     }
 
     const data = await response.json();
-    return data && data.length > 0;
+    if (data && data.length > 0) {
+      return true;
+    }
+
+    // Fall back to local whitelist if not found in Supabase database
+    return APPROVED_ACCOUNTS.some(approved => 
+      approved.trim().toUpperCase() === acct.trim().toUpperCase()
+    );
   } catch (err) {
     console.error("Supabase error, falling back to local whitelist:", err);
     return APPROVED_ACCOUNTS.some(approved => 
