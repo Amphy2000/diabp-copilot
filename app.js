@@ -39,6 +39,9 @@ let currentContractId = null;
 let activePurchaseProposal = null;
 let wakeLock = null;
 let currentSubscriptionId = null;
+let pipCanvasElement = null;
+let pipVideoElement = null;
+let pipDrawInterval = null;
 
 // Performance Stats Object
 let stats = {
