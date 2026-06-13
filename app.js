@@ -38,6 +38,15 @@ let currentProposalId = null;
 let currentContractId = null;
 let activePurchaseProposal = null;
 let wakeLock = null;
+let currentSubscriptionId = null;
+
+// Performance Stats Object
+let stats = {
+  wins: 0,
+  losses: 0,
+  total: 0,
+  history: []
+};
 
 // DOM Elements
 const loginPanel = document.getElementById('loginPanel');
@@ -67,6 +76,17 @@ const adminPanel = document.getElementById('adminPanel');
 const adminWhitelistInput = document.getElementById('adminWhitelistInput');
 const adminWhitelistBtn = document.getElementById('adminWhitelistBtn');
 const adminFeedback = document.getElementById('adminFeedback');
+
+// Performance Stats Elements
+const statsWins = document.getElementById('statsWins');
+const statsLosses = document.getElementById('statsLosses');
+const statsWinRate = document.getElementById('statsWinRate');
+const statsTotal = document.getElementById('statsTotal');
+const toggleHistoryBtn = document.getElementById('toggleHistoryBtn');
+const tradeHistorySection = document.getElementById('tradeHistorySection');
+const tradeHistoryBody = document.getElementById('tradeHistoryBody');
+const resetStatsBtn = document.getElementById('resetStatsBtn');
+const exportReportBtn = document.getElementById('exportReportBtn');
 
 // PWA Installation Elements
 let deferredPrompt = null;
@@ -354,6 +374,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   checkAuth();
+  loadStats();
 });
 
 // Helper to check if account is whitelisted
@@ -1026,6 +1047,13 @@ async function handleMessage(data, isLoginAttempt = false) {
 //           TICK PROCESSOR & STRATEGY
 // ════════════════════════════════════════════
 
+function calculateSMA(period) {
+  if (ticksHistory.length < period) return null;
+  const slice = ticksHistory.slice(-period);
+  const sum = slice.reduce((a, b) => a + b, 0);
+  return sum / period;
+}
+
 function processTick(tick) {
   const price = parseFloat(tick.quote);
   livePrice.innerText = price.toFixed(4);
@@ -1047,10 +1075,36 @@ function processTick(tick) {
     }
   }
 
-  // Keep a record of the last 4 prices to analyze patterns
+  // Keep a record of the last 50 prices to analyze patterns and calculate moving averages
   ticksHistory.push(price);
-  if (ticksHistory.length > 4) {
+  if (ticksHistory.length > 50) {
     ticksHistory.shift();
+  }
+
+  // Calculate moving averages for trend filtering
+  const sma10 = calculateSMA(10);
+  const sma20 = calculateSMA(20);
+  
+  let trendStr = "Analyzing...";
+  let trendColor = "var(--text-muted)";
+  
+  if (sma10 && sma20) {
+    if (sma10 > sma20) {
+      trendStr = "Bullish 📈";
+      trendColor = "var(--color-success)";
+    } else if (sma10 < sma20) {
+      trendStr = "Bearish 📉";
+      trendColor = "var(--color-danger)";
+    } else {
+      trendStr = "Neutral ➡️";
+      trendColor = "var(--text-muted)";
+    }
+  }
+  
+  const trendLabel = document.getElementById('trendLabel');
+  if (trendLabel) {
+    trendLabel.innerText = `Trend: ${trendStr}`;
+    trendLabel.style.color = trendColor;
   }
 
   // Execute strategy if trading is active and not waiting on a trade
@@ -1060,21 +1114,29 @@ function processTick(tick) {
 }
 
 function evaluateStrategyPattern() {
-  if (ticksHistory.length < 4) return;
+  if (ticksHistory.length < 20) return; // Need at least 20 ticks for SMA-20
 
-  const t0 = ticksHistory[0];
-  const t1 = ticksHistory[1];
-  const t2 = ticksHistory[2];
-  const t3 = ticksHistory[3];
+  const sma10 = calculateSMA(10);
+  const sma20 = calculateSMA(20);
+  if (!sma10 || !sma20) return;
 
-  // 1. Mean-Reversion Pattern: 3 consecutive drops -> Buy Rise (CALL)
-  if (t1 < t0 && t2 < t1 && t3 < t2) {
-    addLog(`Pattern Match: 3 drops detected. Buying RISE...`, "info");
+  const len = ticksHistory.length;
+  const t0 = ticksHistory[len - 4];
+  const t1 = ticksHistory[len - 3];
+  const t2 = ticksHistory[len - 2];
+  const t3 = ticksHistory[len - 1];
+
+  const trendIsBullish = sma10 > sma20;
+  const trendIsBearish = sma10 < sma20;
+
+  // 1. Trend-Following Bullish Pullback: Trend is Bullish, last 3 ticks were consecutive drops -> Buy Rise (CALL)
+  if (trendIsBullish && t1 < t0 && t2 < t1 && t3 < t2) {
+    addLog(`Trend: Bullish | Pullback: 3 consecutive drops. Buying RISE...`, "info");
     proposeTrade("CALL");
   }
-  // 2. Mean-Reversion Pattern: 3 consecutive rises -> Buy Fall (PUT)
-  else if (t1 > t0 && t2 > t1 && t3 > t2) {
-    addLog(`Pattern Match: 3 rises detected. Buying FALL...`, "info");
+  // 2. Trend-Following Bearish Pullback: Trend is Bearish, last 3 consecutive rises -> Buy Fall (PUT)
+  else if (trendIsBearish && t1 > t0 && t2 > t1 && t3 > t2) {
+    addLog(`Trend: Bearish | Pullback: 3 consecutive rises. Buying FALL...`, "info");
     proposeTrade("PUT");
   }
 }
@@ -1123,9 +1185,14 @@ function buyContract(proposalId) {
 function handleTradeOutcome(contract) {
   const status = contract.status; // 'won' or 'lost'
   const profit = parseFloat(contract.profit);
+  const contractType = contract.contract_type || activePurchaseProposal || "Unknown";
   
   sessionProfit += profit;
   updateProfitDisplay();
+
+  const result = status === 'won' ? 'win' : 'loss';
+  const displayType = contractType === 'CALL' ? 'RISE 🟢' : (contractType === 'PUT' ? 'FALL 🔴' : contractType);
+  recordTrade(displayType, contract.buy_price || currentStake, profit, result);
 
   if (status === 'won') {
     addLog(`🎉 WIN! Profit: +$${profit.toFixed(2)}`, "success");
@@ -1476,6 +1543,148 @@ if (toggleGuideBtn && settingsGuide) {
       settingsGuide.classList.add('hidden');
       toggleGuideBtn.innerText = "📖 Show Settings Guide";
     }
+  });
+}
+
+// ════════════════════════════════════════════
+//         PERFORMANCE STATS & HISTORY
+// ════════════════════════════════════════════
+
+function loadStats() {
+  try {
+    const stored = localStorage.getItem('v75_bot_stats');
+    if (stored) {
+      stats = JSON.parse(stored);
+      updateStatsUI();
+    }
+  } catch (e) {
+    console.warn("Failed to load stats:", e);
+  }
+}
+
+function saveStats() {
+  try {
+    localStorage.setItem('v75_bot_stats', JSON.stringify(stats));
+  } catch (e) {
+    console.warn("Failed to save stats:", e);
+  }
+}
+
+function updateStatsUI() {
+  if (!statsWins) return;
+  statsWins.innerText = stats.wins;
+  statsLosses.innerText = stats.losses;
+  statsTotal.innerText = stats.total;
+  
+  const rate = stats.total > 0 ? ((stats.wins / stats.total) * 100).toFixed(1) : "0.0";
+  statsWinRate.innerText = `${rate}%`;
+  
+  // Populate table
+  if (!tradeHistoryBody) return;
+  if (stats.history.length === 0) {
+    tradeHistoryBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No trades recorded.</td></tr>`;
+    return;
+  }
+  
+  tradeHistoryBody.innerHTML = stats.history.map(t => {
+    const isWin = t.result === 'win';
+    const resultClass = isWin ? 'win-color' : 'loss-color';
+    const profitPrefix = t.profit >= 0 ? '+' : '';
+    return `
+      <tr>
+        <td>${t.time}</td>
+        <td>${t.type}</td>
+        <td>$${t.stake.toFixed(2)}</td>
+        <td class="${resultClass}">${profitPrefix}$${t.profit.toFixed(2)}</td>
+        <td class="${resultClass}" style="font-weight: 700;">${t.result.toUpperCase()}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function recordTrade(type, stake, profit, result) {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  
+  if (result === 'win') {
+    stats.wins++;
+  } else {
+    stats.losses++;
+  }
+  stats.total++;
+  
+  stats.history.unshift({
+    time: timeStr,
+    type: type,
+    stake: stake,
+    profit: profit,
+    result: result
+  });
+  
+  // Limit history to 50 entries
+  if (stats.history.length > 50) {
+    stats.history.pop();
+  }
+  
+  saveStats();
+  updateStatsUI();
+}
+
+// Bind event listeners for statistics panel
+if (toggleHistoryBtn && tradeHistorySection) {
+  toggleHistoryBtn.addEventListener('click', () => {
+    const isHidden = tradeHistorySection.classList.contains('hidden');
+    if (isHidden) {
+      tradeHistorySection.classList.remove('hidden');
+      toggleHistoryBtn.innerText = "📋 Hide Trade History & Export Report";
+    } else {
+      tradeHistorySection.classList.add('hidden');
+      toggleHistoryBtn.innerText = "📋 View Trade History & Export Report";
+    }
+  });
+}
+
+if (resetStatsBtn) {
+  resetStatsBtn.addEventListener('click', () => {
+    if (confirm("Are you sure you want to reset all performance statistics? This cannot be undone.")) {
+      stats = {
+        wins: 0,
+        losses: 0,
+        total: 0,
+        history: []
+      };
+      saveStats();
+      updateStatsUI();
+      addLog("Performance statistics reset.", "info");
+    }
+  });
+}
+
+if (exportReportBtn) {
+  exportReportBtn.addEventListener('click', () => {
+    const rate = stats.total > 0 ? ((stats.wins / stats.total) * 100).toFixed(1) : "0.0";
+    const reportText = 
+`🔥 AMPHY V75 SCALPER BOT PERFORMANCE REPORT 🔥
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📈 Total Trades: ${stats.total}
+🟢 Wins: ${stats.wins}
+🔴 Losses: ${stats.losses}
+🎯 Win Rate: ${rate}%
+💰 Net Session Profit: $${sessionProfit.toFixed(2)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚀 Join under my Deriv partner link:
+👉 https://deriv.partners/rx?sidi=9A373E8A-A450-487A-A419-064B4FE5B751&utm_campaign=dynamicworks&utm_medium=affiliate&utm_source=CU13329`;
+    
+    navigator.clipboard.writeText(reportText).then(() => {
+      const originalText = exportReportBtn.innerText;
+      exportReportBtn.innerText = "Copied! ✅";
+      setTimeout(() => {
+        exportReportBtn.innerText = originalText;
+      }, 2000);
+      addLog("Promo report copied to clipboard!", "success");
+    }).catch(err => {
+      console.error("Failed to copy report:", err);
+    });
   });
 }
 

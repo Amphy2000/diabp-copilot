@@ -905,7 +905,116 @@ body {
   color: var(--text-main);
 }
 
+/* ════════════════════════════════════════════ */
+/*             PERFORMANCE ANALYTICS            */
+/* ════════════════════════════════════════════ */
+.performance-section {
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  padding: 1.15rem;
+  margin-bottom: 1.5rem;
+}
 
+.performance-section h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-main);
+}
 
+.perf-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
 
+.perf-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
 
+.perf-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.perf-value {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.win-color {
+  color: var(--color-success);
+}
+
+.loss-color {
+  color: var(--color-danger);
+}
+
+.text-glow {
+  text-shadow: 0 0 8px rgba(0, 242, 254, 0.4);
+}
+
+.history-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 0.85rem;
+  margin-top: 0.75rem;
+}
+
+.history-card h4 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.table-container {
+  max-height: 180px;
+  overflow-y: auto;
+  margin-top: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.history-table th, .history-table td {
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.history-table th {
+  background: rgba(0, 0, 0, 0.2);
+  font-weight: 600;
+  color: var(--text-muted);
+  position: sticky;
+  top: 0;
+}
+
+.history-table tr:not(:last-child) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.history-table tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.btn-xs {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+}

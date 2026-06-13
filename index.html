@@ -149,7 +149,10 @@
 
       <!-- Live Tick Visualizer -->
       <div class="tick-card">
-        <span class="tick-label">Live V75 Price</span>
+        <div style="display: flex; flex-direction: column;">
+          <span class="tick-label">Live V75 Price</span>
+          <span id="trendLabel" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; font-weight: 600;">Trend: Analyzing...</span>
+        </div>
         <div class="tick-stream">
           <span id="livePrice" class="tick-price">—</span>
           <span id="tickDirection" class="tick-arrow"></span>
@@ -193,6 +196,62 @@
       <div id="statusIndicator" class="status-bar status-idle">
         <span class="status-dot"></span>
         <span id="statusText">Bot is Idle</span>
+      </div>
+
+      <!-- Performance Analytics -->
+      <div class="performance-section margin-top-md">
+        <div class="perf-header flex-row-between">
+          <h3>Performance Analytics</h3>
+          <button id="resetStatsBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; border-color: rgba(255,255,255,0.1); color: var(--text-muted);">Reset Stats</button>
+        </div>
+        <div class="perf-grid">
+          <div class="perf-card">
+            <span class="perf-label">Wins</span>
+            <span id="statsWins" class="perf-value win-color">0</span>
+          </div>
+          <div class="perf-card">
+            <span class="perf-label">Losses</span>
+            <span id="statsLosses" class="perf-value loss-color">0</span>
+          </div>
+          <div class="perf-card">
+            <span class="perf-label">Win Rate</span>
+            <span id="statsWinRate" class="perf-value text-glow" style="color: var(--color-primary);">0%</span>
+          </div>
+          <div class="perf-card">
+            <span class="perf-label">Total Trades</span>
+            <span id="statsTotal" class="perf-value">0</span>
+          </div>
+        </div>
+        
+        <!-- Collapsible Trade History -->
+        <div class="history-toggle-container margin-top-sm">
+          <button id="toggleHistoryBtn" class="btn btn-outline btn-sm width-full" style="font-size: 11px; padding: 6px;">📋 View Trade History & Export Report</button>
+        </div>
+        
+        <div id="tradeHistorySection" class="history-card hidden">
+          <div class="history-actions flex-row-between margin-bottom-sm" style="display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="margin: 0; font-size: 0.85rem;">Trade History</h4>
+            <button id="exportReportBtn" class="btn btn-primary btn-xs" style="padding: 2px 6px; font-size: 10px;">📤 Copy Promo Report</button>
+          </div>
+          <div class="table-container">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Type</th>
+                  <th>Stake</th>
+                  <th>Profit</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody id="tradeHistoryBody">
+                <tr>
+                  <td colspan="5" style="text-align: center; color: var(--text-muted);">No trades recorded.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <!-- Developer Admin Panel -->
