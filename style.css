@@ -1194,4 +1194,28 @@ body {
   #pwaInstallBtn {
     width: 100%;
   }
+
+  /* Prevent mobile input auto-zoom by forcing minimum 16px font size */
+  .acc-select,
+  .admin-input,
+  .input-group input,
+  #promoTemplateSelect {
+    font-size: 16px !important;
+  }
+
+  /* Adjust heights and padding for mobile-friendly interaction sizes */
+  .acc-select {
+    padding: 6px 10px !important;
+  }
+
+  #promoTemplateSelect {
+    height: 32px !important;
+    padding: 4px 8px !important;
+  }
+
+  #exportReportBtn {
+    font-size: 13px !important;
+    height: 32px !important;
+    padding: 0 12px !important;
+  }
 }
