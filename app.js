@@ -214,7 +214,11 @@ function logout() {
 function connectWebSocket(isLoginAttempt = false) {
   addLog("Connecting to Deriv WebSocket server...", "info");
   
-  socket = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${APP_ID}`);
+  // Deriv WebSocket server strictly requires a numeric App ID.
+  // If the configured APP_ID is alphanumeric (e.g. '33xCanrA7...'), we fallback to '61247' for the socket connection.
+  const wsAppId = /^\d+$/.test(APP_ID) ? APP_ID : '61247';
+  
+  socket = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${wsAppId}`);
 
   socket.onopen = () => {
     addLog("Socket connected. Authorizing...", "info");
