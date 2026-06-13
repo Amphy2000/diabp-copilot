@@ -1878,36 +1878,30 @@ function startPipMode() {
   const stream = pipCanvasElement.captureStream(5);
   pipVideoElement.srcObject = stream;
 
-  pipVideoElement.onloadedmetadata = () => {
-    pipVideoElement.play()
-      .then(() => {
-        pipVideoElement.requestPictureInPicture()
-          .then((pipWindow) => {
-            addLog("Floating Bot active! You can now minimize the app.", "success");
-            sendPushNotification("📺 Floating Bot Active", "The bot will continue trading in background.");
-            
-            // Set up drawing interval
-            pipDrawInterval = setInterval(() => {
-              drawPipCanvas(ctx);
-            }, 200);
+  // Play and then request PiP directly without waiting for loadedmetadata
+  pipVideoElement.play()
+    .then(() => {
+      return pipVideoElement.requestPictureInPicture();
+    })
+    .then((pipWindow) => {
+      addLog("Floating Bot active! You can now minimize the app.", "success");
+      sendPushNotification("📺 Floating Bot Active", "The bot will continue trading in background.");
+      
+      // Set up drawing interval
+      pipDrawInterval = setInterval(() => {
+        drawPipCanvas(ctx);
+      }, 200);
 
-            // Handle PiP Window close
-            pipVideoElement.addEventListener('leavepictureinpicture', () => {
-              cleanupPip();
-            });
-          })
-          .catch((err) => {
-            console.error("Failed to enter PiP:", err);
-            addLog(`Failed to enter Floating mode: ${err.message}`, "error");
-            cleanupPip();
-          });
-      })
-      .catch((err) => {
-        console.error("Failed to play PiP video:", err);
-        addLog("Failed to play background stream.", "error");
+      // Handle PiP Window close
+      pipVideoElement.addEventListener('leavepictureinpicture', () => {
         cleanupPip();
       });
-  };
+    })
+    .catch((err) => {
+      console.error("Failed to enter PiP:", err);
+      addLog(`Failed to enter Floating mode: ${err.message}`, "error");
+      cleanupPip();
+    });
 }
 
 function drawPipCanvas(ctx) {
