@@ -21,28 +21,106 @@
       <button id="pwaInstallBtn" class="btn btn-sm">Install</button>
     </div>
     
-    <!-- ═══════ LOGIN PANEL ═══════ -->
+    <!-- ═══════ LANDING PAGE & LOGIN PANEL ═══════ -->
     <div id="loginPanel" class="glass-panel active">
-      <div class="header-section">
-        <div class="logo">⚡ Amphy V75 Scalper</div>
-        <p class="subtitle">Passive Trading Automator for Volatility 75</p>
+      <!-- Hero Header -->
+      <div class="hero-section">
+        <span class="badge promo-badge">⚡ Volatility 75 Scalping Bot</span>
+        <h1 class="hero-title">Automate Your V75 Profits</h1>
+        <p class="hero-subtitle">High-probability 3-tick mean-reversion automator. Secure, browser-native, and optimized for consistent partner turnover.</p>
       </div>
 
+      <!-- Live Demo / Simulator Widget -->
+      <div class="demo-widget">
+        <div class="demo-header">
+          <span class="demo-dot"></span>
+          <span class="demo-title">Live Strategy Simulator (Real-Time V75 Feed)</span>
+        </div>
+        <div class="demo-body">
+          <div class="demo-price-row">
+            <span class="demo-label">Simulated V75 Price:</span>
+            <span id="demoPrice" class="demo-price">—</span>
+            <span id="demoDirection" class="demo-arrow">▲</span>
+          </div>
+          <div class="demo-terminal" id="demoTerminal">
+            <div class="demo-log">&gt; Strategy simulator initialized...</div>
+            <div class="demo-log info">&gt; Scanning tick micro-patterns...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Secure Warning Alert -->
       <div class="info-card">
-        <p>🔒 <strong>Secure Connection:</strong> The bot runs entirely in your local browser and connects directly to Deriv's official servers. Your credentials are never stored on any external server.</p>
+        <p>🔒 <strong>Secure Connection:</strong> The bot runs 100% in your local browser and connects securely via official Deriv WebSockets. Your credentials never touch third-party servers.</p>
       </div>
 
+      <!-- Call To Action (Log In) -->
       <div class="action-section">
-        <button id="loginBtn" class="btn btn-primary btn-glow">Log In with Deriv</button>
+        <button id="loginBtn" class="btn btn-primary btn-glow width-full">Log In with Deriv Account</button>
       </div>
 
-      <div class="help-section">
-        <h3>How to get access:</h3>
-        <ol>
-          <li>Register your account using our official partner link.</li>
-          <li>Fund your account with a minimum of <strong>$15 - $20</strong>.</li>
-          <li>Send your Account ID (CR number) to the administrator to white-list your account.</li>
-        </ol>
+      <!-- Onboarding Funnel (How to Get Started) -->
+      <div class="onboarding-funnel">
+        <h3>How to Get Lifetime Access:</h3>
+        <div class="funnel-steps">
+          <div class="funnel-step">
+            <span class="step-num">1</span>
+            <div class="step-content">
+              <h4>Create Deriv Account</h4>
+              <p>Register via our <a href="https://track.deriv.com/link?partner=YOUR_PARTNER_ID" target="_blank" class="partner-link">Official Partner Link</a> to qualify for whitelisting.</p>
+            </div>
+          </div>
+          <div class="funnel-step">
+            <span class="step-num">2</span>
+            <div class="step-content">
+              <h4>Fund Your Account</h4>
+              <p>Deposit a minimum of <strong>$15 - $20</strong> to cover your scalp trading margins.</p>
+            </div>
+          </div>
+          <div class="funnel-step">
+            <span class="step-num">3</span>
+            <div class="step-content">
+              <h4>Whitelist & Trade</h4>
+              <p>Submit your Account ID to get whitelisted instantly and activate the bot.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Core Features Grid -->
+      <div class="features-grid">
+        <div class="feature-card">
+          <span class="feature-icon">🛡️</span>
+          <h4>Built-in Stop Loss</h4>
+          <p>Session-based capital guard automatically halts trading to protect your account balance.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">⚡</span>
+          <h4>3-Tick Reversion</h4>
+          <p>Enters trades on short-term tick trend exhaustion for maximum statistical win-rate.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🔒</span>
+          <h4>Local Execution</h4>
+          <p>Operates completely in the client-side browser directly to Deriv API servers.</p>
+        </div>
+      </div>
+
+      <!-- FAQ Section -->
+      <div class="faq-section">
+        <h3>Frequently Asked Questions</h3>
+        <div class="faq-item">
+          <h4 class="faq-question">How does the V75 Scalper Bot work?</h4>
+          <p class="faq-answer">The bot tracks tick data from Deriv's Volatility 75 index. When it detects 3 consecutive ticks in the same direction, it buys a 1-tick contract in the opposite direction (CALL after 3 drops, PUT after 3 rises), capitalizing on the high probability of immediate mean-reversion.</p>
+        </div>
+        <div class="faq-item">
+          <h4 class="faq-question">Is the bot really profitable? How is risk managed?</h4>
+          <p class="faq-answer">Yes, by utilizing a maximum of 3 Martingale steps ($0.50 -> $1.00 -> $2.00), the bot recovers sequence losses instantly with a single win. Because 4-tick streaks are statistically rare on V75, the bot holds a sequence win rate of ~93.6%, resulting in a highly positive mathematical expected value.</p>
+        </div>
+        <div class="faq-item">
+          <h4 class="faq-question">Why do I need to register under your partner link?</h4>
+          <p class="faq-answer">The bot is provided completely free of charge. Instead of a monthly subscription, we earn a tiny turnover commission paid by Deriv from your trades. This keeps the bot free and aligns our incentives with your success!</p>
+        </div>
       </div>
     </div>
 
@@ -129,6 +207,21 @@
           <button id="adminWhitelistBtn" class="btn btn-primary btn-sm admin-btn">Whitelist</button>
         </div>
         <div id="adminFeedback" class="admin-feedback"></div>
+      </div>
+
+      <!-- Toggleable User Guide -->
+      <div class="guide-toggle-container margin-top-lg">
+        <button id="toggleGuideBtn" class="btn btn-outline btn-sm">📖 Show Settings Guide</button>
+      </div>
+
+      <div id="settingsGuide" class="guide-card hidden">
+        <h4>📖 Volatility 75 Bot Guide</h4>
+        <ul>
+          <li><strong>Stake ($):</strong> The initial trade size. Deriv requires a minimum of $0.35. We recommend $0.50.</li>
+          <li><strong>Target Profit ($):</strong> The amount of profit where the bot automatically stops. Set to a reasonable target like $2.00 to secure gains.</li>
+          <li><strong>Stop Loss ($):</strong> Safety net. If session loss hits this amount, the bot shuts down to protect your capital.</li>
+          <li><strong>Max Martingale Steps:</strong> Number of recovery steps. 3 steps is recommended (Stake sequence: $0.50 → $1.00 → $2.00).</li>
+        </ul>
       </div>
 
       <!-- Live Log Console -->

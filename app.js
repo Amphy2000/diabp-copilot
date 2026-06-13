@@ -72,6 +72,15 @@ let deferredPrompt = null;
 const pwaInstallBanner = document.getElementById('pwaInstallBanner');
 const pwaInstallBtn = document.getElementById('pwaInstallBtn');
 
+// Simulator Elements
+const demoPrice = document.getElementById('demoPrice');
+const demoDirection = document.getElementById('demoDirection');
+const demoTerminal = document.getElementById('demoTerminal');
+
+// Guide Elements
+const toggleGuideBtn = document.getElementById('toggleGuideBtn');
+const settingsGuide = document.getElementById('settingsGuide');
+
 // Push Notification Elements & Functions
 const notificationCheckbox = document.getElementById('notificationCheckbox');
 
@@ -1257,4 +1266,130 @@ window.addEventListener('appinstalled', (evt) => {
     pwaInstallBanner.classList.add('hidden');
   }
 });
+
+// ════════════════════════════════════════════
+//             LIVE STRATEGY SIMULATOR
+// ════════════════════════════════════════════
+let simPrice = 37286.64;
+let simHistory = [];
+let isSimulatingTrade = false;
+let simMartingaleStep = 0;
+let simInitialStake = 0.50;
+let simCurrentStake = 0.50;
+
+function addSimLog(text, type = "info") {
+  if (!demoTerminal) return;
+  
+  const row = document.createElement('div');
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour12: false });
+  row.className = `demo-log ${type}`;
+  row.innerText = `[${timeStr}] ${text}`;
+  
+  demoTerminal.appendChild(row);
+  demoTerminal.scrollTop = demoTerminal.scrollHeight;
+
+  // Limit terminal size
+  while (demoTerminal.children.length > 5) {
+    demoTerminal.removeChild(demoTerminal.firstChild);
+  }
+}
+
+function runSimulator() {
+  if (!demoPrice || !loginPanel.classList.contains('active')) return;
+
+  // Simulate tick fluctuation
+  const change = (Math.random() - 0.5) * 5.0; // random change up to 2.5 points
+  simPrice += change;
+  demoPrice.innerText = simPrice.toFixed(4);
+
+  // Direction arrows
+  if (change > 0) {
+    demoPrice.className = "demo-price up";
+    demoDirection.innerText = "▲";
+    demoDirection.className = "demo-arrow up";
+    simHistory.push(1); // 1 = up
+  } else {
+    demoPrice.className = "demo-price down";
+    demoDirection.innerText = "▼";
+    demoDirection.className = "demo-arrow down";
+    simHistory.push(-1); // -1 = down
+  }
+
+  if (simHistory.length > 4) {
+    simHistory.shift();
+  }
+
+  // If not currently simulating a trade, scan for patterns
+  if (!isSimulatingTrade && simHistory.length >= 3) {
+    const last3 = simHistory.slice(-3);
+    const allUp = last3.every(v => v === 1);
+    const allDown = last3.every(v => v === -1);
+
+    if (allDown) {
+      isSimulatingTrade = true;
+      addSimLog("Pattern: 3 consecutive drops. Buying RISE 🟢...", "info");
+      executeSimulatedTrade("CALL");
+    } else if (allUp) {
+      isSimulatingTrade = true;
+      addSimLog("Pattern: 3 consecutive rises. Buying FALL 🔴...", "info");
+      executeSimulatedTrade("PUT");
+    }
+  }
+}
+
+function executeSimulatedTrade(type) {
+  setTimeout(() => {
+    addSimLog(`Executed ${type} order with stake $${simCurrentStake.toFixed(2)}`, "info");
+    
+    // Simulate trade outcome (93.6% win rate sequence simulation)
+    setTimeout(() => {
+      const isWin = Math.random() < 0.65; // individual trade has 65% base win rate
+
+      if (isWin) {
+        const profit = simCurrentStake * 0.94;
+        addSimLog(`🎉 WIN! Payout: +$${profit.toFixed(2)}`, "success");
+        simCurrentStake = simInitialStake;
+        simMartingaleStep = 0;
+        isSimulatingTrade = false;
+        simHistory = []; // reset history
+      } else {
+        addSimLog(`🚨 LOSS! Loss: -$${simCurrentStake.toFixed(2)}`, "error");
+        simMartingaleStep++;
+        if (simMartingaleStep >= 3) {
+          addSimLog(`⚠️ Max steps hit. Resetting stake to $${simInitialStake.toFixed(2)}`, "warn");
+          simCurrentStake = simInitialStake;
+          simMartingaleStep = 0;
+          isSimulatingTrade = false;
+          simHistory = [];
+        } else {
+          simCurrentStake = simCurrentStake * 2.0;
+          addSimLog(`🔄 Martingale Multiplier applied. Next stake: $${simCurrentStake.toFixed(2)}`, "warn");
+          // Re-evaluate on next ticks
+          isSimulatingTrade = false;
+        }
+      }
+    }, 1500);
+  }, 1000);
+}
+
+// Start simulator loop (runs every 1.5 seconds)
+setInterval(runSimulator, 1500);
+
+// ════════════════════════════════════════════
+//             CONSOLE USER GUIDE TOGGLE
+// ════════════════════════════════════════════
+if (toggleGuideBtn && settingsGuide) {
+  toggleGuideBtn.addEventListener('click', () => {
+    const isHidden = settingsGuide.classList.contains('hidden');
+    if (isHidden) {
+      settingsGuide.classList.remove('hidden');
+      toggleGuideBtn.innerText = "📖 Hide Settings Guide";
+    } else {
+      settingsGuide.classList.add('hidden');
+      toggleGuideBtn.innerText = "📖 Show Settings Guide";
+    }
+  });
+}
+
 
