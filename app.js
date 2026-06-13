@@ -1511,10 +1511,14 @@ function releaseWakeLock() {
   }
 }
 
-// Handle visibility change to re-request Wake Lock if visible
+// Handle visibility change to re-request Wake Lock if visible or send push notification when backgrounded
 document.addEventListener('visibilitychange', async () => {
-  if (isTrading && document.visibilityState === 'visible') {
-    await requestWakeLock();
+  if (isTrading) {
+    if (document.visibilityState === 'visible') {
+      await requestWakeLock();
+    } else if (document.visibilityState === 'hidden') {
+      sendPushNotification("⚡ Running in Background", "Amphy Bot is actively monitoring V75 tick patterns and trading in the background.");
+    }
   }
 });
 
@@ -1810,13 +1814,15 @@ function updateStatsUI() {
   tradeHistoryBody.innerHTML = stats.history.map(t => {
     const isWin = t.result === 'win';
     const resultClass = isWin ? 'win-color' : 'loss-color';
-    const profitPrefix = t.profit >= 0 ? '+' : '';
+    const stakeVal = parseFloat(t.stake) || 0;
+    const profitVal = parseFloat(t.profit) || 0;
+    const profitPrefix = profitVal >= 0 ? '+' : '';
     return `
       <tr>
         <td>${t.time}</td>
         <td>${t.type}</td>
-        <td>$${t.stake.toFixed(2)}</td>
-        <td class="${resultClass}">${profitPrefix}$${t.profit.toFixed(2)}</td>
+        <td>$${stakeVal.toFixed(2)}</td>
+        <td class="${resultClass}">${profitPrefix}$${profitVal.toFixed(2)}</td>
         <td class="${resultClass}" style="font-weight: 700;">${t.result.toUpperCase()}</td>
       </tr>
     `;
@@ -1827,6 +1833,9 @@ function recordTrade(type, stake, profit, result) {
   const now = new Date();
   const timeStr = now.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
   
+  const stakeNum = parseFloat(stake) || parseFloat(currentStake) || 0;
+  const profitNum = parseFloat(profit) || 0;
+
   if (result === 'win') {
     stats.wins++;
   } else {
@@ -1837,8 +1846,8 @@ function recordTrade(type, stake, profit, result) {
   stats.history.unshift({
     time: timeStr,
     type: type,
-    stake: stake,
-    profit: profit,
+    stake: stakeNum,
+    profit: profitNum,
     result: result
   });
   
