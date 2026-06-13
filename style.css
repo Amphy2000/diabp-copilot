@@ -1127,10 +1127,12 @@ body {
 
   .admin-input {
     width: 100%;
+    flex: none;
   }
 
   .admin-btn {
     width: 100%;
+    flex: none;
   }
 
   .pwa-banner {
