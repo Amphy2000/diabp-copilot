@@ -42,6 +42,8 @@ let currentSubscriptionId = null;
 let pipCanvasElement = null;
 let pipVideoElement = null;
 let pipDrawInterval = null;
+let keepAliveAudioContext = null;
+let keepAliveOscillator = null;
 
 // Performance Stats Object
 let stats = {
@@ -1445,6 +1447,7 @@ startBotBtn.addEventListener('click', () => {
   addLog(`Params: Stake=$${initialStake.toFixed(2)}, Target=$${targetProfit.toFixed(2)}, Stop=$${stopLoss.toFixed(2)}, MaxSteps=${maxMartingaleSteps}`, "info");
   
   requestWakeLock();
+  startKeepAlive();
   
   sendPushNotification("🤖 Bot Started", `Monitoring V75 tick patterns...\nStake: $${initialStake.toFixed(2)} | Target: $${targetProfit.toFixed(2)}`);
 });
@@ -1461,6 +1464,7 @@ function stopTrading(reason) {
   currentContractId = null;
 
   releaseWakeLock();
+  stopKeepAlive();
 
   startBotBtn.classList.remove('hidden');
   stopBotBtn.classList.add('hidden');
@@ -1517,6 +1521,66 @@ document.addEventListener('visibilitychange', async () => {
     await requestWakeLock();
   }
 });
+
+// ════════════════════════════════════════════
+//         BACKGROUND KEEP ALIVE FUNCTIONS
+// ════════════════════════════════════════════
+
+function startKeepAlive() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) {
+      console.warn("AudioContext is not supported by your browser.");
+      return;
+    }
+    
+    if (!keepAliveAudioContext) {
+      keepAliveAudioContext = new AudioContextClass();
+    }
+    
+    // Resume if suspended (browser autoplay restriction)
+    if (keepAliveAudioContext.state === 'suspended') {
+      keepAliveAudioContext.resume();
+    }
+    
+    // Check if oscillator is already running
+    if (keepAliveOscillator) return;
+
+    // Create an oscillator node (makes sound)
+    keepAliveOscillator = keepAliveAudioContext.createOscillator();
+    keepAliveOscillator.type = 'sine';
+    keepAliveOscillator.frequency.value = 440; // Frequency doesn't matter (silent)
+
+    // Create gain node (controls volume)
+    const gainNode = keepAliveAudioContext.createGain();
+    gainNode.gain.value = 0.000001; // Virtually silent to the speaker
+
+    // Connect oscillator -> gain -> destination
+    keepAliveOscillator.connect(gainNode);
+    gainNode.connect(keepAliveAudioContext.destination);
+
+    // Start playing
+    keepAliveOscillator.start();
+    addLog("Background keep-alive active (silent Web Audio).", "info");
+  } catch (err) {
+    console.warn("Could not start background keep-alive:", err);
+  }
+}
+
+function stopKeepAlive() {
+  if (keepAliveOscillator) {
+    try {
+      keepAliveOscillator.stop();
+      keepAliveOscillator.disconnect();
+    } catch (e) {}
+    keepAliveOscillator = null;
+  }
+  if (keepAliveAudioContext && keepAliveAudioContext.state !== 'closed') {
+    try {
+      keepAliveAudioContext.suspend();
+    } catch (e) {}
+  }
+}
 
 // ════════════════════════════════════════════
 //                LOGGING & UTILS
