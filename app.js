@@ -1902,7 +1902,7 @@ if (exportReportBtn) {
     const rate = stats.total > 0 ? ((stats.wins / stats.total) * 100).toFixed(1) : "0.0";
     const selectedTemplate = promoTemplateSelect ? promoTemplateSelect.value : 'raw';
     
-    const partnerLink = "https://deriv.partners/rx?sidi=9A373E8A-A450-487A-A419-064B4FE5B751&utm_campaign=dynamicworks&utm_medium=affiliate&utm_source=CU13329";
+    const partnerLink = window.location.origin;
     
     let reportText = "";
     
@@ -1946,7 +1946,7 @@ ${partnerLink}`;
 💰 Net Session Profit: $${sessionProfit.toFixed(2)}
 💵 Lifetime Net Profit: $${(stats.totalProfit || 0).toFixed(2)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚀 Join under my Deriv partner link:
+🚀 Get free bot access & start trading:
 👉 ${partnerLink}`;
     }
     
