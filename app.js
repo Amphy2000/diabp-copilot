@@ -37,6 +37,7 @@ let currentMartingaleStep = 0;
 let currentProposalId = null;
 let currentContractId = null;
 let activePurchaseProposal = null;
+let wakeLock = null;
 
 // DOM Elements
 const loginPanel = document.getElementById('loginPanel');
@@ -238,6 +239,10 @@ window.addEventListener('DOMContentLoaded', async () => {
       idx++;
     }
     localStorage.setItem('deriv_tokens_map', JSON.stringify(tokensMap));
+
+    // Store all accounts so the account selector works immediately in legacy flow
+    const legacyAccounts = Object.keys(tokensMap).map(acctId => ({ account_id: acctId }));
+    localStorage.setItem('deriv_all_accounts', JSON.stringify(legacyAccounts));
 
     localStorage.setItem('deriv_token', legacyToken);
     localStorage.setItem('deriv_acct', legacyAcct);
@@ -544,6 +549,27 @@ if (adminWhitelistBtn) {
         
         if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
           throw new Error("Supabase credentials are not configured.");
+        }
+
+        // Check if already whitelisted first to avoid duplicate key errors
+        try {
+          const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/allowed_users?account_id=eq.${accountToWhitelist}`, {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            }
+          });
+          if (checkRes.ok) {
+            const checkData = await checkRes.json();
+            if (checkData && checkData.length > 0) {
+              showAdminFeedback(`Account ${accountToWhitelist} is already whitelisted!`, "success");
+              addLog(`Database Whitelist Check (Direct): ${accountToWhitelist} is already whitelisted.`, "success");
+              adminWhitelistInput.value = "";
+              return;
+            }
+          }
+        } catch (checkErr) {
+          console.warn("Failed to check existing whitelist table row:", checkErr);
         }
 
         const directRes = await fetch(`${SUPABASE_URL}/rest/v1/allowed_users`, {
@@ -923,7 +949,16 @@ async function handleMessage(data, isLoginAttempt = false) {
   }
 
   else if (msgType === 'proposal') {
-    if (!data.error && data.proposal) {
+    if (data.error) {
+      addLog(`Proposal failed: ${data.error.message}`, "error");
+      sendPushNotification("❌ Proposal Failed", `Error: ${data.error.message}`);
+      activePurchaseProposal = null;
+      currentProposalId = null;
+      if (isTrading) {
+        statusText.innerText = "Bot is Active";
+        statusIndicator.className = "status-bar status-running";
+      }
+    } else if (data.proposal) {
       if (isTrading && activePurchaseProposal === data.proposal.echo_req.contract_type) {
         currentProposalId = data.proposal.id;
         buyContract(currentProposalId);
@@ -956,7 +991,16 @@ async function handleMessage(data, isLoginAttempt = false) {
   }
 
   else if (msgType === 'proposal_open_contract') {
-    if (!data.error && data.proposal_open_contract) {
+    if (data.error) {
+      addLog(`Contract tracking failed: ${data.error.message}`, "error");
+      activePurchaseProposal = null;
+      currentProposalId = null;
+      currentContractId = null;
+      if (isTrading) {
+        statusText.innerText = "Bot is Active";
+        statusIndicator.className = "status-bar status-running";
+      }
+    } else if (data.proposal_open_contract) {
       const contract = data.proposal_open_contract;
       
       // Check if trade is complete
@@ -1048,7 +1092,7 @@ function proposeTrade(type) {
     basis: "stake",
     contract_type: type,
     currency: "USD",
-    duration: 1,
+    duration: 5,
     duration_unit: "t"
   };
 
@@ -1168,6 +1212,8 @@ startBotBtn.addEventListener('click', () => {
   addLog("🤖 V75 Scalper Bot Started.", "success");
   addLog(`Params: Stake=$${initialStake.toFixed(2)}, Target=$${targetProfit.toFixed(2)}, Stop=$${stopLoss.toFixed(2)}, MaxSteps=${maxMartingaleSteps}`, "info");
   
+  requestWakeLock();
+  
   sendPushNotification("🤖 Bot Started", `Monitoring V75 tick patterns...\nStake: $${initialStake.toFixed(2)} | Target: $${targetProfit.toFixed(2)}`);
 });
 
@@ -1181,6 +1227,8 @@ function stopTrading(reason) {
   activePurchaseProposal = null;
   currentProposalId = null;
   currentContractId = null;
+
+  releaseWakeLock();
 
   startBotBtn.classList.remove('hidden');
   stopBotBtn.classList.add('hidden');
@@ -1202,6 +1250,41 @@ function toggleInputs(disabled) {
   stopLossInput.disabled = disabled;
   martingaleStepsInput.disabled = disabled;
 }
+
+// ════════════════════════════════════════════
+//             WAKE LOCK HELPER FUNCTIONS
+// ════════════════════════════════════════════
+
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      addLog("Screen Wake Lock active (prevents screen from sleeping).", "info");
+    }
+  } catch (err) {
+    console.warn(`Could not obtain Screen Wake Lock: ${err.message}`);
+  }
+}
+
+function releaseWakeLock() {
+  if (wakeLock !== null) {
+    wakeLock.release()
+      .then(() => {
+        wakeLock = null;
+        addLog("Screen Wake Lock released.", "info");
+      })
+      .catch(err => {
+        console.warn(`Error releasing Wake Lock: ${err.message}`);
+      });
+  }
+}
+
+// Handle visibility change to re-request Wake Lock if visible
+document.addEventListener('visibilitychange', async () => {
+  if (isTrading && document.visibilityState === 'visible') {
+    await requestWakeLock();
+  }
+});
 
 // ════════════════════════════════════════════
 //                LOGGING & UTILS
