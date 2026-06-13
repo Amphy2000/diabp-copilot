@@ -1041,8 +1041,8 @@ async function handleMessage(data, isLoginAttempt = false) {
         currentSubscriptionId = data.subscription.id;
       }
       
-      // Check if trade is complete
-      if (contract.is_expired === 1 || contract.status !== 'open') {
+      // Check if trade is complete (only when status is no longer 'open')
+      if (contract.status !== 'open') {
         // Unsubscribe using forget request
         if (currentSubscriptionId) {
           socket.send(JSON.stringify({
