@@ -162,6 +162,18 @@
       <!-- Bot Parameters / Config -->
       <div class="config-section">
         <h3>Bot Settings</h3>
+
+        <!-- Risk Presets Selector -->
+        <div class="risk-presets-container">
+          <label style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.35rem; display: block;">Suggested Settings Wizard (Based on Balance)</label>
+          <div class="risk-buttons-grid">
+            <button type="button" id="presetConservativeBtn" class="preset-btn">Conservative 🛡️</button>
+            <button type="button" id="presetModerateBtn" class="preset-btn active">Moderate ⚖️</button>
+            <button type="button" id="presetAggressiveBtn" class="preset-btn">Aggressive 🔥</button>
+          </div>
+          <div id="presetFeedback" class="preset-info-text">⚖️ Moderate: 2% stake, 3 max recovery steps. Recommended balance: $25+</div>
+        </div>
+
         <div class="input-grid">
           <div class="input-group">
             <label for="stakeInput">Stake ($)</label>

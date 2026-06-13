@@ -342,6 +342,55 @@ body {
   letter-spacing: 0.5px;
 }
 
+.risk-presets-container {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.risk-buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.preset-btn {
+  font-family: var(--font-family-sans);
+  font-weight: 600;
+  font-size: 0.72rem;
+  padding: 0.5rem 0.25rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.preset-btn.active {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: rgba(56, 189, 248, 0.08);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.15);
+}
+
+.preset-btn:hover:not(.active) {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-main);
+}
+
+.preset-info-text {
+  font-size: 0.72rem;
+  color: var(--color-primary);
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
 .input-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -71,6 +71,14 @@ const targetProfitInput = document.getElementById('targetProfitInput');
 const stopLossInput = document.getElementById('stopLossInput');
 const martingaleStepsInput = document.getElementById('martingaleStepsInput');
 
+// Risk Presets elements
+const presetConservativeBtn = document.getElementById('presetConservativeBtn');
+const presetModerateBtn = document.getElementById('presetModerateBtn');
+const presetAggressiveBtn = document.getElementById('presetAggressiveBtn');
+const presetFeedback = document.getElementById('presetFeedback');
+
+let currentPreset = 'moderate'; // 'conservative', 'moderate', 'aggressive', 'custom'
+
 // Developer Admin Panel Elements
 const adminPanel = document.getElementById('adminPanel');
 const adminWhitelistInput = document.getElementById('adminWhitelistInput');
@@ -510,6 +518,99 @@ if (accountSelect) {
   });
 }
 
+// ════════════════════════════════════════════
+//         RISK PRESET & SETTINGS WIZARD
+// ════════════════════════════════════════════
+
+function applyPreset(presetType) {
+  currentPreset = presetType;
+  
+  if (!presetConservativeBtn || !presetModerateBtn || !presetAggressiveBtn || !presetFeedback) return;
+
+  // Update button active states
+  presetConservativeBtn.classList.toggle('active', presetType === 'conservative');
+  presetModerateBtn.classList.toggle('active', presetType === 'moderate');
+  presetAggressiveBtn.classList.toggle('active', presetType === 'aggressive');
+
+  // Retrieve current balance
+  let balance = 20.0; // Default fallback if not logged in
+  const balStr = balanceText ? balanceText.innerText.replace('$', '') : '';
+  const parsedBal = parseFloat(balStr);
+  if (!isNaN(parsedBal) && parsedBal > 0) {
+    balance = parsedBal;
+  }
+
+  let calculatedStake = 0.50;
+  let calculatedSteps = 3;
+  let calculatedStop = 5.00;
+  let calculatedTarget = 2.00;
+  let feedbackMsg = "";
+
+  if (presetType === 'conservative') {
+    calculatedStake = Math.max(0.35, Math.round((balance * 0.01) * 20) / 20); // 1% of balance, rounded to nearest 0.05
+    calculatedSteps = 2;
+    calculatedStop = Math.round((calculatedStake * (1 + 2 + 4)) * 100) / 100; // sum of stakes for 2 steps (Stake + 2*Stake)
+    calculatedTarget = Math.max(1.00, Math.round((balance * 0.03) * 2) / 2); // 3% of balance target
+    feedbackMsg = `🛡️ Conservative: 1% stake ($${calculatedStake.toFixed(2)}), 2 recovery steps. Low risk. Recommended balance: $15+`;
+  } else if (presetType === 'moderate') {
+    calculatedStake = Math.max(0.50, Math.round((balance * 0.02) * 20) / 20); // 2% of balance, rounded to nearest 0.05
+    if (balance < 25) {
+      calculatedStake = 0.50; // Fallback minimum stake
+    }
+    calculatedSteps = 3;
+    calculatedStop = Math.round((calculatedStake * (1 + 2 + 4 + 8)) * 100) / 100; // sum of stakes for 3 steps
+    calculatedTarget = Math.max(2.00, Math.round((balance * 0.07) * 2) / 2); // 7% of balance target
+    feedbackMsg = `⚖️ Moderate: 2% stake ($${calculatedStake.toFixed(2)}), 3 recovery steps. Balanced risk. Recommended balance: $25+`;
+  } else if (presetType === 'aggressive') {
+    calculatedStake = Math.max(0.50, Math.round((balance * 0.04) * 10) / 10); // 4% of balance, rounded to nearest 0.10
+    calculatedSteps = 4;
+    calculatedStop = Math.round((calculatedStake * (1 + 2 + 4 + 8 + 16)) * 100) / 100; // sum of stakes for 4 steps
+    calculatedTarget = Math.max(5.00, Math.round((balance * 0.15) * 2) / 2); // 15% of balance target
+    feedbackMsg = `🔥 Aggressive: 4% stake ($${calculatedStake.toFixed(2)}), 4 recovery steps. High yield, high risk. Recommended balance: $50+`;
+  }
+
+  // Update inputs
+  if (presetType !== 'custom') {
+    if (stakeInput) stakeInput.value = calculatedStake.toFixed(2);
+    if (targetProfitInput) targetProfitInput.value = calculatedTarget.toFixed(2);
+    if (stopLossInput) stopLossInput.value = calculatedStop.toFixed(2);
+    if (martingaleStepsInput) martingaleStepsInput.value = calculatedSteps;
+    presetFeedback.innerText = feedbackMsg;
+    
+    console.log(`Preset Applied: ${presetType}. Stake: ${calculatedStake}, Steps: ${calculatedSteps}, Stop: ${calculatedStop}, Target: ${calculatedTarget}`);
+  }
+}
+
+// Event Listeners for Presets
+if (presetConservativeBtn) {
+  presetConservativeBtn.addEventListener('click', () => applyPreset('conservative'));
+}
+if (presetModerateBtn) {
+  presetModerateBtn.addEventListener('click', () => applyPreset('moderate'));
+}
+if (presetAggressiveBtn) {
+  presetAggressiveBtn.addEventListener('click', () => applyPreset('aggressive'));
+}
+
+// Event listeners to detect manual customization
+const markCustomSettings = () => {
+  currentPreset = 'custom';
+  if (presetConservativeBtn) presetConservativeBtn.classList.remove('active');
+  if (presetModerateBtn) presetModerateBtn.classList.remove('active');
+  if (presetAggressiveBtn) presetAggressiveBtn.classList.remove('active');
+  if (presetFeedback) presetFeedback.innerText = "✏️ Custom settings applied by user.";
+};
+
+if (stakeInput) stakeInput.addEventListener('input', markCustomSettings);
+if (targetProfitInput) targetProfitInput.addEventListener('input', markCustomSettings);
+if (stopLossInput) stopLossInput.addEventListener('input', markCustomSettings);
+if (martingaleStepsInput) martingaleStepsInput.addEventListener('input', markCustomSettings);
+
+// Apply default on load
+setTimeout(() => {
+  applyPreset('moderate');
+}, 500);
+
 // Developer Admin Panel logic
 function checkAdminStatus() {
   const currentAcct = localStorage.getItem('deriv_acct');
@@ -937,10 +1038,12 @@ async function handleMessage(data, isLoginAttempt = false) {
       await populateAccountSelector(token);
       checkAdminStatus();
       
-      // Update Balance
-      const balance = data.authorize.balance;
-      const currency = data.authorize.currency;
       balanceText.innerText = `$${parseFloat(balance).toFixed(2)}`;
+      
+      // Auto-recalculate recommended settings if not customized
+      if (typeof applyPreset === 'function' && currentPreset !== 'custom') {
+        applyPreset(currentPreset);
+      }
       
       // Subscribe to balance updates
       socket.send(JSON.stringify({
@@ -960,6 +1063,11 @@ async function handleMessage(data, isLoginAttempt = false) {
   else if (msgType === 'balance') {
     if (!data.error && data.balance) {
       balanceText.innerText = `$${parseFloat(data.balance.balance).toFixed(2)}`;
+      
+      // Auto-recalculate recommended settings if not customized
+      if (typeof applyPreset === 'function' && currentPreset !== 'custom') {
+        applyPreset(currentPreset);
+      }
     }
   }
 
