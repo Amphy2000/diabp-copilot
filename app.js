@@ -13,6 +13,11 @@ const APPROVED_ACCOUNTS = [
   // Add your clients' account IDs here as they sign up under your link
 ];
 
+// 3. Supabase Credentials (leave blank to use the hardcoded APPROVED_ACCOUNTS whitelist instead)
+const SUPABASE_URL = ''; // Paste your Supabase project URL here
+const SUPABASE_ANON_KEY = ''; // Paste your Supabase anon public key here
+
+
 // ════════════════════════════════════════════
 //            STATE & UI SELECTORS
 // ════════════════════════════════════════════
@@ -74,15 +79,47 @@ window.addEventListener('DOMContentLoaded', () => {
   checkAuth();
 });
 
-function checkAuth() {
+// Helper to check if account is whitelisted
+async function isAccountApproved(acct) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    return APPROVED_ACCOUNTS.some(approved => 
+      approved.trim().toUpperCase() === acct.trim().toUpperCase()
+    );
+  }
+
+  try {
+    const formattedAcct = acct.trim().toUpperCase();
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/allowed_users?account_id=eq.${formattedAcct}`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      }
+    });
+    
+    if (!response.ok) {
+      console.warn("Supabase response not OK, falling back to local whitelist");
+      return APPROVED_ACCOUNTS.some(approved => 
+        approved.trim().toUpperCase() === acct.trim().toUpperCase()
+      );
+    }
+
+    const data = await response.json();
+    return data && data.length > 0;
+  } catch (err) {
+    console.error("Supabase error, falling back to local whitelist:", err);
+    return APPROVED_ACCOUNTS.some(approved => 
+      approved.trim().toUpperCase() === acct.trim().toUpperCase()
+    );
+  }
+}
+
+async function checkAuth() {
   const token = localStorage.getItem('deriv_token');
   const acct = localStorage.getItem('deriv_acct');
 
   if (token && acct) {
-    // Check if account is in the white-list
-    const isApproved = APPROVED_ACCOUNTS.some(approved => 
-      approved.trim().toUpperCase() === acct.trim().toUpperCase()
-    );
+    // Check if account is in the white-list (via Supabase or local fallback)
+    const isApproved = await isAccountApproved(acct);
 
     if (!isApproved) {
       alert(`⚠️ ACCESS DENIED\nYour account (${acct}) is not white-listed.\n\nPlease contact the admin to activate access.`);
