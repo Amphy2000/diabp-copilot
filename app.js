@@ -407,6 +407,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').then(reg => {
       console.log('Service Worker registered scope:', reg.scope);
+      reg.update(); // Force checking server for service worker updates
     }).catch(err => {
       console.error('Service Worker registration failed:', err);
     });
@@ -1602,8 +1603,8 @@ function evaluateStrategyPattern() {
   const isRecoveryStep = currentMartingaleStep > 0;
   const useStrict = isRecoveryStep && useStrictMartingale;
 
-  const rsiCallThreshold = useStrict ? 35 : 40;
-  const rsiPutThreshold = useStrict ? 65 : 60;
+  const rsiCallThreshold = useStrict ? 35 : 45;
+  const rsiPutThreshold = useStrict ? 65 : 55;
 
   let callBounce = false;
   let putBounce = false;
