@@ -294,8 +294,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     localStorage.setItem('deriv_token', legacyToken);
     localStorage.setItem('deriv_acct', legacyAcct);
     localStorage.removeItem('deriv_app_id'); // clear any OAuth-based App ID
-    window.history.replaceState({}, document.title, window.location.pathname);
-    checkAuth();
+    // Perform a full reload to clean the URL query params and restore viewport scale
+    window.location.replace(window.location.origin + '/');
     return;
   }
 
@@ -381,14 +381,26 @@ window.addEventListener('DOMContentLoaded', async () => {
       localStorage.setItem('deriv_app_id', appId);
 
       addLog(`OAuth login successful for account ${targetAcct.account_id}`, "success");
+      
+      // Clear session storage
+      sessionStorage.removeItem('oauth_state');
+      sessionStorage.removeItem('code_verifier');
+
+      // Perform a full reload to clean URL and force browser to reset viewport to device width
+      window.location.replace(window.location.origin + '/');
+      return;
     } catch (err) {
       addLog(`OAuth error: ${err.message}`, "error");
       alert(`OAuth login failed: ${err.message}`);
+      
+      // Clear session storage
+      sessionStorage.removeItem('oauth_state');
+      sessionStorage.removeItem('code_verifier');
+      
+      // Reload on failure too to clean query strings
+      window.location.replace(window.location.origin + '/');
+      return;
     }
-
-    // Clear session storage
-    sessionStorage.removeItem('oauth_state');
-    sessionStorage.removeItem('code_verifier');
   }
 
   // Register service worker for PWA support and mobile push notifications
@@ -1079,13 +1091,18 @@ function logout() {
   localStorage.removeItem('deriv_token');
   localStorage.removeItem('deriv_acct');
   localStorage.removeItem('deriv_app_id');
+  localStorage.removeItem('deriv_tokens_map');
+  localStorage.removeItem('deriv_all_accounts');
   isTrading = false;
   isAuthorized = false;
   if (socket) {
-    socket.close();
+    try {
+      socket.close();
+    } catch (e) {}
   }
   
-  checkAuth();
+  // Force a full reload to clean memory, reset viewport scaling, and show clean login page
+  window.location.replace(window.location.origin + '/');
 }
 
 // ════════════════════════════════════════════
