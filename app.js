@@ -28,6 +28,9 @@ let isAuthorized = false;
 let currentAuthorizedAccount = null;
 let isTrading = false;
 let ticksHistory = []; // stores tick prices
+let ticksHistoryCounters = [];
+let absoluteTickCounter = 0;
+let chartTradeMarkers = [];
 let sessionProfit = 0.0;
 let initialStake = 0.50;
 let currentStake = 0.50;
@@ -1543,6 +1546,22 @@ async function handleMessage(data, isLoginAttempt = false) {
       addLog(`Order placed successfully. ID: ${currentContractId}`, "info");
       sendPushNotification("📈 Trade Placed", `${activePurchaseProposal === 'CALL' ? 'RISE 🟢' : 'FALL 🔴'} order executed with stake $${currentStake.toFixed(2)}.`);
       
+      // Record trade marker for chart visualizer
+      const lastPrice = ticksHistory.length > 0 ? ticksHistory[ticksHistory.length - 1] : 0;
+      chartTradeMarkers.push({
+        absoluteIndex: absoluteTickCounter,
+        price: lastPrice,
+        type: activePurchaseProposal,
+        result: null,
+        id: currentContractId
+      });
+      if (chartTradeMarkers.length > 50) {
+        chartTradeMarkers.shift();
+      }
+      if (typeof drawChart === 'function') {
+        drawChart();
+      }
+
       // Subscribe to this specific contract's updates to check outcome
       socket.send(JSON.stringify({
         proposal_open_contract: 1,
@@ -1643,9 +1662,12 @@ function processTick(tick) {
   }
 
   // Keep a record of the last 100 prices to analyze patterns and calculate moving averages
+  absoluteTickCounter++;
   ticksHistory.push(price);
+  ticksHistoryCounters.push(absoluteTickCounter);
   if (ticksHistory.length > 100) {
     ticksHistory.shift();
+    ticksHistoryCounters.shift();
   }
 
   // Calculate moving averages for trend filtering
@@ -1703,6 +1725,10 @@ function processTick(tick) {
       }
       evaluateStrategyPattern();
     }
+  }
+
+  if (typeof drawChart === 'function') {
+    drawChart();
   }
 }
 
@@ -1806,6 +1832,20 @@ function handleTradeOutcome(contract) {
   const status = contract.status; // 'won' or 'lost'
   const profit = parseFloat(contract.profit);
   const contractType = contract.contract_type || activePurchaseProposal || "Unknown";
+
+  // Update trade marker outcome on chart
+  const marker = chartTradeMarkers.find(m => m.id === contract.contract_id);
+  if (marker) {
+    marker.result = status === 'won' ? 'win' : 'loss';
+  } else {
+    const lastPending = [...chartTradeMarkers].reverse().find(m => m.result === null);
+    if (lastPending) {
+      lastPending.result = status === 'won' ? 'win' : 'loss';
+    }
+  }
+  if (typeof drawChart === 'function') {
+    drawChart();
+  }
   
   sessionProfit += profit;
   updateProfitDisplay();
@@ -2541,6 +2581,10 @@ function saveSessionState() {
 
 function clearSessionState() {
   localStorage.removeItem('deriv_bot_active_session');
+  chartTradeMarkers = [];
+  if (typeof drawChart === 'function') {
+    drawChart();
+  }
 }
 
 function checkActiveSession() {
@@ -2694,6 +2738,242 @@ function handleWebSocketDisconnect() {
   } else {
     isReconnecting = false;
     reconnectAttempts = 0;
+  }
+}
+
+// ════════════════════════════════════════════
+//             REAL-TIME TICK CHART DRAWING
+// ════════════════════════════════════════════
+
+function drawChart() {
+  const canvas = document.getElementById('tickChart');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  // Scale the canvas for high-DPR screens to keep lines sharp
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+
+  const width = rect.width;
+  const height = rect.height;
+
+  // Clear background
+  ctx.clearRect(0, 0, width, height);
+
+  // If no price history is loaded, show dynamic placeholder text
+  if (!ticksHistory || ticksHistory.length === 0) {
+    ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Waiting for live ticks feed...", width / 2, height / 2);
+    return;
+  }
+
+  const prices = ticksHistory;
+  
+  // Precompute SMA 10 and SMA 20 values for the current tick history subset
+  const sma10Values = [];
+  const sma20Values = [];
+  for (let i = 0; i < prices.length; i++) {
+    // SMA-10
+    if (i >= 9) {
+      const slice = prices.slice(i - 9, i + 1);
+      const avg = slice.reduce((a, b) => a + b, 0) / 10;
+      sma10Values.push(avg);
+    } else {
+      sma10Values.push(null);
+    }
+
+    // SMA-20
+    if (i >= 19) {
+      const slice = prices.slice(i - 19, i + 1);
+      const avg = slice.reduce((a, b) => a + b, 0) / 20;
+      sma20Values.push(avg);
+    } else {
+      sma20Values.push(null);
+    }
+  }
+
+  // Calculate min and max bounds for y-axis scaling
+  let minVal = Infinity;
+  let maxVal = -Infinity;
+  for (let i = 0; i < prices.length; i++) {
+    minVal = Math.min(minVal, prices[i]);
+    maxVal = Math.max(maxVal, prices[i]);
+    if (sma10Values[i] !== null) {
+      minVal = Math.min(minVal, sma10Values[i]);
+      maxVal = Math.max(maxVal, sma10Values[i]);
+    }
+    if (sma20Values[i] !== null) {
+      minVal = Math.min(minVal, sma20Values[i]);
+      maxVal = Math.max(maxVal, sma20Values[i]);
+    }
+  }
+
+  const range = maxVal - minVal;
+  const padding = range > 0 ? range * 0.08 : 0.5;
+  minVal -= padding;
+  maxVal += padding;
+
+  const rightMargin = 45; // pixels reserved for the current price badge
+  const chartWidth = width - rightMargin;
+
+  // 1. Draw Grid Lines
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let g = 1; g < 4; g++) {
+    const gy = (g / 4) * height;
+    ctx.moveTo(0, gy);
+    ctx.lineTo(chartWidth, gy);
+  }
+  ctx.stroke();
+
+  // 2. Draw Price Area Gradient
+  const points = [];
+  ctx.beginPath();
+  for (let i = 0; i < prices.length; i++) {
+    const x = (i / (prices.length - 1)) * chartWidth;
+    const y = height - ((prices[i] - minVal) / (maxVal - minVal)) * height;
+    points.push({ x, y });
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+
+  if (points.length > 0) {
+    ctx.lineTo(points[points.length - 1].x, height);
+    ctx.lineTo(points[0].x, height);
+    ctx.closePath();
+    const areaGrad = ctx.createLinearGradient(0, 0, 0, height);
+    areaGrad.addColorStop(0, "rgba(56, 189, 248, 0.08)");
+    areaGrad.addColorStop(1, "rgba(56, 189, 248, 0.0)");
+    ctx.fillStyle = areaGrad;
+    ctx.fill();
+  }
+
+  // 3. Draw Price Line
+  ctx.strokeStyle = "#38bdf8"; // cyan
+  ctx.lineWidth = 2;
+  ctx.shadowColor = "rgba(56, 189, 248, 0.4)";
+  ctx.shadowBlur = 4;
+  ctx.beginPath();
+  for (let i = 0; i < points.length; i++) {
+    if (i === 0) ctx.moveTo(points[i].x, points[i].y);
+    else ctx.lineTo(points[i].x, points[i].y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0; // reset glow
+
+  // 4. Draw SMA-10 Line
+  ctx.strokeStyle = "#f59e0b"; // gold
+  ctx.lineWidth = 1.25;
+  ctx.beginPath();
+  let sma10Started = false;
+  for (let i = 0; i < prices.length; i++) {
+    if (sma10Values[i] !== null) {
+      const x = (i / (prices.length - 1)) * chartWidth;
+      const y = height - ((sma10Values[i] - minVal) / (maxVal - minVal)) * height;
+      if (!sma10Started) {
+        ctx.moveTo(x, y);
+        sma10Started = true;
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+  }
+  ctx.stroke();
+
+  // 5. Draw SMA-20 Line
+  ctx.strokeStyle = "#ec4899"; // pink
+  ctx.lineWidth = 1.25;
+  ctx.beginPath();
+  let sma20Started = false;
+  for (let i = 0; i < prices.length; i++) {
+    if (sma20Values[i] !== null) {
+      const x = (i / (prices.length - 1)) * chartWidth;
+      const y = height - ((sma20Values[i] - minVal) / (maxVal - minVal)) * height;
+      if (!sma20Started) {
+        ctx.moveTo(x, y);
+        sma20Started = true;
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+  }
+  ctx.stroke();
+
+  // 6. Draw Horizontal Current Price level tracker line and Badge
+  const currentPrice = prices[prices.length - 1];
+  const currentY = height - ((currentPrice - minVal) / (maxVal - minVal)) * height;
+
+  ctx.strokeStyle = "rgba(56, 189, 248, 0.35)";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(0, currentY);
+  ctx.lineTo(chartWidth, currentY);
+  ctx.stroke();
+  ctx.setLineDash([]); // reset dash
+
+  // Price tag badge background
+  ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+  ctx.strokeStyle = "#38bdf8";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(width - 43, currentY - 8, 41, 16, 4);
+  } else {
+    ctx.rect(width - 43, currentY - 8, 41, 16);
+  }
+  ctx.fill();
+  ctx.stroke();
+
+  // Price text inside badge
+  ctx.fillStyle = "#38bdf8";
+  ctx.font = "bold 9px monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(currentPrice.toFixed(2), width - 22, currentY);
+
+  // 7. Render Trade Markers
+  for (let i = 0; i < chartTradeMarkers.length; i++) {
+    const marker = chartTradeMarkers[i];
+    const idx = ticksHistoryCounters.indexOf(marker.absoluteIndex);
+    if (idx !== -1) {
+      const x = (idx / (prices.length - 1)) * chartWidth;
+      const y = height - ((marker.price - minVal) / (maxVal - minVal)) * height;
+
+      // Draw glowing dot
+      let markerColor = "#f59e0b"; // gold/yellow for pending
+      if (marker.result === 'win') markerColor = "#10b981"; // emerald green
+      else if (marker.result === 'loss') markerColor = "#ef4444"; // rose red
+
+      ctx.beginPath();
+      ctx.arc(x, y, 4.5, 0, 2 * Math.PI);
+      ctx.fillStyle = markerColor;
+      ctx.shadowColor = markerColor;
+      ctx.shadowBlur = 6;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Draw visual direction arrow above/below the dot
+      ctx.fillStyle = markerColor;
+      ctx.font = "bold 9px sans-serif";
+      ctx.textAlign = "center";
+      if (marker.type === 'CALL') {
+        ctx.textBaseline = "bottom";
+        ctx.fillText("▲", x, y - 5);
+      } else {
+        ctx.textBaseline = "top";
+        ctx.fillText("▼", x, y + 5);
+      }
+    }
   }
 }
 
