@@ -1309,7 +1309,11 @@ function connectWebSocket(isLoginAttempt = false) {
         connectTokenBtn.innerText = "Connect with Token";
         connectTokenBtn.disabled = false;
       }
-      logout();
+      if (isReconnecting || isTrading) {
+        handleWebSocketDisconnect();
+      } else {
+        logout();
+      }
     });
   } else {
     // Legacy flow
@@ -1382,7 +1386,11 @@ async function handleMessage(data, isLoginAttempt = false) {
           connectTokenBtn.disabled = false;
         }
       }
-      logout();
+      if (isReconnecting || isTrading) {
+        handleWebSocketDisconnect();
+      } else {
+        logout();
+      }
     } else {
       const acct = data.authorize.loginid;
       
