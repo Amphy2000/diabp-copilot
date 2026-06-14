@@ -25,6 +25,7 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJ
 // ════════════════════════════════════════════
 let socket = null;
 let isAuthorized = false;
+let currentAuthorizedAccount = null;
 let isTrading = false;
 let ticksHistory = []; // stores tick prices
 let sessionProfit = 0.0;
@@ -507,7 +508,7 @@ async function populateAccountSelector(token) {
     opt.value = a.account_id;
     const typeStr = a.account_id.toUpperCase().startsWith('DOT') || a.account_id.toUpperCase().startsWith('VRTC') ? 'Demo' : 'Real';
     opt.textContent = `${a.account_id} (${typeStr})`;
-    if (a.account_id === currentAcct) {
+    if (currentAcct && a.account_id.trim().toUpperCase() === currentAcct.trim().toUpperCase()) {
       opt.selected = true;
     }
     accountSelect.appendChild(opt);
@@ -671,13 +672,14 @@ setTimeout(() => {
 
 // Bot Database Analytics Reporting and Retrieving
 async function reportSessionAnalytics() {
-  const acct = localStorage.getItem('deriv_acct');
+  const acct = currentAuthorizedAccount || localStorage.getItem('deriv_acct');
   if (!acct) return;
 
-  const isDemo = acct.startsWith('VRTC') || acct.startsWith('DOT');
+  const cleanAcct = acct.trim().toUpperCase();
+  const isDemo = cleanAcct.startsWith('VRTC') || cleanAcct.startsWith('DOT');
   
   const payload = {
-    account_id: acct,
+    account_id: cleanAcct,
     is_demo: isDemo,
     trades_count: sessionTradesCount,
     wins_count: sessionWins,
@@ -1168,6 +1170,7 @@ function connectWebSocket(isLoginAttempt = false) {
       socket.onopen = () => {
         addLog("Connected to Options WebSocket!", "success");
         isAuthorized = true;
+        currentAuthorizedAccount = acct ? acct.trim().toUpperCase() : null;
         
         // Fetch balance and subscribe to ticks
         socket.send(JSON.stringify({
@@ -1316,6 +1319,7 @@ async function handleMessage(data, isLoginAttempt = false) {
 
       // Successfully authorized & whitelisted
       localStorage.setItem('deriv_acct', acct);
+      currentAuthorizedAccount = acct ? acct.trim().toUpperCase() : null;
       isAuthorized = true;
       addLog("Successfully Authorized!", "success");
       
@@ -2402,7 +2406,7 @@ ${actionText}
 
 function saveSessionState() {
   const sessionState = {
-    account_id: localStorage.getItem('deriv_acct'),
+    account_id: currentAuthorizedAccount || localStorage.getItem('deriv_acct'),
     initialStake: initialStake,
     currentStake: currentStake,
     currentMartingaleStep: currentMartingaleStep,
@@ -2435,7 +2439,9 @@ function checkActiveSession() {
     try {
       const state = JSON.parse(sessionData);
       const currentAcct = localStorage.getItem('deriv_acct');
-      if (state && !isTrading && state.account_id === currentAcct) {
+      const cleanCurrent = currentAcct ? currentAcct.trim().toUpperCase() : "";
+      const cleanSaved = state.account_id ? state.account_id.trim().toUpperCase() : "";
+      if (state && !isTrading && cleanSaved === cleanCurrent) {
         resumeStep.innerText = state.currentMartingaleStep;
         resumeStake.innerText = `$${parseFloat(state.currentStake).toFixed(2)}`;
         
