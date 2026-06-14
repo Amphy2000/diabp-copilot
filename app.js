@@ -34,6 +34,10 @@ let targetProfit = 2.00;
 let stopLoss = 5.00;
 let maxMartingaleSteps = 3;
 let currentMartingaleStep = 0;
+let lossCooldownTicks = 15;
+let cooldownTicksRemaining = 0;
+let useSma50Guard = true;
+let useStrictMartingale = true;
 let currentProposalId = null;
 let currentContractId = null;
 let activePurchaseProposal = null;
@@ -81,6 +85,9 @@ const stakeInput = document.getElementById('stakeInput');
 const targetProfitInput = document.getElementById('targetProfitInput');
 const stopLossInput = document.getElementById('stopLossInput');
 const martingaleStepsInput = document.getElementById('martingaleStepsInput');
+const lossCooldownInput = document.getElementById('lossCooldownInput');
+const sma50GuardCheckbox = document.getElementById('sma50GuardCheckbox');
+const strictMartingaleCheckbox = document.getElementById('strictMartingaleCheckbox');
 
 // Risk Presets elements
 const presetConservativeBtn = document.getElementById('presetConservativeBtn');
@@ -556,6 +563,9 @@ function applyPreset(presetType) {
   let calculatedSteps = 3;
   let calculatedStop = 5.00;
   let calculatedTarget = 2.00;
+  let calculatedCooldown = 15;
+  let calculatedSma50 = true;
+  let calculatedStrictMartingale = true;
   let feedbackMsg = "";
 
   if (presetType === 'conservative') {
@@ -563,7 +573,10 @@ function applyPreset(presetType) {
     calculatedSteps = 2;
     calculatedStop = Math.round((calculatedStake * (1 + 2 + 4)) * 100) / 100; // sum of stakes for 2 steps (Stake + 2*Stake)
     calculatedTarget = Math.max(1.00, Math.round((balance * 0.03) * 2) / 2); // 3% of balance target
-    feedbackMsg = `🛡️ Conservative: 1% stake ($${calculatedStake.toFixed(2)}), 2 recovery steps. Low risk. Recommended balance: $15+`;
+    calculatedCooldown = 20;
+    calculatedSma50 = true;
+    calculatedStrictMartingale = true;
+    feedbackMsg = `🛡️ Conservative: 1% stake ($${calculatedStake.toFixed(2)}), 2 recovery steps, 20-tick loss cooldown. Low risk. Recommended balance: $15+`;
   } else if (presetType === 'moderate') {
     calculatedStake = Math.max(0.50, Math.round((balance * 0.02) * 20) / 20); // 2% of balance, rounded to nearest 0.05
     if (balance < 25) {
@@ -572,13 +585,19 @@ function applyPreset(presetType) {
     calculatedSteps = 3;
     calculatedStop = Math.round((calculatedStake * (1 + 2 + 4 + 8)) * 100) / 100; // sum of stakes for 3 steps
     calculatedTarget = Math.max(2.00, Math.round((balance * 0.07) * 2) / 2); // 7% of balance target
-    feedbackMsg = `⚖️ Moderate: 2% stake ($${calculatedStake.toFixed(2)}), 3 recovery steps. Balanced risk. Recommended balance: $25+`;
+    calculatedCooldown = 15;
+    calculatedSma50 = true;
+    calculatedStrictMartingale = true;
+    feedbackMsg = `⚖️ Moderate: 2% stake ($${calculatedStake.toFixed(2)}), 3 recovery steps, 15-tick loss cooldown. Balanced risk. Recommended balance: $25+`;
   } else if (presetType === 'aggressive') {
     calculatedStake = Math.max(0.50, Math.round((balance * 0.04) * 10) / 10); // 4% of balance, rounded to nearest 0.10
     calculatedSteps = 4;
     calculatedStop = Math.round((calculatedStake * (1 + 2 + 4 + 8 + 16)) * 100) / 100; // sum of stakes for 4 steps
     calculatedTarget = Math.max(5.00, Math.round((balance * 0.15) * 2) / 2); // 15% of balance target
-    feedbackMsg = `🔥 Aggressive: 4% stake ($${calculatedStake.toFixed(2)}), 4 recovery steps. High yield, high risk. Recommended balance: $50+`;
+    calculatedCooldown = 10;
+    calculatedSma50 = true;
+    calculatedStrictMartingale = true;
+    feedbackMsg = `🔥 Aggressive: 4% stake ($${calculatedStake.toFixed(2)}), 4 recovery steps, 10-tick loss cooldown. High yield, high risk. Recommended balance: $50+`;
   }
 
   // Update inputs
@@ -587,9 +606,12 @@ function applyPreset(presetType) {
     if (targetProfitInput) targetProfitInput.value = calculatedTarget.toFixed(2);
     if (stopLossInput) stopLossInput.value = calculatedStop.toFixed(2);
     if (martingaleStepsInput) martingaleStepsInput.value = calculatedSteps;
+    if (lossCooldownInput) lossCooldownInput.value = calculatedCooldown;
+    if (sma50GuardCheckbox) sma50GuardCheckbox.checked = calculatedSma50;
+    if (strictMartingaleCheckbox) strictMartingaleCheckbox.checked = calculatedStrictMartingale;
     presetFeedback.innerText = feedbackMsg;
     
-    console.log(`Preset Applied: ${presetType}. Stake: ${calculatedStake}, Steps: ${calculatedSteps}, Stop: ${calculatedStop}, Target: ${calculatedTarget}`);
+    console.log(`Preset Applied: ${presetType}. Stake: ${calculatedStake}, Steps: ${calculatedSteps}, Stop: ${calculatedStop}, Target: ${calculatedTarget}, Cooldown: ${calculatedCooldown}`);
   }
 }
 
@@ -617,6 +639,9 @@ if (stakeInput) stakeInput.addEventListener('input', markCustomSettings);
 if (targetProfitInput) targetProfitInput.addEventListener('input', markCustomSettings);
 if (stopLossInput) stopLossInput.addEventListener('input', markCustomSettings);
 if (martingaleStepsInput) martingaleStepsInput.addEventListener('input', markCustomSettings);
+if (lossCooldownInput) lossCooldownInput.addEventListener('input', markCustomSettings);
+if (sma50GuardCheckbox) sma50GuardCheckbox.addEventListener('change', markCustomSettings);
+if (strictMartingaleCheckbox) strictMartingaleCheckbox.addEventListener('change', markCustomSettings);
 
 // Apply default on load
 setTimeout(() => {
@@ -1449,9 +1474,9 @@ function processTick(tick) {
     }
   }
 
-  // Keep a record of the last 50 prices to analyze patterns and calculate moving averages
+  // Keep a record of the last 100 prices to analyze patterns and calculate moving averages
   ticksHistory.push(price);
-  if (ticksHistory.length > 50) {
+  if (ticksHistory.length > 100) {
     ticksHistory.shift();
   }
 
@@ -1491,9 +1516,25 @@ function processTick(tick) {
     trendLabel.style.color = trendColor;
   }
 
+  if (cooldownTicksRemaining > 0) {
+    cooldownTicksRemaining--;
+    if (cooldownTicksRemaining === 0) {
+      addLog("⏱️ Loss cooldown complete. Bot is ready to evaluate trades.", "info");
+    }
+  }
+
   // Execute strategy if trading is active and not waiting on a trade
   if (isTrading && activePurchaseProposal === null && currentContractId === null) {
-    evaluateStrategyPattern();
+    if (cooldownTicksRemaining > 0) {
+      statusText.innerText = `Cooldown: ${cooldownTicksRemaining} ticks`;
+      statusIndicator.className = "status-bar status-idle";
+    } else {
+      if (statusText.innerText.startsWith("Cooldown")) {
+        statusText.innerText = "Bot is Active";
+        statusIndicator.className = "status-bar status-running";
+      }
+      evaluateStrategyPattern();
+    }
   }
 }
 
@@ -1504,6 +1545,8 @@ function evaluateStrategyPattern() {
   const sma20 = calculateSMA(20);
   const rsi14 = calculateRSI(14);
   if (!sma10 || !sma20 || rsi14 === null) return;
+
+  const sma50 = useSma50Guard ? calculateSMA(50) : null;
 
   const len = ticksHistory.length;
   // Extract the last 5 ticks to check for 3 drops followed by a rise, or 3 rises followed by a drop
@@ -1516,22 +1559,55 @@ function evaluateStrategyPattern() {
   const trendIsBullish = sma10 > sma20;
   const trendIsBearish = sma10 < sma20;
 
+  const isRecoveryStep = currentMartingaleStep > 0;
+  const useStrict = isRecoveryStep && useStrictMartingale;
+
+  const rsiCallThreshold = useStrict ? 35 : 40;
+  const rsiPutThreshold = useStrict ? 65 : 60;
+
+  let callBounce = false;
+  let putBounce = false;
+
+  if (useStrict && len >= 6) {
+    const t_5 = ticksHistory[len - 6];
+    const t_4 = ticksHistory[len - 5];
+    const t_3 = ticksHistory[len - 4];
+    const t_2 = ticksHistory[len - 3];
+    const t_1 = ticksHistory[len - 2];
+    const t_0 = ticksHistory[len - 1]; // current price
+    
+    // Strict recovery CALL entry: 3 consecutive drops followed by 2 consecutive rises
+    callBounce = (t_4 < t_5 && t_3 < t_4 && t_2 < t_3 && t_1 > t_2 && t_0 > t_1);
+    // Strict recovery PUT entry: 3 consecutive rises followed by 2 consecutive drops
+    putBounce = (t_4 > t_5 && t_3 > t_4 && t_2 > t_3 && t_1 < t_2 && t_0 < t_1);
+  } else {
+    // Standard CALL entry: 3 consecutive drops followed by 1 rise
+    callBounce = (t1 < t0 && t2 < t1 && t3 < t2 && t4 > t3);
+    // Standard PUT entry: 3 consecutive rises followed by 1 drop
+    putBounce = (t1 > t0 && t2 > t1 && t3 > t2 && t4 < t3);
+  }
+
+  const isSma50CallValid = !useSma50Guard || !sma50 || t4 > sma50;
+  const isSma50PutValid = !useSma50Guard || !sma50 || t4 < sma50;
+
   // 1. Trend-Following Bullish Pullback:
   // - Trend is Bullish (SMA10 > SMA20)
-  // - RSI is oversold (< 40)
+  // - RSI is oversold (< rsiCallThreshold)
   // - Breakout Guard: Current price is above SMA20 (confirms it is a pullback, not a downward trend crash)
-  // - Trigger: 3 consecutive drops followed by 1 rise tick (confirms the bounce has started)
-  if (trendIsBullish && rsi14 < 40 && t4 > sma20 && t1 < t0 && t2 < t1 && t3 < t2 && t4 > t3) {
-    addLog(`Trend: Bullish | RSI: ${rsi14.toFixed(1)} (Oversold) | Pullback bounce detected. Buying RISE...`, "info");
+  // - SMA-50 Trend Guard: Price is above SMA-50
+  // - Trigger: Pullback bounce detected (standard or strict recovery)
+  if (trendIsBullish && rsi14 < rsiCallThreshold && t4 > sma20 && isSma50CallValid && callBounce) {
+    addLog(`Trend: Bullish | RSI: ${rsi14.toFixed(1)} (Threshold: ${rsiCallThreshold}) | Pullback bounce detected${useStrict ? ' [Strict Recovery]' : ''}. Buying RISE...`, "info");
     proposeTrade("CALL");
   }
   // 2. Trend-Following Bearish Pullback:
   // - Trend is Bearish (SMA10 < SMA20)
-  // - RSI is overbought (> 60)
+  // - RSI is overbought (> rsiPutThreshold)
   // - Breakout Guard: Current price is below SMA20 (confirms it is a pullback, not an upward trend spike)
-  // - Trigger: 3 consecutive rises followed by 1 drop tick (confirms the bounce down has started)
-  else if (trendIsBearish && rsi14 > 60 && t4 < sma20 && t1 > t0 && t2 > t1 && t3 > t2 && t4 < t3) {
-    addLog(`Trend: Bearish | RSI: ${rsi14.toFixed(1)} (Overbought) | Pullback bounce detected. Buying FALL...`, "info");
+  // - SMA-50 Trend Guard: Price is below SMA-50
+  // - Trigger: Pullback bounce detected (standard or strict recovery)
+  else if (trendIsBearish && rsi14 > rsiPutThreshold && t4 < sma20 && isSma50PutValid && putBounce) {
+    addLog(`Trend: Bearish | RSI: ${rsi14.toFixed(1)} (Threshold: ${rsiPutThreshold}) | Pullback bounce detected${useStrict ? ' [Strict Recovery]' : ''}. Buying FALL...`, "info");
     proposeTrade("PUT");
   }
 }
@@ -1610,6 +1686,12 @@ function handleTradeOutcome(contract) {
   } else {
     addLog(`🚨 LOSS! Loss: -$${Math.abs(profit).toFixed(2)}`, "error");
     
+    // Apply loss cooldown if configured
+    if (lossCooldownTicks > 0) {
+      cooldownTicksRemaining = lossCooldownTicks;
+      addLog(`⏱️ Applying loss cooldown of ${lossCooldownTicks} ticks to prevent consecutive losses.`, "warn");
+    }
+
     // Martingale management
     currentMartingaleStep++;
     if (currentMartingaleStep >= maxMartingaleSteps) {
@@ -1666,6 +1748,11 @@ startBotBtn.addEventListener('click', () => {
   maxMartingaleSteps = parseInt(martingaleStepsInput.value);
   currentMartingaleStep = 0;
   sessionProfit = 0.0;
+
+  lossCooldownTicks = lossCooldownInput ? (parseInt(lossCooldownInput.value) || 0) : 15;
+  cooldownTicksRemaining = 0;
+  useSma50Guard = sma50GuardCheckbox ? sma50GuardCheckbox.checked : true;
+  useStrictMartingale = strictMartingaleCheckbox ? strictMartingaleCheckbox.checked : true;
 
   // Reset session database analytics tracking variables
   activeSessionDbId = null;
@@ -1737,6 +1824,9 @@ function toggleInputs(disabled) {
   targetProfitInput.disabled = disabled;
   stopLossInput.disabled = disabled;
   martingaleStepsInput.disabled = disabled;
+  if (lossCooldownInput) lossCooldownInput.disabled = disabled;
+  if (sma50GuardCheckbox) sma50GuardCheckbox.disabled = disabled;
+  if (strictMartingaleCheckbox) strictMartingaleCheckbox.disabled = disabled;
 }
 
 // ════════════════════════════════════════════
