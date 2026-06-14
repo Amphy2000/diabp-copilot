@@ -37,6 +37,7 @@ let currentStake = 0.50;
 let targetProfit = 2.00;
 let stopLoss = 5.00;
 let maxMartingaleSteps = 3;
+let martingaleMultiplier = 2.0;
 let currentMartingaleStep = 0;
 let lossCooldownTicks = 15;
 let cooldownTicksRemaining = 0;
@@ -103,6 +104,7 @@ const stakeInput = document.getElementById('stakeInput');
 const targetProfitInput = document.getElementById('targetProfitInput');
 const stopLossInput = document.getElementById('stopLossInput');
 const martingaleStepsInput = document.getElementById('martingaleStepsInput');
+const martingaleMultiplierInput = document.getElementById('martingaleMultiplierInput');
 const lossCooldownInput = document.getElementById('lossCooldownInput');
 const sma50GuardCheckbox = document.getElementById('sma50GuardCheckbox');
 const strictMartingaleCheckbox = document.getElementById('strictMartingaleCheckbox');
@@ -637,6 +639,7 @@ function applyPreset(presetType) {
     if (targetProfitInput) targetProfitInput.value = calculatedTarget.toFixed(2);
     if (stopLossInput) stopLossInput.value = calculatedStop.toFixed(2);
     if (martingaleStepsInput) martingaleStepsInput.value = calculatedSteps;
+    if (martingaleMultiplierInput) martingaleMultiplierInput.value = "2.0";
     if (lossCooldownInput) lossCooldownInput.value = calculatedCooldown;
     if (sma50GuardCheckbox) sma50GuardCheckbox.checked = calculatedSma50;
     if (strictMartingaleCheckbox) strictMartingaleCheckbox.checked = calculatedStrictMartingale;
@@ -670,6 +673,7 @@ if (stakeInput) stakeInput.addEventListener('input', markCustomSettings);
 if (targetProfitInput) targetProfitInput.addEventListener('input', markCustomSettings);
 if (stopLossInput) stopLossInput.addEventListener('input', markCustomSettings);
 if (martingaleStepsInput) martingaleStepsInput.addEventListener('input', markCustomSettings);
+if (martingaleMultiplierInput) martingaleMultiplierInput.addEventListener('input', markCustomSettings);
 if (lossCooldownInput) lossCooldownInput.addEventListener('input', markCustomSettings);
 if (sma50GuardCheckbox) sma50GuardCheckbox.addEventListener('change', markCustomSettings);
 if (strictMartingaleCheckbox) strictMartingaleCheckbox.addEventListener('change', markCustomSettings);
@@ -1889,8 +1893,8 @@ function handleTradeOutcome(contract) {
       currentStake = initialStake;
       currentMartingaleStep = 0;
     } else {
-      currentStake = currentStake * parseFloat(martingaleStepsInput.value === '1' ? 1.0 : 2.0); // Multiply by 2
-      addLog(`🔄 Martingale Multiplier applied. Next stake: $${currentStake.toFixed(2)}`, "warn");
+      currentStake = currentStake * parseFloat(martingaleStepsInput.value === '1' ? 1.0 : martingaleMultiplier);
+      addLog(`🔄 Martingale Multiplier (${martingaleMultiplier}x) applied. Next stake: $${currentStake.toFixed(2)}`, "warn");
       sendPushNotification("🚨 Trade LOST", `Loss: -$${Math.abs(profit).toFixed(2)} (Martingale Step ${currentMartingaleStep} next: $${currentStake.toFixed(2)}) | Session: $${sessionProfit.toFixed(2)}`);
     }
   }
@@ -1943,6 +1947,13 @@ startBotBtn.addEventListener('click', () => {
   currentMartingaleStep = 0;
   sessionProfit = 0.0;
 
+  const multiplierVal = parseFloat(martingaleMultiplierInput ? martingaleMultiplierInput.value : '2.0');
+  if (isNaN(multiplierVal) || multiplierVal < 1.0 || multiplierVal > 5.0) {
+    alert("⚠️ Invalid Martingale Multiplier!\nPlease enter a number between 1.0 and 5.0.");
+    return;
+  }
+  martingaleMultiplier = multiplierVal;
+
   lossCooldownTicks = lossCooldownInput ? (parseInt(lossCooldownInput.value) || 0) : 15;
   cooldownTicksRemaining = 0;
   useSma50Guard = sma50GuardCheckbox ? sma50GuardCheckbox.checked : true;
@@ -1976,7 +1987,7 @@ startBotBtn.addEventListener('click', () => {
   statusIndicator.className = "status-bar status-running";
   
   addLog("🤖 V75 Scalper Bot Started.", "success");
-  addLog(`Params: Stake=$${initialStake.toFixed(2)}, Target=$${targetProfit.toFixed(2)}, Stop=$${stopLoss.toFixed(2)}, MaxSteps=${maxMartingaleSteps}`, "info");
+  addLog(`Params: Stake=$${initialStake.toFixed(2)}, Target=$${targetProfit.toFixed(2)}, Stop=$${stopLoss.toFixed(2)}, MaxSteps=${maxMartingaleSteps}, Multiplier=${martingaleMultiplier}x`, "info");
   
   requestWakeLock();
   startKeepAlive();
@@ -2037,6 +2048,7 @@ function toggleInputs(disabled) {
   targetProfitInput.disabled = disabled;
   stopLossInput.disabled = disabled;
   martingaleStepsInput.disabled = disabled;
+  if (martingaleMultiplierInput) martingaleMultiplierInput.disabled = disabled;
   if (lossCooldownInput) lossCooldownInput.disabled = disabled;
   if (sma50GuardCheckbox) sma50GuardCheckbox.disabled = disabled;
   if (strictMartingaleCheckbox) strictMartingaleCheckbox.disabled = disabled;
@@ -2566,6 +2578,7 @@ function saveSessionState() {
     targetProfit: targetProfit,
     stopLoss: stopLoss,
     maxMartingaleSteps: maxMartingaleSteps,
+    martingaleMultiplier: martingaleMultiplier,
     lossCooldownTicks: lossCooldownTicks,
     useSma50Guard: useSma50Guard,
     useStrictMartingale: useStrictMartingale,
@@ -2645,6 +2658,7 @@ if (resumeBotBtn) {
       targetProfit = parseFloat(state.targetProfit);
       stopLoss = parseFloat(state.stopLoss);
       maxMartingaleSteps = parseInt(state.maxMartingaleSteps);
+      martingaleMultiplier = parseFloat(state.martingaleMultiplier !== undefined ? state.martingaleMultiplier : 2.0);
       lossCooldownTicks = parseInt(state.lossCooldownTicks);
       useSma50Guard = state.useSma50Guard;
       useStrictMartingale = state.useStrictMartingale;
@@ -2659,6 +2673,7 @@ if (resumeBotBtn) {
       targetProfitInput.value = targetProfit;
       stopLossInput.value = stopLoss;
       martingaleStepsInput.value = maxMartingaleSteps;
+      if (martingaleMultiplierInput) martingaleMultiplierInput.value = martingaleMultiplier;
       if (lossCooldownInput) lossCooldownInput.value = lossCooldownTicks;
       if (sma50GuardCheckbox) sma50GuardCheckbox.checked = useSma50Guard;
       if (strictMartingaleCheckbox) strictMartingaleCheckbox.checked = useStrictMartingale;
