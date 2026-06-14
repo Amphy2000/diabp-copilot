@@ -1165,9 +1165,14 @@ function connectWebSocket(isLoginAttempt = false) {
           subscribe: 1
         }));
 
-        // Subscribe to V75 ticks
+        // Subscribe to V75 ticks with history to instantly populate calculations on startup
         socket.send(JSON.stringify({
-          ticks: 'R_75',
+          ticks_history: 'R_75',
+          adjust_start_time: 1,
+          count: 100,
+          end: 'latest',
+          start: 1,
+          style: 'ticks',
           subscribe: 1
         }));
 
@@ -1322,9 +1327,14 @@ async function handleMessage(data, isLoginAttempt = false) {
         subscribe: 1
       }));
 
-      // Subscribe to V75 ticks
+      // Subscribe to V75 ticks with history to instantly populate calculations on startup
       socket.send(JSON.stringify({
-        ticks: 'R_75',
+        ticks_history: 'R_75',
+        adjust_start_time: 1,
+        count: 100,
+        end: 'latest',
+        start: 1,
+        style: 'ticks',
         subscribe: 1
       }));
     }
@@ -1338,6 +1348,19 @@ async function handleMessage(data, isLoginAttempt = false) {
       // Auto-recalculate recommended settings if not customized
       if (typeof applyPreset === 'function' && currentPreset !== 'custom') {
         applyPreset(currentPreset);
+      }
+    }
+  }
+
+  else if (msgType === 'history') {
+    if (data.history && data.history.prices) {
+      ticksHistory = data.history.prices.map(price => parseFloat(price));
+      addLog(`📈 Loaded ${ticksHistory.length} historical ticks. Trend analysis active!`, "success");
+      
+      // Update UI element to display current price immediately
+      if (ticksHistory.length > 0) {
+        const lastPrice = ticksHistory[ticksHistory.length - 1];
+        livePrice.innerText = lastPrice.toFixed(4);
       }
     }
   }
