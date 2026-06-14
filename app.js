@@ -1166,15 +1166,19 @@ function connectWebSocket(isLoginAttempt = false) {
           subscribe: 1
         }));
 
-        // Subscribe to V75 ticks with history to instantly populate calculations on startup
+        // Fetch historical ticks (one-time request) to populate indicator calculations
         socket.send(JSON.stringify({
           ticks_history: 'R_75',
           adjust_start_time: 1,
           count: 100,
           end: 'latest',
           start: 1,
-          style: 'ticks',
-          subscribe: 1
+          style: 'ticks'
+        }));
+
+        // Subscribe to live ticks separately to ensure reliable tick stream delivery
+        socket.send(JSON.stringify({
+          ticks: 'R_75'
         }));
 
         if (isLoginAttempt && connectTokenBtn) {
@@ -1328,15 +1332,19 @@ async function handleMessage(data, isLoginAttempt = false) {
         subscribe: 1
       }));
 
-      // Subscribe to V75 ticks with history to instantly populate calculations on startup
+      // Fetch historical ticks (one-time request) to populate indicator calculations
       socket.send(JSON.stringify({
         ticks_history: 'R_75',
         adjust_start_time: 1,
         count: 100,
         end: 'latest',
         start: 1,
-        style: 'ticks',
-        subscribe: 1
+        style: 'ticks'
+      }));
+
+      // Subscribe to live ticks separately to ensure reliable tick stream delivery
+      socket.send(JSON.stringify({
+        ticks: 'R_75'
       }));
     }
   }

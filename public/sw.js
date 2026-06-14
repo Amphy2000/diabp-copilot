@@ -1,4 +1,4 @@
-const CACHE_NAME = 'amphy-v75-bot-cache-v2';
+const CACHE_NAME = 'amphy-v75-bot-cache-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
