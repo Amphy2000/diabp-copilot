@@ -1859,8 +1859,10 @@ function stopTrading(reason) {
     resumeSessionContainer.classList.add('hidden');
   }
 
-  // Clear stored session state since the session has ended/stopped
-  clearSessionState();
+  // Only clear stored session state on explicit user stops or safety target hits, NOT on connection loss
+  if (reason === "Stopped by user" || reason === "Target Profit Reached" || reason === "Stop Loss Hit" || reason === "Account switched") {
+    clearSessionState();
+  }
   
   statusText.innerText = "Bot is Idle";
   statusIndicator.className = "status-bar status-idle";
@@ -2400,6 +2402,7 @@ ${actionText}
 
 function saveSessionState() {
   const sessionState = {
+    account_id: localStorage.getItem('deriv_acct'),
     initialStake: initialStake,
     currentStake: currentStake,
     currentMartingaleStep: currentMartingaleStep,
@@ -2431,7 +2434,8 @@ function checkActiveSession() {
   if (sessionData) {
     try {
       const state = JSON.parse(sessionData);
-      if (state && !isTrading) {
+      const currentAcct = localStorage.getItem('deriv_acct');
+      if (state && !isTrading && state.account_id === currentAcct) {
         resumeStep.innerText = state.currentMartingaleStep;
         resumeStake.innerText = `$${parseFloat(state.currentStake).toFixed(2)}`;
         
