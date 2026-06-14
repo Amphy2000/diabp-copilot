@@ -2731,6 +2731,21 @@ async function updateSessionHeartbeat(accountId) {
       'Content-Type': 'application/json'
     };
     
+    // Check if another device has taken over the lock
+    const res = await fetch(url, { method: 'GET', headers });
+    if (res.ok) {
+      const rows = await res.json();
+      if (rows && rows.length > 0) {
+        const dbDeviceId = rows[0].device_id;
+        if (dbDeviceId && dbDeviceId !== deviceId) {
+          addLog("🚨 Session takeover detected. Halting bot immediately to prevent double-trading.", "error");
+          sendPushNotification("🚨 Session Taken Over", "Trading halted because this session was resumed on another device.");
+          stopTrading("Takeover by another device");
+          return;
+        }
+      }
+    }
+    
     const payload = {
       last_heartbeat: new Date().toISOString(),
       updated_at: new Date().toISOString()
