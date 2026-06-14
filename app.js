@@ -2721,7 +2721,7 @@ async function saveSessionStateCloud(accountId, sessionState) {
   }
 }
 
-async function updateSessionHeartbeat(accountId) {
+async function updateSessionHeartbeat(accountId, forceWrite = false) {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return;
   try {
     const url = `${SUPABASE_URL}/rest/v1/active_sessions?account_id=eq.${accountId}`;
@@ -2731,24 +2731,27 @@ async function updateSessionHeartbeat(accountId) {
       'Content-Type': 'application/json'
     };
     
-    // Check if another device has taken over the lock
-    const res = await fetch(url, { method: 'GET', headers });
-    if (res.ok) {
-      const rows = await res.json();
-      if (rows && rows.length > 0) {
-        const dbDeviceId = rows[0].device_id;
-        if (dbDeviceId && dbDeviceId !== deviceId) {
-          addLog("🚨 Session takeover detected. Halting bot immediately to prevent double-trading.", "error");
-          sendPushNotification("🚨 Session Taken Over", "Trading halted because this session was resumed on another device.");
-          stopTrading("Takeover by another device");
-          return;
+    if (!forceWrite) {
+      // Check if another device has taken over the lock
+      const res = await fetch(url, { method: 'GET', headers });
+      if (res.ok) {
+        const rows = await res.json();
+        if (rows && rows.length > 0) {
+          const dbDeviceId = rows[0].device_id;
+          if (dbDeviceId && dbDeviceId !== deviceId) {
+            addLog("🚨 Session takeover detected. Halting bot immediately to prevent double-trading.", "error");
+            sendPushNotification("🚨 Session Taken Over", "Trading halted because this session was resumed on another device.");
+            stopTrading("Takeover by another device");
+            return;
+          }
         }
       }
     }
     
     const payload = {
       last_heartbeat: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      device_id: deviceId // Always keep device_id updated to our lock
     };
 
     await fetch(url, {
@@ -2763,14 +2766,15 @@ async function updateSessionHeartbeat(accountId) {
 
 function startHeartbeatLoop(accountId) {
   if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
-  updateSessionHeartbeat(accountId);
+  // Force first heartbeat write immediately to override lock and avoid startup race checks
+  updateSessionHeartbeat(accountId, true);
   heartbeatIntervalId = setInterval(() => {
     if (!isTrading) {
       clearInterval(heartbeatIntervalId);
       heartbeatIntervalId = null;
       return;
     }
-    updateSessionHeartbeat(accountId);
+    updateSessionHeartbeat(accountId, false);
   }, 10000);
 }
 
