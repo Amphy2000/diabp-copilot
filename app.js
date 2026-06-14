@@ -133,6 +133,7 @@ const tradeHistorySection = document.getElementById('tradeHistorySection');
 const tradeHistoryBody = document.getElementById('tradeHistoryBody');
 const resetStatsBtn = document.getElementById('resetStatsBtn');
 const exportReportBtn = document.getElementById('exportReportBtn');
+const exportCsvBtn = document.getElementById('exportCsvBtn');
 const promoTemplateSelect = document.getElementById('promoTemplateSelect');
 
 // PWA Installation Elements
@@ -2381,18 +2382,21 @@ function updateStatsUI() {
   // Populate table
   if (!tradeHistoryBody) return;
   if (stats.history.length === 0) {
-    tradeHistoryBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No trades recorded.</td></tr>`;
+    tradeHistoryBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No trades recorded.</td></tr>`;
     return;
   }
   
-  tradeHistoryBody.innerHTML = stats.history.map(t => {
+  const N = stats.history.length;
+  tradeHistoryBody.innerHTML = stats.history.map((t, idx) => {
     const isWin = t.result === 'win';
     const resultClass = isWin ? 'win-color' : 'loss-color';
     const stakeVal = parseFloat(t.stake) || 0;
     const profitVal = parseFloat(t.profit) || 0;
     const profitPrefix = profitVal >= 0 ? '+' : '';
+    const indexNum = N - idx;
     return `
       <tr>
+        <td style="color: var(--text-muted);">#${indexNum}</td>
         <td>${t.time}</td>
         <td>${t.type}</td>
         <td>$${stakeVal.toFixed(2)}</td>
@@ -2463,6 +2467,46 @@ if (resetStatsBtn) {
       updateStatsUI();
       addLog("Performance statistics reset.", "info");
     }
+  });
+}
+
+if (exportCsvBtn) {
+  exportCsvBtn.addEventListener('click', () => {
+    if (!stats.history || stats.history.length === 0) {
+      alert("⚠️ No trade logs available to export.");
+      return;
+    }
+
+    const headers = ["Index", "Time", "Type", "Stake ($)", "Profit ($)", "Result"];
+    const csvRows = [headers.join(",")];
+    
+    const sortedHistory = [...stats.history].reverse();
+    
+    sortedHistory.forEach((t, idx) => {
+      const indexNum = idx + 1;
+      const profitPrefix = t.profit >= 0 ? "+" : "";
+      const row = [
+        indexNum,
+        t.time,
+        `"${t.type}"`,
+        t.stake.toFixed(2),
+        `${profitPrefix}${t.profit.toFixed(2)}`,
+        t.result.toUpperCase()
+      ];
+      csvRows.push(row.join(","));
+    });
+
+    const csvContent = csvRows.join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `v75_scalper_trades_${Date.now()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addLog("📥 Trade history exported to CSV.", "success");
   });
 }
 

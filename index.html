@@ -298,6 +298,7 @@
                 <option value="social">Social Hook 🤖</option>
                 <option value="short">Status Hook ⚡</option>
               </select>
+              <button id="exportCsvBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; height: 22px; display: flex; align-items: center; border-color: rgba(56, 189, 248, 0.4); color: var(--color-primary);">📥 Export CSV</button>
               <button id="exportReportBtn" class="btn btn-primary btn-xs" style="padding: 2px 6px; font-size: 10px; height: 22px; display: flex; align-items: center;">📤 Share Stats</button>
             </div>
           </div>
@@ -305,6 +306,7 @@
             <table class="history-table">
               <thead>
                 <tr>
+                  <th style="width: 50px;">Index</th>
                   <th>Time</th>
                   <th>Type</th>
                   <th>Stake</th>
@@ -314,7 +316,7 @@
               </thead>
               <tbody id="tradeHistoryBody">
                 <tr>
-                  <td colspan="5" style="text-align: center; color: var(--text-muted);">No trades recorded.</td>
+                  <td colspan="6" style="text-align: center; color: var(--text-muted);">No trades recorded.</td>
                 </tr>
               </tbody>
             </table>
