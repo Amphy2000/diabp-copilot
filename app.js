@@ -1603,30 +1603,12 @@ function evaluateStrategyPattern() {
   const isRecoveryStep = currentMartingaleStep > 0;
   const useStrict = isRecoveryStep && useStrictMartingale;
 
-  const rsiCallThreshold = useStrict ? 35 : 45;
-  const rsiPutThreshold = useStrict ? 65 : 55;
+  const rsiCallThreshold = useStrict ? 40 : 45;
+  const rsiPutThreshold = useStrict ? 60 : 55;
 
-  let callBounce = false;
-  let putBounce = false;
-
-  if (useStrict && len >= 6) {
-    const t_5 = ticksHistory[len - 6];
-    const t_4 = ticksHistory[len - 5];
-    const t_3 = ticksHistory[len - 4];
-    const t_2 = ticksHistory[len - 3];
-    const t_1 = ticksHistory[len - 2];
-    const t_0 = ticksHistory[len - 1]; // current price
-    
-    // Strict recovery CALL entry: 3 consecutive drops followed by 2 consecutive rises
-    callBounce = (t_4 < t_5 && t_3 < t_4 && t_2 < t_3 && t_1 > t_2 && t_0 > t_1);
-    // Strict recovery PUT entry: 3 consecutive rises followed by 2 consecutive drops
-    putBounce = (t_4 > t_5 && t_3 > t_4 && t_2 > t_3 && t_1 < t_2 && t_0 < t_1);
-  } else {
-    // Standard CALL entry: 3 consecutive drops followed by 1 rise
-    callBounce = (t1 < t0 && t2 < t1 && t3 < t2 && t4 > t3);
-    // Standard PUT entry: 3 consecutive rises followed by 1 drop
-    putBounce = (t1 > t0 && t2 > t1 && t3 > t2 && t4 < t3);
-  }
+  // Pullback entry trigger: 3 consecutive drops/rises followed by 1 bounce tick
+  const callBounce = (t1 < t0 && t2 < t1 && t3 < t2 && t4 > t3);
+  const putBounce = (t1 > t0 && t2 > t1 && t3 > t2 && t4 < t3);
 
   const isSma50CallValid = !useSma50Guard || !sma50 || t4 > sma50;
   const isSma50PutValid = !useSma50Guard || !sma50 || t4 < sma50;
