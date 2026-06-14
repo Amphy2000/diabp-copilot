@@ -64,6 +64,10 @@ let reconnectAttempts = 0;
 const maxReconnectAttempts = 5;
 let reconnectTimeoutId = null;
 
+let deviceId = '';
+let heartbeatIntervalId = null;
+let activeSessionCache = null;
+
 // Performance Stats Object
 let stats = {
   wins: 0,
@@ -291,6 +295,12 @@ async function fetchAccountsWithFallback(token) {
 
 // Check URL parameters on page load
 window.addEventListener('DOMContentLoaded', async () => {
+  deviceId = localStorage.getItem('deriv_bot_device_id');
+  if (!deviceId) {
+    deviceId = 'dev_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('deriv_bot_device_id', deviceId);
+  }
+
   const urlParams = new URLSearchParams(window.location.search);
   
   // 1. Check for legacy OAuth credentials (and parse all account tokens in redirect)
@@ -2616,8 +2626,12 @@ ${actionText}
 // ════════════════════════════════════════════
 
 function saveSessionState() {
+  const acct = currentAuthorizedAccount || localStorage.getItem('deriv_acct');
+  if (!acct) return;
+
+  const cleanAcct = acct.trim().toUpperCase();
   const sessionState = {
-    account_id: currentAuthorizedAccount || localStorage.getItem('deriv_acct'),
+    account_id: cleanAcct,
     initialStake: initialStake,
     currentStake: currentStake,
     currentMartingaleStep: currentMartingaleStep,
@@ -2634,53 +2648,279 @@ function saveSessionState() {
     sessionWins: sessionWins,
     sessionLosses: sessionLosses,
     sessionTradesCount: sessionTradesCount,
-    timestamp: Date.now()
+    device_id: deviceId,
+    last_heartbeat: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   };
+
+  // 1. Keep a local backup
   localStorage.setItem('deriv_bot_active_session', JSON.stringify(sessionState));
+
+  // 2. Save to Supabase Cloud asynchronously (non-blocking)
+  if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+    saveSessionStateCloud(cleanAcct, sessionState);
+    if (isTrading && !heartbeatIntervalId) {
+      startHeartbeatLoop(cleanAcct);
+    }
+  }
+}
+
+async function saveSessionStateCloud(accountId, sessionState) {
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/active_sessions?account_id=eq.${accountId}`;
+    const headers = {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json'
+    };
+
+    const checkRes = await fetch(url, { method: 'GET', headers });
+    const exists = checkRes.ok && (await checkRes.json()).length > 0;
+
+    let method = 'POST';
+    let saveUrl = `${SUPABASE_URL}/rest/v1/active_sessions`;
+    if (exists) {
+      method = 'PATCH';
+      saveUrl = url;
+    }
+
+    const payload = {
+      account_id: accountId,
+      initial_stake: sessionState.initialStake,
+      current_stake: sessionState.currentStake,
+      current_martingale_step: sessionState.currentMartingaleStep,
+      session_profit: sessionState.sessionProfit,
+      target_profit: sessionState.targetProfit,
+      stop_loss: sessionState.stopLoss,
+      max_martingale_steps: sessionState.maxMartingaleSteps,
+      martingale_multiplier: sessionState.martingaleMultiplier,
+      loss_cooldown_ticks: sessionState.lossCooldownTicks,
+      use_sma50_guard: sessionState.useSma50Guard,
+      use_strict_martingale: sessionState.useStrictMartingale,
+      active_session_db_id: sessionState.activeSessionDbId || null,
+      session_traded_volume: sessionState.sessionTradedVolume,
+      session_wins: sessionState.sessionWins,
+      session_losses: sessionState.sessionLosses,
+      session_trades_count: sessionState.sessionTradesCount,
+      device_id: sessionState.device_id,
+      last_heartbeat: sessionState.last_heartbeat,
+      updated_at: sessionState.updated_at
+    };
+
+    const res = await fetch(saveUrl, {
+      method,
+      headers,
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      console.warn("Failed to save session state to Supabase:", res.status, await res.text());
+    }
+  } catch (err) {
+    console.warn("Error saving session state to Supabase:", err);
+  }
+}
+
+async function updateSessionHeartbeat(accountId) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return;
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/active_sessions?account_id=eq.${accountId}`;
+    const headers = {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json'
+    };
+    
+    const payload = {
+      last_heartbeat: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    await fetch(url, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(payload)
+    });
+  } catch (err) {
+    console.warn("Error updating session heartbeat:", err);
+  }
+}
+
+function startHeartbeatLoop(accountId) {
+  if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
+  updateSessionHeartbeat(accountId);
+  heartbeatIntervalId = setInterval(() => {
+    if (!isTrading) {
+      clearInterval(heartbeatIntervalId);
+      heartbeatIntervalId = null;
+      return;
+    }
+    updateSessionHeartbeat(accountId);
+  }, 10000);
 }
 
 function clearSessionState() {
   localStorage.removeItem('deriv_bot_active_session');
+  activeSessionCache = null;
+  
+  if (heartbeatIntervalId) {
+    clearInterval(heartbeatIntervalId);
+    heartbeatIntervalId = null;
+  }
+  
   chartTradeMarkers = [];
   if (typeof drawChart === 'function') {
     drawChart();
   }
+
+  const acct = currentAuthorizedAccount || localStorage.getItem('deriv_acct');
+  if (acct && SUPABASE_URL && SUPABASE_ANON_KEY) {
+    const cleanAcct = acct.trim().toUpperCase();
+    const url = `${SUPABASE_URL}/rest/v1/active_sessions?account_id=eq.${cleanAcct}`;
+    const headers = {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+    };
+    fetch(url, { method: 'DELETE', headers })
+      .catch(err => console.warn("Failed to delete session state from Supabase:", err));
+  }
 }
 
-function checkActiveSession() {
+async function checkActiveSession() {
   if (!resumeSessionContainer) return;
   
-  const sessionData = localStorage.getItem('deriv_bot_active_session');
-  if (sessionData) {
-    try {
-      const state = JSON.parse(sessionData);
-      const currentAcct = localStorage.getItem('deriv_acct');
-      const cleanCurrent = currentAcct ? currentAcct.trim().toUpperCase() : "";
-      const cleanSaved = state.account_id ? state.account_id.trim().toUpperCase() : "";
-      if (state && !isTrading && cleanSaved === cleanCurrent) {
-        resumeStep.innerText = state.currentMartingaleStep;
-        resumeStake.innerText = `$${parseFloat(state.currentStake).toFixed(2)}`;
-        
-        const profit = parseFloat(state.sessionProfit);
-        resumeProfit.innerText = `${profit >= 0 ? '+' : ''}$${profit.toFixed(2)}`;
-        
-        if (profit >= 0) {
-          resumeProfit.className = "profit-won";
-          resumeProfit.style.color = "var(--color-success)";
-        } else {
-          resumeProfit.className = "profit-lost";
-          resumeProfit.style.color = "var(--color-danger)";
-        }
+  const currentAcct = localStorage.getItem('deriv_acct');
+  if (!currentAcct) {
+    resumeSessionContainer.classList.add('hidden');
+    if (!isTrading) startBotBtn.classList.remove('hidden');
+    return;
+  }
+  const cleanCurrent = currentAcct.trim().toUpperCase();
 
-        resumeSessionContainer.classList.remove('hidden');
-        startBotBtn.classList.add('hidden');
-        return;
+  let state = null;
+  
+  // 1. Fetch from Supabase Cloud
+  if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+    try {
+      const url = `${SUPABASE_URL}/rest/v1/active_sessions?account_id=eq.${cleanCurrent}`;
+      const headers = {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      };
+      const res = await fetch(url, { method: 'GET', headers });
+      if (res.ok) {
+        const rows = await res.json();
+        if (rows && rows.length > 0) {
+          const row = rows[0];
+          state = {
+            account_id: row.account_id,
+            initialStake: parseFloat(row.initial_stake),
+            currentStake: parseFloat(row.current_stake),
+            currentMartingaleStep: parseInt(row.current_martingale_step),
+            sessionProfit: parseFloat(row.session_profit),
+            targetProfit: parseFloat(row.target_profit),
+            stopLoss: parseFloat(row.stop_loss),
+            maxMartingaleSteps: parseInt(row.max_martingale_steps),
+            martingaleMultiplier: parseFloat(row.martingale_multiplier),
+            lossCooldownTicks: parseInt(row.loss_cooldown_ticks),
+            useSma50Guard: row.use_sma50_guard,
+            useStrictMartingale: row.use_strict_martingale,
+            activeSessionDbId: row.active_session_db_id,
+            sessionTradedVolume: parseFloat(row.session_traded_volume),
+            sessionWins: parseInt(row.session_wins),
+            sessionLosses: parseInt(row.session_losses),
+            sessionTradesCount: parseInt(row.session_trades_count),
+            device_id: row.device_id,
+            last_heartbeat: row.last_heartbeat
+          };
+        }
       }
     } catch (e) {
-      console.error("Failed to parse active session:", e);
-      clearSessionState();
+      console.warn("Failed to check active session from Supabase, falling back to localStorage:", e);
     }
   }
+
+  // 2. Fall back to local storage backup
+  if (!state) {
+    const sessionData = localStorage.getItem('deriv_bot_active_session');
+    if (sessionData) {
+      try {
+        const saved = JSON.parse(sessionData);
+        const cleanSaved = saved.account_id ? saved.account_id.trim().toUpperCase() : "";
+        if (saved && cleanSaved === cleanCurrent) {
+          state = saved;
+        }
+      } catch (e) {
+        console.error("Failed to parse local active session:", e);
+      }
+    }
+  }
+
+  if (state && !isTrading) {
+    activeSessionCache = state;
+    
+    // Check if active on another device (heartbeat fresh)
+    let isLockedOnOtherDevice = false;
+    let secondsSinceLastHeartbeat = 999;
+    
+    if (state.last_heartbeat && state.device_id !== deviceId) {
+      const lastHeartTime = new Date(state.last_heartbeat).getTime();
+      secondsSinceLastHeartbeat = Math.round((Date.now() - lastHeartTime) / 1000);
+      if (secondsSinceLastHeartbeat >= 0 && secondsSinceLastHeartbeat < 45) {
+        isLockedOnOtherDevice = true;
+      }
+    }
+
+    resumeStep.innerText = state.currentMartingaleStep;
+    resumeStake.innerText = `$${parseFloat(state.currentStake).toFixed(2)}`;
+    
+    const profit = parseFloat(state.sessionProfit);
+    resumeProfit.innerText = `${profit >= 0 ? '+' : ''}$${profit.toFixed(2)}`;
+    
+    if (profit >= 0) {
+      resumeProfit.className = "profit-won";
+      resumeProfit.style.color = "var(--color-success)";
+    } else {
+      resumeProfit.className = "profit-lost";
+      resumeProfit.style.color = "var(--color-danger)";
+    }
+
+    const badgeId = 'deviceLockBadge';
+    let badge = document.getElementById(badgeId);
+
+    if (isLockedOnOtherDevice) {
+      if (!badge) {
+        badge = document.createElement('div');
+        badge.id = badgeId;
+        badge.style.background = "rgba(239, 68, 68, 0.1)";
+        badge.style.color = "var(--color-danger)";
+        badge.style.border = "1px solid rgba(239, 68, 68, 0.2)";
+        badge.style.borderRadius = "4px";
+        badge.style.padding = "6px 8px";
+        badge.style.fontSize = "10px";
+        badge.style.marginTop = "8px";
+        badge.style.textAlign = "center";
+        badge.style.fontWeight = "600";
+        resumeSessionContainer.insertBefore(badge, resumeSessionContainer.firstChild);
+      }
+      badge.innerText = `⚠️ Active on another device (Heartbeat: ${secondsSinceLastHeartbeat}s ago)`;
+      if (resumeBotBtn) {
+        resumeBotBtn.style.boxShadow = "0 0 10px rgba(239, 68, 68, 0.5)";
+      }
+    } else {
+      if (badge) badge.remove();
+      if (resumeBotBtn) {
+        resumeBotBtn.style.boxShadow = "";
+      }
+    }
+
+    resumeSessionContainer.classList.remove('hidden');
+    startBotBtn.classList.add('hidden');
+    return;
+  }
+  
+  const badge = document.getElementById('deviceLockBadge');
+  if (badge) badge.remove();
   
   resumeSessionContainer.classList.add('hidden');
   if (!isTrading) {
@@ -2690,13 +2930,21 @@ function checkActiveSession() {
 
 // Event Listeners for Session Recovery
 if (resumeBotBtn) {
-  resumeBotBtn.addEventListener('click', () => {
-    const sessionData = localStorage.getItem('deriv_bot_active_session');
-    if (!sessionData) return;
+  resumeBotBtn.addEventListener('click', async () => {
+    const state = activeSessionCache;
+    if (!state) return;
+
+    // Concurrency Warning & Takeover
+    if (state.last_heartbeat && state.device_id !== deviceId) {
+      const lastHeartTime = new Date(state.last_heartbeat).getTime();
+      const secondsSinceLastHeartbeat = Math.round((Date.now() - lastHeartTime) / 1000);
+      if (secondsSinceLastHeartbeat >= 0 && secondsSinceLastHeartbeat < 45) {
+        const confirmOverride = confirm(`⚠️ Warning: This session is currently active on another device (Heartbeat: ${secondsSinceLastHeartbeat}s ago).\n\nResuming here will override and takeover the session, which might disrupt trading on the other device.\n\nDo you want to continue?`);
+        if (!confirmOverride) return;
+      }
+    }
 
     try {
-      const state = JSON.parse(sessionData);
-
       // Restore session variables
       initialStake = parseFloat(state.initialStake);
       currentStake = parseFloat(state.currentStake);
@@ -2745,8 +2993,14 @@ if (resumeBotBtn) {
       addLog(`🔄 Session Resumed! Step: ${currentMartingaleStep} | Stake: $${currentStake.toFixed(2)} | Profit: $${sessionProfit.toFixed(2)}`, "success");
       sendPushNotification("🤖 Bot Resumed", `Continuing V75 scalper session...\nNext Stake: $${currentStake.toFixed(2)} | Session Profit: $${sessionProfit.toFixed(2)}`);
 
-      // Immediately save state again to ensure timestamp/any field updates are captured
+      // Overwrite the device lock with our current device ID
+      state.device_id = deviceId;
+      state.last_heartbeat = new Date().toISOString();
       saveSessionState();
+
+      // Start the heartbeat updater
+      const cleanAcct = (state.account_id || localStorage.getItem('deriv_acct')).trim().toUpperCase();
+      startHeartbeatLoop(cleanAcct);
 
     } catch (e) {
       console.error("Error resuming session:", e);
