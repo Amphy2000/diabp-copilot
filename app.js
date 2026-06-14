@@ -1637,17 +1637,16 @@ function evaluateStrategyPattern() {
   // - Breakout Guard: Current price is above SMA20 (confirms it is a pullback, not a downward trend crash)
   // - SMA-50 Trend Guard: Price is above SMA-50
   // - Trigger: Pullback bounce detected (standard or strict recovery)
-  if (trendIsBullish && rsi14 < rsiCallThreshold && t4 > sma20 && isSma50CallValid && callBounce) {
+  if (trendIsBullish && rsi14 < rsiCallThreshold && isSma50CallValid && callBounce) {
     addLog(`Trend: Bullish | RSI: ${rsi14.toFixed(1)} (Threshold: ${rsiCallThreshold}) | Pullback bounce detected${useStrict ? ' [Strict Recovery]' : ''}. Buying RISE...`, "info");
     proposeTrade("CALL");
   }
   // 2. Trend-Following Bearish Pullback:
   // - Trend is Bearish (SMA10 < SMA20)
   // - RSI is overbought (> rsiPutThreshold)
-  // - Breakout Guard: Current price is below SMA20 (confirms it is a pullback, not an upward trend spike)
   // - SMA-50 Trend Guard: Price is below SMA-50
   // - Trigger: Pullback bounce detected (standard or strict recovery)
-  else if (trendIsBearish && rsi14 > rsiPutThreshold && t4 < sma20 && isSma50PutValid && putBounce) {
+  else if (trendIsBearish && rsi14 > rsiPutThreshold && isSma50PutValid && putBounce) {
     addLog(`Trend: Bearish | RSI: ${rsi14.toFixed(1)} (Threshold: ${rsiPutThreshold}) | Pullback bounce detected${useStrict ? ' [Strict Recovery]' : ''}. Buying FALL...`, "info");
     proposeTrade("PUT");
   }
