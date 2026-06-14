@@ -1506,22 +1506,32 @@ function evaluateStrategyPattern() {
   if (!sma10 || !sma20 || rsi14 === null) return;
 
   const len = ticksHistory.length;
-  const t0 = ticksHistory[len - 4];
-  const t1 = ticksHistory[len - 3];
-  const t2 = ticksHistory[len - 2];
-  const t3 = ticksHistory[len - 1];
+  // Extract the last 5 ticks to check for 3 drops followed by a rise, or 3 rises followed by a drop
+  const t0 = ticksHistory[len - 5];
+  const t1 = ticksHistory[len - 4];
+  const t2 = ticksHistory[len - 3];
+  const t3 = ticksHistory[len - 2];
+  const t4 = ticksHistory[len - 1]; // current price
 
   const trendIsBullish = sma10 > sma20;
   const trendIsBearish = sma10 < sma20;
 
-  // 1. Trend-Following Bullish Pullback: Trend is Bullish, RSI is oversold (< 40), last 3 ticks were consecutive drops -> Buy Rise (CALL)
-  if (trendIsBullish && rsi14 < 40 && t1 < t0 && t2 < t1 && t3 < t2) {
-    addLog(`Trend: Bullish | RSI: ${rsi14.toFixed(1)} (Oversold) | Pullback detected. Buying RISE...`, "info");
+  // 1. Trend-Following Bullish Pullback:
+  // - Trend is Bullish (SMA10 > SMA20)
+  // - RSI is oversold (< 40)
+  // - Breakout Guard: Current price is above SMA20 (confirms it is a pullback, not a downward trend crash)
+  // - Trigger: 3 consecutive drops followed by 1 rise tick (confirms the bounce has started)
+  if (trendIsBullish && rsi14 < 40 && t4 > sma20 && t1 < t0 && t2 < t1 && t3 < t2 && t4 > t3) {
+    addLog(`Trend: Bullish | RSI: ${rsi14.toFixed(1)} (Oversold) | Pullback bounce detected. Buying RISE...`, "info");
     proposeTrade("CALL");
   }
-  // 2. Trend-Following Bearish Pullback: Trend is Bearish, RSI is overbought (> 60), last 3 consecutive rises -> Buy Fall (PUT)
-  else if (trendIsBearish && rsi14 > 60 && t1 > t0 && t2 > t1 && t3 > t2) {
-    addLog(`Trend: Bearish | RSI: ${rsi14.toFixed(1)} (Overbought) | Pullback detected. Buying FALL...`, "info");
+  // 2. Trend-Following Bearish Pullback:
+  // - Trend is Bearish (SMA10 < SMA20)
+  // - RSI is overbought (> 60)
+  // - Breakout Guard: Current price is below SMA20 (confirms it is a pullback, not an upward trend spike)
+  // - Trigger: 3 consecutive rises followed by 1 drop tick (confirms the bounce down has started)
+  else if (trendIsBearish && rsi14 > 60 && t4 < sma20 && t1 > t0 && t2 > t1 && t3 > t2 && t4 < t3) {
+    addLog(`Trend: Bearish | RSI: ${rsi14.toFixed(1)} (Overbought) | Pullback bounce detected. Buying FALL...`, "info");
     proposeTrade("PUT");
   }
 }
