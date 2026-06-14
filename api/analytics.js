@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -188,6 +188,76 @@ export default async function handler(req, res) {
     } catch (err) {
       console.error('Analytics write error:', err);
       return res.status(500).json({ error: 'Failed to record analytics', details: err.message });
+    }
+  }
+
+  // ════════════════════════════════════════════
+  // 3. DELETE METHOD: Clear Real Account Analytics
+  // ════════════════════════════════════════════
+  if (req.method === 'DELETE') {
+    const { admin_account_id, admin_token } = req.query;
+
+    if (!admin_account_id || !admin_token) {
+      return res.status(400).json({ error: 'Missing admin credentials' });
+    }
+
+    const allowedAdminAccounts = ['ROT91833970', 'DOT93132805'];
+    const formattedAdmin = admin_account_id.trim().toUpperCase();
+
+    if (!allowedAdminAccounts.includes(formattedAdmin)) {
+      return res.status(403).json({ error: 'Unauthorized: This account does not have developer privileges.' });
+    }
+
+    // Validate token with Deriv API
+    try {
+      const derivAppId = process.env.VITE_DERIV_APP_ID || '33xCanrA7freeICOdpEoH';
+      const derivRes = await fetch('https://api.derivws.com/trading/v1/options/accounts', {
+        method: 'GET',
+        headers: {
+          'Deriv-App-ID': derivAppId,
+          'Authorization': `Bearer ${admin_token}`
+        }
+      });
+
+      if (!derivRes.ok) {
+        return res.status(401).json({ error: 'Deriv authentication failed' });
+      }
+
+      const derivData = await derivRes.json();
+      const accounts = derivData.data || [];
+      const ownsAccount = accounts.some(acc => acc.account_id.trim().toUpperCase() === formattedAdmin);
+      if (!ownsAccount) {
+        return res.status(401).json({ error: 'Authentication mismatch' });
+      }
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to validate credentials with Deriv', details: err.message });
+    }
+
+    // Delete real sessions from Supabase bot_sessions
+    try {
+      const dbRes = await fetch(`${supabaseUrl}/rest/v1/bot_sessions?is_demo=eq.false`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Prefer': 'return=representation'
+        }
+      });
+
+      if (!dbRes.ok) {
+        const errText = await dbRes.text();
+        return res.status(dbRes.status).json({ error: `Database error: ${errText}` });
+      }
+
+      const deletedData = await dbRes.json();
+      return res.status(200).json({
+        success: true,
+        message: `Successfully deleted ${deletedData ? deletedData.length : 0} real trading sessions.`,
+        deleted: deletedData
+      });
+    } catch (err) {
+      console.error('Analytics delete error:', err);
+      return res.status(500).json({ error: 'Failed to clear real sessions from database', details: err.message });
     }
   }
 

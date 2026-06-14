@@ -901,6 +901,67 @@ if (refreshAnalyticsBtn) {
   refreshAnalyticsBtn.addEventListener('click', loadAdminAnalytics);
 }
 
+// Hook clear real stats button
+const clearRealStatsBtn = document.getElementById('clearRealStatsBtn');
+if (clearRealStatsBtn) {
+  clearRealStatsBtn.addEventListener('click', async () => {
+    if (!confirm("⚠️ WARNING\nAre you sure you want to delete all recorded Real account trading statistics from the database? This will reset the Traded Volume and Commission values back to $0.00.\n\nThis action cannot be undone.")) {
+      return;
+    }
+
+    const adminAcct = localStorage.getItem('deriv_acct');
+    const adminToken = localStorage.getItem('deriv_token');
+
+    if (!adminAcct || !adminToken) {
+      showAdminFeedback("Missing authentication credentials to perform database reset.", "error");
+      return;
+    }
+
+    clearRealStatsBtn.disabled = true;
+    clearRealStatsBtn.innerText = "Clearing...";
+
+    try {
+      let success = false;
+      
+      // Try via secure serverless API
+      const res = await fetch(`/api/analytics?admin_account_id=${adminAcct}&admin_token=${adminToken}`, {
+        method: 'DELETE'
+      });
+
+      if (res.ok) {
+        success = true;
+      } else {
+        // Fallback to direct REST endpoint
+        if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+          const response = await fetch(`${SUPABASE_URL}/rest/v1/bot_sessions?is_demo=eq.false`, {
+            method: 'DELETE',
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            }
+          });
+          if (response.ok) {
+            success = true;
+          }
+        }
+      }
+
+      if (success) {
+        showAdminFeedback("Successfully cleared all real-account sessions!", "success");
+        loadAdminAnalytics();
+      } else {
+        showAdminFeedback("Failed to clear sessions. Please check database permissions.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showAdminFeedback("Error communicating with database.", "error");
+    } finally {
+      clearRealStatsBtn.disabled = false;
+      clearRealStatsBtn.innerText = "🧹 Clear Real Stats";
+    }
+  });
+}
+
 if (adminWhitelistBtn) {
   adminWhitelistBtn.addEventListener('click', async () => {
     const accountToWhitelist = adminWhitelistInput.value.trim().toUpperCase();
