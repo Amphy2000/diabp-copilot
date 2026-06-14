@@ -563,6 +563,7 @@ if (accountSelect) {
     localStorage.setItem('deriv_acct', selectedAcct);
     updateAccountLabelBadge(selectedAcct);
     checkAdminStatus();
+    checkActiveSession();
 
     if (socket) {
       socket.close();
@@ -1261,6 +1262,8 @@ function connectWebSocket(isLoginAttempt = false) {
           statusText.innerText = "Bot is Active";
           statusIndicator.className = "status-bar status-running";
         }
+
+        checkActiveSession();
 
         // Fetch balance and subscribe to ticks
         socket.send(JSON.stringify({
