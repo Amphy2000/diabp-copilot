@@ -54,6 +54,12 @@ let sessionWins = 0;
 let sessionLosses = 0;
 let sessionTradesCount = 0;
 
+// Auto-Reconnect State Variables
+let isReconnecting = false;
+let reconnectAttempts = 0;
+const maxReconnectAttempts = 5;
+let reconnectTimeoutId = null;
+
 // Performance Stats Object
 let stats = {
   wins: 0,
@@ -1233,6 +1239,21 @@ function connectWebSocket(isLoginAttempt = false) {
         isAuthorized = true;
         currentAuthorizedAccount = acct ? acct.trim().toUpperCase() : null;
         
+        if (isReconnecting) {
+          addLog("🔄 Options WebSocket connection re-established. Session resumed.", "success");
+          sendPushNotification("🔄 Connection Restored", "Bot is active and trading has resumed.");
+        }
+        isReconnecting = false;
+        reconnectAttempts = 0;
+        if (reconnectTimeoutId) {
+          clearTimeout(reconnectTimeoutId);
+          reconnectTimeoutId = null;
+        }
+        if (isTrading) {
+          statusText.innerText = "Bot is Active";
+          statusIndicator.className = "status-bar status-running";
+        }
+
         // Fetch balance and subscribe to ticks
         socket.send(JSON.stringify({
           balance: 1,
@@ -1264,7 +1285,7 @@ function connectWebSocket(isLoginAttempt = false) {
         addLog("Options WebSocket disconnected.", "warn");
         isAuthorized = false;
         if (isTrading) {
-          stopTrading("Disconnect event detected.");
+          handleWebSocketDisconnect();
         }
       };
 
@@ -1311,7 +1332,7 @@ function connectWebSocket(isLoginAttempt = false) {
         addLog("WebSocket disconnected.", "warn");
         isAuthorized = false;
         if (isTrading) {
-          stopTrading("Disconnect event detected.");
+          handleWebSocketDisconnect();
         }
       };
 
@@ -1383,6 +1404,21 @@ async function handleMessage(data, isLoginAttempt = false) {
       currentAuthorizedAccount = acct ? acct.trim().toUpperCase() : null;
       isAuthorized = true;
       addLog("Successfully Authorized!", "success");
+
+      if (isReconnecting) {
+        addLog("🔄 WebSocket connection re-established. Session resumed.", "success");
+        sendPushNotification("🔄 Connection Restored", "Bot is active and trading has resumed.");
+      }
+      isReconnecting = false;
+      reconnectAttempts = 0;
+      if (reconnectTimeoutId) {
+        clearTimeout(reconnectTimeoutId);
+        reconnectTimeoutId = null;
+      }
+      if (isTrading) {
+        statusText.innerText = "Bot is Active";
+        statusIndicator.className = "status-bar status-running";
+      }
       
       // Display trading console
       loginPanel.classList.remove('active');
@@ -1907,6 +1943,13 @@ stopBotBtn.addEventListener('click', () => {
 });
 
 function stopTrading(reason) {
+  if (reconnectTimeoutId) {
+    clearTimeout(reconnectTimeoutId);
+    reconnectTimeoutId = null;
+  }
+  isReconnecting = false;
+  reconnectAttempts = 0;
+
   const wasTrading = isTrading;
   isTrading = false;
   activePurchaseProposal = null;
@@ -2610,5 +2653,39 @@ if (discardSessionBtn) {
       addLog("🧹 Unfinished session discarded.", "info");
     }
   });
+}
+
+// ════════════════════════════════════════════
+//             AUTO-RECONNECT HEARTBEAT
+// ════════════════════════════════════════════
+
+function handleWebSocketDisconnect() {
+  isAuthorized = false;
+
+  if (isTrading) {
+    if (reconnectAttempts < maxReconnectAttempts) {
+      isReconnecting = true;
+      reconnectAttempts++;
+      const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 10000); // Exponential backoff up to 10s
+
+      statusText.innerText = `Reconnecting (${reconnectAttempts}/${maxReconnectAttempts})...`;
+      statusIndicator.className = "status-bar status-idle"; // Set to idle warning state
+      addLog(`⚠️ WebSocket disconnected. Attempting auto-reconnect ${reconnectAttempts}/${maxReconnectAttempts} in ${(delay/1000).toFixed(0)}s...`, "warn");
+      sendPushNotification("⚠️ Bot Connection Lost", `Attempting auto-reconnect ${reconnectAttempts}/${maxReconnectAttempts}...`);
+
+      if (reconnectTimeoutId) clearTimeout(reconnectTimeoutId);
+      reconnectTimeoutId = setTimeout(() => {
+        connectWebSocket();
+      }, delay);
+    } else {
+      isReconnecting = false;
+      reconnectAttempts = 0;
+      stopTrading("Connection permanently lost after maximum retry attempts.");
+      alert("🚨 Connection Lost!\nThe bot was unable to reconnect to Deriv after 5 attempts. Trading has been stopped to protect your account.");
+    }
+  } else {
+    isReconnecting = false;
+    reconnectAttempts = 0;
+  }
 }
 
