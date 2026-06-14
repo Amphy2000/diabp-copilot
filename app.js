@@ -80,6 +80,14 @@ const stopBotBtn = document.getElementById('stopBotBtn');
 const statusIndicator = document.getElementById('statusIndicator');
 const statusText = document.getElementById('statusText');
 
+// Session Resume Elements
+const resumeSessionContainer = document.getElementById('resumeSessionContainer');
+const resumeStep = document.getElementById('resumeStep');
+const resumeStake = document.getElementById('resumeStake');
+const resumeProfit = document.getElementById('resumeProfit');
+const resumeBotBtn = document.getElementById('resumeBotBtn');
+const discardSessionBtn = document.getElementById('discardSessionBtn');
+
 // Settings Inputs
 const stakeInput = document.getElementById('stakeInput');
 const targetProfitInput = document.getElementById('targetProfitInput');
@@ -1037,6 +1045,7 @@ async function checkAuth() {
     updateAccountLabelBadge(acct);
     await populateAccountSelector(token);
     checkAdminStatus();
+    checkActiveSession();
 
     connectWebSocket();
   } else {
@@ -1318,6 +1327,7 @@ async function handleMessage(data, isLoginAttempt = false) {
       const token = localStorage.getItem('deriv_token');
       await populateAccountSelector(token);
       checkAdminStatus();
+      checkActiveSession();
       
       balanceText.innerText = `$${parseFloat(balance).toFixed(2)}`;
       
@@ -1741,6 +1751,11 @@ function handleTradeOutcome(contract) {
   currentProposalId = null;
   currentContractId = null;
 
+  // Save active session state in real-time
+  if (isTrading) {
+    saveSessionState();
+  }
+
   // Check safety targets
   if (sessionProfit >= targetProfit) {
     addLog(`🏆 TARGET PROFIT REACHED! Session Profit: $${sessionProfit.toFixed(2)}`, "success");
@@ -1816,7 +1831,9 @@ startBotBtn.addEventListener('click', () => {
   
   requestWakeLock();
   startKeepAlive();
-  
+
+  saveSessionState();
+
   sendPushNotification("🤖 Bot Started", `Monitoring V75 tick patterns...\nStake: $${initialStake.toFixed(2)} | Target: $${targetProfit.toFixed(2)}`);
 });
 
@@ -1836,6 +1853,14 @@ function stopTrading(reason) {
 
   startBotBtn.classList.remove('hidden');
   stopBotBtn.classList.add('hidden');
+  
+  // Hide resume container when stopped
+  if (resumeSessionContainer) {
+    resumeSessionContainer.classList.add('hidden');
+  }
+
+  // Clear stored session state since the session has ended/stopped
+  clearSessionState();
   
   statusText.innerText = "Bot is Idle";
   statusIndicator.className = "status-bar status-idle";
@@ -2366,6 +2391,153 @@ ${actionText}
     }).catch(err => {
       console.error("Failed to copy report:", err);
     });
+  });
+}
+
+// ════════════════════════════════════════════
+//             SESSION PERSISTENCE HELPERS
+// ════════════════════════════════════════════
+
+function saveSessionState() {
+  const sessionState = {
+    initialStake: initialStake,
+    currentStake: currentStake,
+    currentMartingaleStep: currentMartingaleStep,
+    sessionProfit: sessionProfit,
+    targetProfit: targetProfit,
+    stopLoss: stopLoss,
+    maxMartingaleSteps: maxMartingaleSteps,
+    lossCooldownTicks: lossCooldownTicks,
+    useSma50Guard: useSma50Guard,
+    useStrictMartingale: useStrictMartingale,
+    activeSessionDbId: activeSessionDbId,
+    sessionTradedVolume: sessionTradedVolume,
+    sessionWins: sessionWins,
+    sessionLosses: sessionLosses,
+    sessionTradesCount: sessionTradesCount,
+    timestamp: Date.now()
+  };
+  localStorage.setItem('deriv_bot_active_session', JSON.stringify(sessionState));
+}
+
+function clearSessionState() {
+  localStorage.removeItem('deriv_bot_active_session');
+}
+
+function checkActiveSession() {
+  if (!resumeSessionContainer) return;
+  
+  const sessionData = localStorage.getItem('deriv_bot_active_session');
+  if (sessionData) {
+    try {
+      const state = JSON.parse(sessionData);
+      if (state && !isTrading) {
+        resumeStep.innerText = state.currentMartingaleStep;
+        resumeStake.innerText = `$${parseFloat(state.currentStake).toFixed(2)}`;
+        
+        const profit = parseFloat(state.sessionProfit);
+        resumeProfit.innerText = `${profit >= 0 ? '+' : ''}$${profit.toFixed(2)}`;
+        
+        if (profit >= 0) {
+          resumeProfit.className = "profit-won";
+          resumeProfit.style.color = "var(--color-success)";
+        } else {
+          resumeProfit.className = "profit-lost";
+          resumeProfit.style.color = "var(--color-danger)";
+        }
+
+        resumeSessionContainer.classList.remove('hidden');
+        startBotBtn.classList.add('hidden');
+        return;
+      }
+    } catch (e) {
+      console.error("Failed to parse active session:", e);
+      clearSessionState();
+    }
+  }
+  
+  resumeSessionContainer.classList.add('hidden');
+  if (!isTrading) {
+    startBotBtn.classList.remove('hidden');
+  }
+}
+
+// Event Listeners for Session Recovery
+if (resumeBotBtn) {
+  resumeBotBtn.addEventListener('click', () => {
+    const sessionData = localStorage.getItem('deriv_bot_active_session');
+    if (!sessionData) return;
+
+    try {
+      const state = JSON.parse(sessionData);
+
+      // Restore session variables
+      initialStake = parseFloat(state.initialStake);
+      currentStake = parseFloat(state.currentStake);
+      currentMartingaleStep = parseInt(state.currentMartingaleStep);
+      sessionProfit = parseFloat(state.sessionProfit);
+      targetProfit = parseFloat(state.targetProfit);
+      stopLoss = parseFloat(state.stopLoss);
+      maxMartingaleSteps = parseInt(state.maxMartingaleSteps);
+      lossCooldownTicks = parseInt(state.lossCooldownTicks);
+      useSma50Guard = state.useSma50Guard;
+      useStrictMartingale = state.useStrictMartingale;
+      activeSessionDbId = state.activeSessionDbId;
+      sessionTradedVolume = parseFloat(state.sessionTradedVolume || 0);
+      sessionWins = parseInt(state.sessionWins || 0);
+      sessionLosses = parseInt(state.sessionLosses || 0);
+      sessionTradesCount = parseInt(state.sessionTradesCount || 0);
+
+      // Update inputs on the UI
+      stakeInput.value = initialStake;
+      targetProfitInput.value = targetProfit;
+      stopLossInput.value = stopLoss;
+      martingaleStepsInput.value = maxMartingaleSteps;
+      if (lossCooldownInput) lossCooldownInput.value = lossCooldownTicks;
+      if (sma50GuardCheckbox) sma50GuardCheckbox.checked = useSma50Guard;
+      if (strictMartingaleCheckbox) strictMartingaleCheckbox.checked = useStrictMartingale;
+
+      // Update profit display
+      updateProfitDisplay();
+
+      // Disable inputs and toggle buttons
+      toggleInputs(true);
+      resumeSessionContainer.classList.add('hidden');
+      startBotBtn.classList.add('hidden');
+      stopBotBtn.classList.remove('hidden');
+
+      // Set active trading state
+      isTrading = true;
+      statusText.innerText = "Bot is Active";
+      statusIndicator.className = "status-bar status-running";
+
+      requestWakeLock();
+      startKeepAlive();
+
+      addLog(`🔄 Session Resumed! Step: ${currentMartingaleStep} | Stake: $${currentStake.toFixed(2)} | Profit: $${sessionProfit.toFixed(2)}`, "success");
+      sendPushNotification("🤖 Bot Resumed", `Continuing V75 scalper session...\nNext Stake: $${currentStake.toFixed(2)} | Session Profit: $${sessionProfit.toFixed(2)}`);
+
+      // Immediately save state again to ensure timestamp/any field updates are captured
+      saveSessionState();
+
+    } catch (e) {
+      console.error("Error resuming session:", e);
+      addLog("Failed to resume session. Starting clean instead.", "error");
+      clearSessionState();
+      resumeSessionContainer.classList.add('hidden');
+      startBotBtn.classList.remove('hidden');
+    }
+  });
+}
+
+if (discardSessionBtn) {
+  discardSessionBtn.addEventListener('click', () => {
+    if (confirm("Are you sure you want to discard this session and start fresh? This cannot be undone.")) {
+      clearSessionState();
+      resumeSessionContainer.classList.add('hidden');
+      startBotBtn.classList.remove('hidden');
+      addLog("🧹 Unfinished session discarded.", "info");
+    }
   });
 }
 

@@ -212,6 +212,24 @@
 
       <!-- Bot Control Buttons -->
       <div class="control-actions">
+        <!-- New Resume Container -->
+        <div id="resumeSessionContainer" class="resume-session-container hidden" style="background: rgba(255, 255, 255, 0.05); border: 1px dashed var(--color-primary); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+          <div class="resume-info" style="font-size: 0.9rem; margin-bottom: 10px;">
+            <div class="resume-title" style="color: var(--color-primary); font-weight: bold; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              ⏱️ Unfinished Session Found
+            </div>
+            <div class="resume-details" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; color: var(--color-neutral);">
+              <div>Step: <strong id="resumeStep" style="color: #ffffff;">0</strong></div>
+              <div>Next Stake: <strong id="resumeStake" style="color: #ffffff;">$0.00</strong></div>
+              <div style="grid-column: span 2;">Profit/Loss: <strong id="resumeProfit" style="color: #ffffff;">$0.00</strong></div>
+            </div>
+          </div>
+          <div class="resume-actions" style="display: flex; gap: 8px;">
+            <button id="resumeBotBtn" class="btn btn-primary btn-sm btn-glow width-full">Resume Session</button>
+            <button id="discardSessionBtn" class="btn btn-outline btn-sm width-full" style="border-color: rgba(255,255,255,0.2); color: var(--color-neutral);">Discard</button>
+          </div>
+        </div>
+
         <button id="startBotBtn" class="btn btn-success btn-glow width-full">Start Scalper Bot</button>
         <button id="stopBotBtn" class="btn btn-danger width-full hidden">Stop Scalper Bot</button>
       </div>
