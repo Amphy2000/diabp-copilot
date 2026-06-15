@@ -56,6 +56,7 @@ let wakeLock = null;
 let currentSubscriptionId = null;
 let keepAliveAudioContext = null;
 let keepAliveOscillator = null;
+let wsPingIntervalId = null; // WebSocket keepalive pinger (fires every 25s)
 
 // Session Database Analytics Tracking
 let activeSessionDbId = null;
@@ -2244,6 +2245,7 @@ startBotBtn.addEventListener('click', () => {
   
   requestWakeLock();
   startKeepAlive();
+  startWsPinger(); // sends a ping every 25s to keep WebSocket alive when screen is off
 
   saveSessionState();
 
@@ -2270,6 +2272,7 @@ function stopTrading(reason) {
 
   releaseWakeLock();
   stopKeepAlive();
+  stopWsPinger();
 
   startBotBtn.classList.remove('hidden');
   stopBotBtn.classList.add('hidden');
@@ -2335,11 +2338,23 @@ function releaseWakeLock() {
   }
 }
 
-// Handle visibility change to re-request Wake Lock if visible or send push notification when backgrounded
+// Handle visibility change: when the screen comes back on, resume audio and reconnect if needed
 document.addEventListener('visibilitychange', async () => {
   if (isTrading) {
     if (document.visibilityState === 'visible') {
+      // Re-request wake lock (it was revoked when screen turned off)
       await requestWakeLock();
+
+      // Resume the audio context (it may have been suspended by the OS)
+      if (keepAliveAudioContext && keepAliveAudioContext.state === 'suspended') {
+        try { await keepAliveAudioContext.resume(); } catch(e) {}
+      }
+
+      // If the WebSocket died while the screen was off, force a reconnect
+      if (!socket || socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) {
+        addLog("📱 Screen resumed — WebSocket was lost. Reconnecting...", "warn");
+        handleWebSocketDisconnect();
+      }
     } else if (document.visibilityState === 'hidden') {
       sendPushNotification("⚡ Running in Background", "Amphy Bot is actively monitoring V75 tick patterns and trading in the background.");
     }
@@ -2403,6 +2418,37 @@ function stopKeepAlive() {
     try {
       keepAliveAudioContext.suspend();
     } catch (e) {}
+  }
+}
+
+// ════════════════════════════════════════════
+//   WEBSOCKET PING (keeps connection alive
+//   when screen is off / page is backgrounded)
+// ════════════════════════════════════════════
+
+/**
+ * Sends a Deriv API ping every 25 seconds.
+ * This prevents the WebSocket server from timing out the connection
+ * when the phone screen is off and the browser is throttled.
+ * Without this, the connection silently dies after ~60-90 seconds.
+ */
+function startWsPinger() {
+  stopWsPinger(); // clear any existing pinger first
+  wsPingIntervalId = setInterval(() => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      try {
+        socket.send(JSON.stringify({ ping: 1 }));
+      } catch (e) {
+        console.warn('WS ping failed:', e);
+      }
+    }
+  }, 25000); // every 25 seconds
+}
+
+function stopWsPinger() {
+  if (wsPingIntervalId) {
+    clearInterval(wsPingIntervalId);
+    wsPingIntervalId = null;
   }
 }
 
