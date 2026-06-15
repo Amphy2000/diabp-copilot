@@ -28,6 +28,13 @@ let isAuthorized = false;
 let currentAuthorizedAccount = null;
 let isTrading = false;
 let candlesHistory = []; // stores compiled 1-minute candles
+
+// ── Cached indicator arrays (recalculated only on candle close, not every tick) ──
+let _cachedEma9 = [];   // EMA-9  values aligned to candlesHistory
+let _cachedEma21 = [];  // EMA-21 values aligned to candlesHistory
+let _cachedEma200 = []; // EMA-200 values aligned to candlesHistory
+let _cachedRsi14 = [];  // RSI-14 values aligned to candlesHistory
+let _chartDrawPending = false; // rAF gate for chart redraws
 let lastTickPrice = null;
 let chartTradeMarkers = [];
 let sessionProfit = 0.0;
@@ -1363,14 +1370,14 @@ function connectWebSocket(isLoginAttempt = false) {
           subscribe: 1
         }));
 
-        // Fetch historical ticks (one-time request) to populate indicator calculations
+        // Fetch historical 1-minute candles (one-time) to populate indicator calculations
         socket.send(JSON.stringify({
           ticks_history: 'R_75',
           adjust_start_time: 1,
           count: 300,
           end: 'latest',
-          start: 1,
-          style: 'ticks'
+          granularity: 60,
+          style: 'candles'
         }));
 
         // Subscribe to live ticks separately to ensure reliable tick stream delivery
@@ -1562,14 +1569,14 @@ async function handleMessage(data, isLoginAttempt = false) {
         subscribe: 1
       }));
 
-      // Fetch historical ticks (one-time request) to populate indicator calculations
+      // Fetch historical 1-minute candles (one-time) to populate indicator calculations
       socket.send(JSON.stringify({
         ticks_history: 'R_75',
         adjust_start_time: 1,
         count: 300,
         end: 'latest',
-        start: 1,
-        style: 'ticks'
+        granularity: 60,
+        style: 'candles'
       }));
 
       // Subscribe to live ticks separately to ensure reliable tick stream delivery
@@ -1600,6 +1607,8 @@ async function handleMessage(data, isLoginAttempt = false) {
         low: parseFloat(c.low),
         close: parseFloat(c.close)
       }));
+      // Immediately build indicator cache so the chart renders with full data
+      _rebuildIndicatorCache();
       addLog(`📈 Loaded ${candlesHistory.length} historical 1-minute candles. Crossover analysis active!`, "success");
       
       // Update UI element to display current price immediately
@@ -1608,6 +1617,9 @@ async function handleMessage(data, isLoginAttempt = false) {
         livePrice.innerText = lastCandle.close.toFixed(4);
         lastTickPrice = lastCandle.close;
       }
+
+      // Draw chart immediately with historical data
+      if (typeof drawChart === 'function') drawChart();
     }
   }
 
@@ -1806,6 +1818,41 @@ function calculateCandleRSIValues(period = 14) {
   return rsiValues;
 }
 
+// ════════════════════════════════════════════
+//    INDICATOR CACHE HELPERS (performance)
+// ════════════════════════════════════════════
+
+/**
+ * Full recalculation of all indicator caches.
+ * Called once per candle close (~once per minute).
+ */
+function _rebuildIndicatorCache() {
+  _cachedEma9   = calculateCandleEMAValues(9);
+  _cachedEma21  = calculateCandleEMAValues(21);
+  _cachedEma200 = calculateCandleEMAValues(200);
+  _cachedRsi14  = calculateCandleRSIValues(14);
+}
+
+/**
+ * Incremental EMA update for the live (current) candle's close price.
+ * This is O(1) and keeps the displayed EMA values up-to-date between candle closes.
+ * @param {number} price - latest tick price
+ */
+function _updateLastEmaIncremental(price) {
+  // Helper to apply one EMA step
+  function applyEmaStep(cache, period) {
+    if (cache.length < 2) return;
+    const k = 2 / (period + 1);
+    const prev = cache[cache.length - 2]; // previous confirmed candle EMA
+    if (prev === null) return;
+    cache[cache.length - 1] = (price * k) + (prev * (1 - k));
+  }
+
+  if (_cachedEma9.length > 0)  applyEmaStep(_cachedEma9, 9);
+  if (_cachedEma21.length > 0) applyEmaStep(_cachedEma21, 21);
+  // Note: EMA-200 and RSI update less critically between closes; skip for speed.
+}
+
 function processTick(tick) {
   const price = parseFloat(tick.quote);
   const timeEpoch = parseInt(tick.epoch);
@@ -1834,12 +1881,14 @@ function processTick(tick) {
   let candleClosed = false;
 
   if (lastCandle && lastCandle.epoch === tickMinuteEpoch) {
-    // Update current candle
+    // Update current candle in-place (no indicator recalc needed — only close changes)
     lastCandle.high = Math.max(lastCandle.high, price);
     lastCandle.low = Math.min(lastCandle.low, price);
     lastCandle.close = price;
+    // Update last EMA value incrementally (fast — avoids full recalc on every tick)
+    _updateLastEmaIncremental(price);
   } else if (lastCandle && tickMinuteEpoch > lastCandle.epoch) {
-    // A new minute has started! That means the previous candle has officially closed.
+    // A new minute has started — previous candle is officially closed.
     candleClosed = true;
 
     // Initialize the new candle
@@ -1854,8 +1903,11 @@ function processTick(tick) {
     if (candlesHistory.length > 300) {
       candlesHistory.shift();
     }
+
+    // Full recalc only on candle close (once per minute)
+    _rebuildIndicatorCache();
   } else if (!lastCandle) {
-    // First candle
+    // First candle ever
     candlesHistory.push({
       epoch: tickMinuteEpoch,
       open: price,
@@ -1863,16 +1915,13 @@ function processTick(tick) {
       low: price,
       close: price
     });
+    _rebuildIndicatorCache();
   }
 
-  // Calculate moving averages/trend status based on candle history
-  const ema9Values = calculateCandleEMAValues(9);
-  const ema21Values = calculateCandleEMAValues(21);
-  const rsiValues = calculateCandleRSIValues(14);
-
-  const curEma9 = ema9Values.length > 0 ? ema9Values[ema9Values.length - 1] : null;
-  const curEma21 = ema21Values.length > 0 ? ema21Values[ema21Values.length - 1] : null;
-  const curRsi = rsiValues.length > 0 ? rsiValues[rsiValues.length - 1] : null;
+  // Use cached indicator values — O(1) lookup, no loop
+  const curEma9  = _cachedEma9.length  > 0 ? _cachedEma9[_cachedEma9.length - 1]   : null;
+  const curEma21 = _cachedEma21.length > 0 ? _cachedEma21[_cachedEma21.length - 1] : null;
+  const curRsi   = _cachedRsi14.length > 0 ? _cachedRsi14[_cachedRsi14.length - 1] : null;
 
   let trendStr = "Analyzing...";
   let trendColor = "var(--text-muted)";
@@ -1929,18 +1978,24 @@ function processTick(tick) {
     }
   }
 
-  if (typeof drawChart === 'function') {
-    drawChart();
+  // Throttle chart redraws using requestAnimationFrame to prevent UI jank
+  if (!_chartDrawPending) {
+    _chartDrawPending = true;
+    requestAnimationFrame(() => {
+      _chartDrawPending = false;
+      if (typeof drawChart === 'function') drawChart();
+    });
   }
 }
 
 function evaluateCrossoverStrategy() {
   if (candlesHistory.length < 21) return; // Need at least 21 candles for indicators
 
-  const ema9Values = calculateCandleEMAValues(9);
-  const ema21Values = calculateCandleEMAValues(21);
-  const ema200Values = calculateCandleEMAValues(200);
-  const rsiValues = calculateCandleRSIValues(14);
+  // Use cached arrays — already computed by _rebuildIndicatorCache() on candle close
+  const ema9Values = _cachedEma9;
+  const ema21Values = _cachedEma21;
+  const ema200Values = _cachedEma200;
+  const rsiValues = _cachedRsi14;
 
   const len = candlesHistory.length;
   if (ema9Values.length < len || ema21Values.length < len || rsiValues.length < len) return;
@@ -3297,11 +3352,9 @@ function drawChart() {
   // Draw last 50 candles for the premium visual representation
   const drawCandles = candlesHistory.slice(-50);
   
-  // Calculate EMA-9 and EMA-21 for indicators mapping
-  const fullEma9 = calculateCandleEMAValues(9);
-  const fullEma21 = calculateCandleEMAValues(21);
-  const ema9Values = fullEma9.slice(-50);
-  const ema21Values = fullEma21.slice(-50);
+  // Use cached EMA arrays (no recalculation — zero extra cost per draw)
+  const ema9Values = _cachedEma9.slice(-50);
+  const ema21Values = _cachedEma21.slice(-50);
 
   // Calculate min and max bounds for y-axis scaling
   let minVal = Infinity;
@@ -3341,12 +3394,18 @@ function drawChart() {
   ctx.stroke();
 
   // 2. Draw Candlesticks
-  const candleSpace = chartWidth / drawCandles.length;
-  const candleWidth = Math.max(2, Math.floor(candleSpace * 0.65));
+  // Fixed 50-slot layout: candles always occupy the same slot width regardless of
+  // how many candles are currently loaded. This prevents mobile stretching on startup.
+  const TOTAL_SLOTS = 50;
+  const slotWidth = chartWidth / TOTAL_SLOTS;
+  const candleWidth = Math.max(2, Math.floor(slotWidth * 0.65));
+  // First candle starts at slot (TOTAL_SLOTS - drawCandles.length)
+  const startSlot = TOTAL_SLOTS - drawCandles.length;
 
   for (let i = 0; i < drawCandles.length; i++) {
     const c = drawCandles[i];
-    const x = (i / (drawCandles.length - 1)) * chartWidth;
+    // x is the center of this candle's slot
+    const x = ((startSlot + i) + 0.5) * slotWidth;
     
     const yOpen = height - ((c.open - minVal) / (maxVal - minVal)) * height;
     const yClose = height - ((c.close - minVal) / (maxVal - minVal)) * height;
@@ -3379,7 +3438,7 @@ function drawChart() {
   let ema9Started = false;
   for (let i = 0; i < drawCandles.length; i++) {
     if (ema9Values[i] !== null && ema9Values[i] !== undefined) {
-      const x = (i / (drawCandles.length - 1)) * chartWidth;
+      const x = ((startSlot + i) + 0.5) * slotWidth;
       const y = height - ((ema9Values[i] - minVal) / (maxVal - minVal)) * height;
       if (!ema9Started) {
         ctx.moveTo(x, y);
@@ -3398,7 +3457,7 @@ function drawChart() {
   let ema21Started = false;
   for (let i = 0; i < drawCandles.length; i++) {
     if (ema21Values[i] !== null && ema21Values[i] !== undefined) {
-      const x = (i / (drawCandles.length - 1)) * chartWidth;
+      const x = ((startSlot + i) + 0.5) * slotWidth;
       const y = height - ((ema21Values[i] - minVal) / (maxVal - minVal)) * height;
       if (!ema21Started) {
         ctx.moveTo(x, y);
@@ -3448,7 +3507,7 @@ function drawChart() {
     const marker = chartTradeMarkers[i];
     const idx = drawCandles.findIndex(c => c.epoch === marker.epoch);
     if (idx !== -1) {
-      const x = (idx / (drawCandles.length - 1)) * chartWidth;
+      const x = ((startSlot + idx) + 0.5) * slotWidth;
       const y = height - ((marker.price - minVal) / (maxVal - minVal)) * height;
 
       let markerColor = "#f59e0b"; // gold/yellow for pending
