@@ -605,7 +605,7 @@ function applyPreset(presetType) {
   }
 
   let calculatedStake = 0.50;
-  let calculatedSteps = 3;
+  let calculatedSteps = 4;
   let calculatedStop = 5.00;
   let calculatedTarget = 2.00;
   let calculatedCooldown = 15;
@@ -615,8 +615,8 @@ function applyPreset(presetType) {
 
   if (presetType === 'conservative') {
     calculatedStake = Math.max(0.35, Math.round((balance * 0.01) * 20) / 20); // 1% of balance, rounded to nearest 0.05
-    calculatedSteps = 2;
-    calculatedStop = Math.round((calculatedStake * (1 + 2 + 4)) * 100) / 100; // sum of stakes for 2 steps (Stake + 2*Stake)
+    calculatedSteps = 3; // Base + 2 recovery steps = 3 total steps
+    calculatedStop = Math.round((calculatedStake * (1 + 2 + 4)) * 100) / 100; // sum of stakes for 3 total steps (Stake * 7)
     calculatedTarget = Math.max(1.00, Math.round((balance * 0.03) * 2) / 2); // 3% of balance target
     calculatedCooldown = 20;
     calculatedSma50 = true;
@@ -627,8 +627,8 @@ function applyPreset(presetType) {
     if (balance < 25) {
       calculatedStake = 0.50; // Fallback minimum stake
     }
-    calculatedSteps = 3;
-    calculatedStop = Math.round((calculatedStake * (1 + 2 + 4 + 8)) * 100) / 100; // sum of stakes for 3 steps
+    calculatedSteps = 4; // Base + 3 recovery steps = 4 total steps
+    calculatedStop = Math.round((calculatedStake * (1 + 2 + 4 + 8)) * 100) / 100; // sum of stakes for 4 total steps (Stake * 15)
     calculatedTarget = Math.max(2.00, Math.round((balance * 0.07) * 2) / 2); // 7% of balance target
     calculatedCooldown = 15;
     calculatedSma50 = true;
@@ -636,8 +636,8 @@ function applyPreset(presetType) {
     feedbackMsg = `⚖️ Moderate: 2% stake ($${calculatedStake.toFixed(2)}), 3 recovery steps, 15-tick loss cooldown. Balanced risk. Recommended balance: $25+`;
   } else if (presetType === 'aggressive') {
     calculatedStake = Math.max(0.50, Math.round((balance * 0.04) * 10) / 10); // 4% of balance, rounded to nearest 0.10
-    calculatedSteps = 4;
-    calculatedStop = Math.round((calculatedStake * (1 + 2 + 4 + 8 + 16)) * 100) / 100; // sum of stakes for 4 steps
+    calculatedSteps = 5; // Base + 4 recovery steps = 5 total steps
+    calculatedStop = Math.round((calculatedStake * (1 + 2 + 4 + 8 + 16)) * 100) / 100; // sum of stakes for 5 total steps (Stake * 31)
     calculatedTarget = Math.max(5.00, Math.round((balance * 0.15) * 2) / 2); // 15% of balance target
     calculatedCooldown = 10;
     calculatedSma50 = true;
@@ -658,6 +658,9 @@ function applyPreset(presetType) {
     presetFeedback.innerText = feedbackMsg;
     
     console.log(`Preset Applied: ${presetType}. Stake: ${calculatedStake}, Steps: ${calculatedSteps}, Stop: ${calculatedStop}, Target: ${calculatedTarget}, Cooldown: ${calculatedCooldown}`);
+    
+    // Refresh the real-time Stop Loss helper text
+    updateStopLossSuggestion();
   }
 }
 
@@ -672,6 +675,72 @@ if (presetAggressiveBtn) {
   presetAggressiveBtn.addEventListener('click', () => applyPreset('aggressive'));
 }
 
+// Dynamic Stop Loss Suggestion & Validator function
+function updateStopLossSuggestion() {
+  const helperEl = document.getElementById('stopLossHelper');
+  if (!helperEl) return;
+
+  const stakeInputVal = document.getElementById('stakeInput');
+  const martingaleStepsInputVal = document.getElementById('martingaleStepsInput');
+  const martingaleMultiplierInputVal = document.getElementById('martingaleMultiplierInput');
+  const stopLossInputVal = document.getElementById('stopLossInput');
+
+  if (!stakeInputVal || !martingaleStepsInputVal || !martingaleMultiplierInputVal || !stopLossInputVal) return;
+
+  const stake = parseFloat(stakeInputVal.value) || 0.35;
+  const steps = parseInt(martingaleStepsInputVal.value) || 1;
+  const multiplier = parseFloat(martingaleMultiplierInputVal.value) || 2.0;
+  const currentStopLoss = parseFloat(stopLossInputVal.value) || 0;
+
+  if (stake <= 0 || steps <= 0 || multiplier < 1.0) {
+    helperEl.style.display = 'none';
+    return;
+  }
+
+  // Calculate total cycle cost
+  let cycleCost = 0;
+  let current = stake;
+  for (let i = 0; i < steps; i++) {
+    cycleCost += current;
+    current = current * multiplier;
+  }
+  cycleCost = Math.round(cycleCost * 100) / 100;
+
+  helperEl.style.display = 'block';
+
+  if (currentStopLoss < cycleCost) {
+    helperEl.style.backgroundColor = 'rgba(239, 68, 68, 0.15)'; // Red background
+    helperEl.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+    helperEl.innerHTML = `
+      <div style="color: #fca5a5; font-weight: 600; display: flex; align-items: center; gap: 4px;">⚠️ Stop Loss Warning</div>
+      <div style="color: var(--text-muted); margin-top: 3px;">
+        Martingale Cycle Cost: <strong>$${cycleCost.toFixed(2)}</strong> (for ${steps} steps at ${multiplier}x).
+        Your Stop Loss (<strong>$${currentStopLoss.toFixed(2)}</strong>) is lower than this cost. The bot will stop trading prematurely on losses.
+      </div>
+    `;
+  } else if (currentStopLoss >= cycleCost * 2) {
+    helperEl.style.backgroundColor = 'rgba(245, 158, 11, 0.15)'; // Orange background
+    helperEl.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+    helperEl.innerHTML = `
+      <div style="color: #fde047; font-weight: 600; display: flex; align-items: center; gap: 4px;">⚠️ High Drawdown Risk</div>
+      <div style="color: var(--text-muted); margin-top: 3px;">
+        Martingale Cycle Cost: <strong>$${cycleCost.toFixed(2)}</strong>.
+        Your Stop Loss (<strong>$${currentStopLoss.toFixed(2)}</strong>) allows <strong>${Math.floor(currentStopLoss / cycleCost)} full cycle failures</strong>. You may experience large drawdowns before the bot halts.
+      </div>
+    `;
+  } else {
+    helperEl.style.backgroundColor = 'rgba(16, 185, 129, 0.1)'; // Green background
+    helperEl.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+    helperEl.innerHTML = `
+      <div style="color: #34d399; font-weight: 600; display: flex; align-items: center; gap: 4px;">✅ Aligned Risk Settings</div>
+      <div style="color: var(--text-muted); margin-top: 3px;">
+        Martingale Cycle Cost: <strong>$${cycleCost.toFixed(2)}</strong>.
+        Stop Loss: <strong>$${currentStopLoss.toFixed(2)}</strong>. Perfectly sized to halt the bot after exactly 1 full cycle failure.
+      </div>
+    `;
+  }
+}
+
 // Event listeners to detect manual customization
 const markCustomSettings = () => {
   currentPreset = 'custom';
@@ -679,11 +748,17 @@ const markCustomSettings = () => {
   if (presetModerateBtn) presetModerateBtn.classList.remove('active');
   if (presetAggressiveBtn) presetAggressiveBtn.classList.remove('active');
   if (presetFeedback) presetFeedback.innerText = "✏️ Custom settings applied by user.";
+  updateStopLossSuggestion();
 };
 
 if (stakeInput) stakeInput.addEventListener('input', markCustomSettings);
 if (targetProfitInput) targetProfitInput.addEventListener('input', markCustomSettings);
-if (stopLossInput) stopLossInput.addEventListener('input', markCustomSettings);
+if (stopLossInput) {
+  stopLossInput.addEventListener('input', () => {
+    markCustomSettings();
+    updateStopLossSuggestion();
+  });
+}
 if (martingaleStepsInput) martingaleStepsInput.addEventListener('input', markCustomSettings);
 if (martingaleMultiplierInput) martingaleMultiplierInput.addEventListener('input', markCustomSettings);
 if (lossCooldownInput) lossCooldownInput.addEventListener('input', markCustomSettings);
@@ -1271,6 +1346,14 @@ function connectWebSocket(isLoginAttempt = false) {
         if (isTrading) {
           statusText.innerText = "Bot is Active";
           statusIndicator.className = "status-bar status-running";
+          if (currentContractId) {
+            addLog(`🔄 Re-subscribing to active contract tracking: ${currentContractId}`, "info");
+            socket.send(JSON.stringify({
+              proposal_open_contract: 1,
+              contract_id: currentContractId,
+              subscribe: 1
+            }));
+          }
         }
 
         checkActiveSession();
@@ -1285,7 +1368,7 @@ function connectWebSocket(isLoginAttempt = false) {
         socket.send(JSON.stringify({
           ticks_history: 'R_75',
           adjust_start_time: 1,
-          count: 100,
+          count: 300,
           end: 'latest',
           start: 1,
           style: 'ticks'
@@ -1447,6 +1530,14 @@ async function handleMessage(data, isLoginAttempt = false) {
       if (isTrading) {
         statusText.innerText = "Bot is Active";
         statusIndicator.className = "status-bar status-running";
+        if (currentContractId) {
+          addLog(`🔄 Re-subscribing to active contract tracking: ${currentContractId}`, "info");
+          socket.send(JSON.stringify({
+            proposal_open_contract: 1,
+            contract_id: currentContractId,
+            subscribe: 1
+          }));
+        }
       }
       
       // Display trading console
@@ -1476,7 +1567,7 @@ async function handleMessage(data, isLoginAttempt = false) {
       socket.send(JSON.stringify({
         ticks_history: 'R_75',
         adjust_start_time: 1,
-        count: 100,
+        count: 300,
         end: 'latest',
         start: 1,
         style: 'ticks'
@@ -1679,11 +1770,11 @@ function processTick(tick) {
     }
   }
 
-  // Keep a record of the last 100 prices to analyze patterns and calculate moving averages
+  // Keep a record of the last 300 prices to analyze patterns and calculate moving averages
   absoluteTickCounter++;
   ticksHistory.push(price);
   ticksHistoryCounters.push(absoluteTickCounter);
-  if (ticksHistory.length > 100) {
+  if (ticksHistory.length > 300) {
     ticksHistory.shift();
     ticksHistoryCounters.shift();
   }
@@ -1758,7 +1849,7 @@ function evaluateStrategyPattern() {
   const rsi14 = calculateRSI(14);
   if (!sma10 || !sma20 || rsi14 === null) return;
 
-  const sma50 = useSma50Guard ? calculateSMA(50) : null;
+  const sma100 = useSma50Guard ? calculateSMA(100) : null;
 
   const len = ticksHistory.length;
   // Extract the last 5 ticks to check for 3 drops followed by a rise, or 3 rises followed by a drop
@@ -1781,14 +1872,14 @@ function evaluateStrategyPattern() {
   const callBounce = (t1 < t0 && t2 < t1 && t3 < t2 && t4 > t3);
   const putBounce = (t1 > t0 && t2 > t1 && t3 > t2 && t4 < t3);
 
-  const isSma50CallValid = !useSma50Guard || !sma50 || t4 > sma50;
-  const isSma50PutValid = !useSma50Guard || !sma50 || t4 < sma50;
+  const isSma50CallValid = !useSma50Guard || !sma100 || t4 > sma100;
+  const isSma50PutValid = !useSma50Guard || !sma100 || t4 < sma100;
 
   // 1. Trend-Following Bullish Pullback:
   // - Trend is Bullish (SMA10 > SMA20)
   // - RSI is oversold (< rsiCallThreshold)
   // - Breakout Guard: Current price is above SMA20 (confirms it is a pullback, not a downward trend crash)
-  // - SMA-50 Trend Guard: Price is above SMA-50
+  // - SMA-100 Trend Guard: Price is above SMA-100
   // - Trigger: Pullback bounce detected (standard or strict recovery)
   if (trendIsBullish && rsi14 < rsiCallThreshold && isSma50CallValid && callBounce) {
     addLog(`Trend: Bullish | RSI: ${rsi14.toFixed(1)} (Threshold: ${rsiCallThreshold}) | Pullback bounce detected${useStrict ? ' [Strict Recovery]' : ''}. Buying RISE...`, "info");
@@ -1797,7 +1888,7 @@ function evaluateStrategyPattern() {
   // 2. Trend-Following Bearish Pullback:
   // - Trend is Bearish (SMA10 < SMA20)
   // - RSI is overbought (> rsiPutThreshold)
-  // - SMA-50 Trend Guard: Price is below SMA-50
+  // - SMA-100 Trend Guard: Price is below SMA-100
   // - Trigger: Pullback bounce detected (standard or strict recovery)
   else if (trendIsBearish && rsi14 > rsiPutThreshold && isSma50PutValid && putBounce) {
     addLog(`Trend: Bearish | RSI: ${rsi14.toFixed(1)} (Threshold: ${rsiPutThreshold}) | Pullback bounce detected${useStrict ? ' [Strict Recovery]' : ''}. Buying FALL...`, "info");
@@ -3110,7 +3201,7 @@ function drawChart() {
     return;
   }
 
-  const prices = ticksHistory;
+  const prices = ticksHistory.slice(-100);
   
   // Precompute SMA 10 and SMA 20 values for the current tick history subset
   const sma10Values = [];

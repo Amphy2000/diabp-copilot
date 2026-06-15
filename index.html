@@ -202,6 +202,7 @@
             <label for="stopLossInput">Stop Loss ($)</label>
             <input type="number" id="stopLossInput" value="5.00" step="1.0" min="1.0" />
           </div>
+          <div id="stopLossHelper" class="grid-span-2 stop-loss-helper-text" style="font-size: 0.72rem; padding: 8px 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--panel-border); margin-top: -0.25rem; margin-bottom: 0.25rem; display: none; line-height: 1.4;"></div>
           <div class="input-group">
             <label for="martingaleStepsInput">Max Martingale Steps</label>
             <input type="number" id="martingaleStepsInput" value="3" min="1" max="5" />
@@ -215,7 +216,7 @@
             <input type="number" id="lossCooldownInput" value="15" min="0" max="50" />
           </div>
           <div class="input-group grid-span-2 flex-row-between">
-            <label for="sma50GuardCheckbox" style="margin-bottom: 0; cursor: pointer;">Use SMA-50 Trend Guard</label>
+            <label for="sma50GuardCheckbox" style="margin-bottom: 0; cursor: pointer;">Use SMA-100 Macro Guard</label>
             <input type="checkbox" id="sma50GuardCheckbox" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--color-primary);" checked />
           </div>
           <div class="input-group grid-span-2 flex-row-between">
