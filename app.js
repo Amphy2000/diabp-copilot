@@ -48,6 +48,7 @@ let currentMartingaleStep = 0;
 let lossCooldownTicks = 15;
 let cooldownTicksRemaining = 0;
 let useSma50Guard = true;
+let lastTradeCandleIdx = -99; // tracks which candle index the last trade fired on (for spacing)
 let useStrictMartingale = true;
 let currentProposalId = null;
 let currentContractId = null;
@@ -1990,60 +1991,108 @@ function processTick(tick) {
 }
 
 function evaluateCrossoverStrategy() {
-  if (candlesHistory.length < 21) return; // Need at least 21 candles for indicators
+  if (candlesHistory.length < 21) return;
 
-  // Use cached arrays — already computed by _rebuildIndicatorCache() on candle close
-  const ema9Values = _cachedEma9;
-  const ema21Values = _cachedEma21;
+  // Use cached indicator arrays (computed once per candle close)
+  const ema9Values   = _cachedEma9;
+  const ema21Values  = _cachedEma21;
   const ema200Values = _cachedEma200;
-  const rsiValues = _cachedRsi14;
+  const rsiValues    = _cachedRsi14;
 
   const len = candlesHistory.length;
   if (ema9Values.length < len || ema21Values.length < len || rsiValues.length < len) return;
 
   const currentIdx = len - 1;
-  const prevIdx = len - 2;
+  const prevIdx    = len - 2;
 
-  const curEma9 = ema9Values[currentIdx];
-  const curEma21 = ema21Values[currentIdx];
-  const prevEma9 = ema9Values[prevIdx];
+  const curEma9   = ema9Values[currentIdx];
+  const curEma21  = ema21Values[currentIdx];
+  const prevEma9  = ema9Values[prevIdx];
   const prevEma21 = ema21Values[prevIdx];
+  const curEma200 = ema200Values.length >= len ? ema200Values[currentIdx] : null;
+  const curRsi    = rsiValues[currentIdx];
 
-  const curEma200 = ema200Values[currentIdx];
-  const curRsi = rsiValues[currentIdx];
+  if (curEma9 == null || curEma21 == null || prevEma9 == null || prevEma21 == null || curRsi == null) return;
 
-  if (curEma9 === null || curEma21 === null || prevEma9 === null || prevEma21 === null) return;
+  const lastCandle = candlesHistory[currentIdx];
+  const prevCandle = candlesHistory[prevIdx];
+  const closePrice = lastCandle.close;
 
+  // ── Macro trend filter (EMA-200) ──────────────────────────────────────────
+  const isMacroBullish = curEma200 !== null ? (closePrice > curEma200) : true;
+  const isMacroBearish = curEma200 !== null ? (closePrice < curEma200) : true;
+  const macroBullValid = !useSma50Guard || isMacroBullish;
+  const macroBearValid = !useSma50Guard || isMacroBearish;
+
+  // ── Strict mode during martingale recovery ────────────────────────────────
+  const useStrict = currentMartingaleStep > 0 && useStrictMartingale;
+
+  // ══════════════════════════════════════════════════════════════
+  //  SIGNAL TIER 1: EMA Crossover — highest confidence
+  //  Fires the moment EMA-9 crosses EMA-21.
+  //  Relaxed RSI thresholds (65/35) so good crossovers aren't blocked.
+  // ══════════════════════════════════════════════════════════════
   const isBullishCrossover = (prevEma9 <= prevEma21) && (curEma9 > curEma21);
   const isBearishCrossover = (prevEma9 >= prevEma21) && (curEma9 < curEma21);
 
-  const lastCandle = candlesHistory[currentIdx];
-  const closePrice = lastCandle.close;
+  const crossCallRsi = useStrict ? 55 : 65; // RSI must be BELOW this for CALL
+  const crossPutRsi  = useStrict ? 45 : 35; // RSI must be ABOVE this for PUT
 
-  // Trend filter using EMA-200
-  const isTrendBullish = curEma200 !== null ? (closePrice > curEma200) : true;
-  const isTrendBearish = curEma200 !== null ? (closePrice < curEma200) : true;
-
-  const isRecoveryStep = currentMartingaleStep > 0;
-  const useStrict = isRecoveryStep && useStrictMartingale;
-
-  const rsiCallThreshold = useStrict ? 45 : 50;
-  const rsiPutThreshold = useStrict ? 55 : 50;
-
-  const isSma50CallValid = !useSma50Guard || isTrendBullish;
-  const isSma50PutValid = !useSma50Guard || isTrendBearish;
-
-  // Evaluate CALL (RISE)
-  if (isBullishCrossover && curRsi !== null && curRsi < rsiCallThreshold && isSma50CallValid) {
-    addLog(`Trend Rider CALL: Bullish Crossover | RSI: ${curRsi.toFixed(1)} | Price above EMA-200. Buying RISE...`, "info");
+  if (isBullishCrossover && curRsi < crossCallRsi && macroBullValid) {
+    lastTradeCandleIdx = currentIdx;
+    addLog(`🟢 CROSSOVER CALL | EMA-9 x EMA-21 | RSI: ${curRsi.toFixed(1)} — Buying RISE`, "info");
     proposeTrade("CALL");
+    return;
   }
-  // Evaluate PUT (FALL)
-  else if (isBearishCrossover && curRsi !== null && curRsi > rsiPutThreshold && isSma50PutValid) {
-    addLog(`Trend Rider PUT: Bearish Crossover | RSI: ${curRsi.toFixed(1)} | Price below EMA-200. Buying FALL...`, "info");
+  if (isBearishCrossover && curRsi > crossPutRsi && macroBearValid) {
+    lastTradeCandleIdx = currentIdx;
+    addLog(`🔴 CROSSOVER PUT | EMA-9 x EMA-21 | RSI: ${curRsi.toFixed(1)} — Buying FALL`, "info");
     proposeTrade("PUT");
+    return;
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  //  SIGNAL TIER 2: Trend Continuation
+  //  Fires every 3 candles when a clear trend is running.
+  //  Requires: EMA alignment + 2 consecutive confirming candles + RSI room.
+  //  This ensures the bot trades multiple times per hour, not zero.
+  // ══════════════════════════════════════════════════════════════
+  const candlesSinceLastTrade = currentIdx - lastTradeCandleIdx;
+  const minSpacing = useStrict ? 5 : 3;
+  if (candlesSinceLastTrade < minSpacing) return;
+
+  // EMA spread must be meaningful (not just noise at the 50-line)
+  const emaSpreadPct = Math.abs(curEma9 - curEma21) / closePrice * 100;
+  const isClearTrend = emaSpreadPct >= 0.01; // at least 0.01% spread
+  if (!isClearTrend) return;
+
+  // Two consecutive confirming candles for momentum
+  const isBullishCandle = lastCandle.close > lastCandle.open;
+  const isBearishCandle = lastCandle.close < lastCandle.open;
+  const prevIsBullish   = prevCandle.close > prevCandle.open;
+  const prevIsBearish   = prevCandle.close < prevCandle.open;
+
+  // RSI limits: avoid entries at extremes
+  const contCallRsi = useStrict ? 50 : 60; // RSI below this for CALL continuation
+  const contPutRsi  = useStrict ? 50 : 40; // RSI above this for PUT continuation
+
+  // CALL continuation: uptrend, two green candles, RSI not overbought, macro supports
+  if (curEma9 > curEma21 && isBullishCandle && prevIsBullish && curRsi < contCallRsi && macroBullValid) {
+    lastTradeCandleIdx = currentIdx;
+    addLog(`🟢 TREND CALL | EMA spread: ${emaSpreadPct.toFixed(3)}% | RSI: ${curRsi.toFixed(1)} — Buying RISE`, "info");
+    proposeTrade("CALL");
+    return;
+  }
+
+  // PUT continuation: downtrend, two red candles, RSI not oversold, macro supports
+  if (curEma9 < curEma21 && isBearishCandle && prevIsBearish && curRsi > contPutRsi && macroBearValid) {
+    lastTradeCandleIdx = currentIdx;
+    addLog(`🔴 TREND PUT | EMA spread: ${emaSpreadPct.toFixed(3)}% | RSI: ${curRsi.toFixed(1)} — Buying FALL`, "info");
+    proposeTrade("PUT");
+    return;
   }
 }
+
 
 // ════════════════════════════════════════════
 //             TRADING ACTIONS
