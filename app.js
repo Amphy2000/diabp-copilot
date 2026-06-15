@@ -473,6 +473,33 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
+  // Initialize FAQ accordion slide transitions
+  const faqQuestions = document.querySelectorAll('.faq-question-btn');
+  faqQuestions.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = btn.closest('.faq-item');
+      const collapse = item.querySelector('.faq-answer-collapse');
+      const isActive = item.classList.contains('active');
+      
+      // Close other active FAQ items
+      document.querySelectorAll('.faq-item.active').forEach(activeItem => {
+        if (activeItem !== item) {
+          activeItem.classList.remove('active');
+          activeItem.querySelector('.faq-answer-collapse').style.maxHeight = null;
+        }
+      });
+      
+      // Toggle current item
+      if (isActive) {
+        item.classList.remove('active');
+        collapse.style.maxHeight = null;
+      } else {
+        item.classList.add('active');
+        collapse.style.maxHeight = collapse.scrollHeight + 'px';
+      }
+    });
+  });
+
   checkAuth();
   loadStats();
 });

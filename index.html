@@ -107,20 +107,50 @@
         </div>
       </div>
 
-      <!-- FAQ Section -->
+      <!-- FAQ Section Accordions -->
       <div class="faq-section">
         <h3>Frequently Asked Questions</h3>
+        
         <div class="faq-item">
-          <h4 class="faq-question">How does the Amphy V75 Bot work?</h4>
-          <p class="faq-answer">The bot loads 300 historical 1-minute candles and computes EMA-9, EMA-21, and RSI-14 in real time. It fires a trade on two types of signal: (1) a fresh EMA crossover — the highest-confidence entry — and (2) a trend continuation signal when two consecutive candles confirm an ongoing trend. This means it trades actively throughout the session, not just during rare crossover events.</p>
+          <button type="button" class="faq-question-btn">
+            <span>How does the Amphy V75 Bot work?</span>
+            <svg class="faq-chevron" viewBox="0 0 24 24" width="16" height="16">
+              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <div class="faq-answer-collapse">
+            <div class="faq-answer-content">
+              <p>The bot loads 300 historical 1-minute candles and computes EMA-9, EMA-21, and RSI-14 in real time. It fires a trade on two types of signal: (1) a fresh EMA crossover — the highest-confidence entry — and (2) a trend continuation signal when two consecutive candles confirm an ongoing trend. This means it trades actively throughout the session, not just during rare crossover events.</p>
+            </div>
+          </div>
         </div>
+
         <div class="faq-item">
-          <h4 class="faq-question">How is risk managed?</h4>
-          <p class="faq-answer">A configurable Stop Loss stops the session if losses exceed your limit. A Target Profit locks in gains and stops automatically. The optional Martingale recovery doubles your stake after a loss (up to a set number of steps) so a single win recovers the sequence. During recovery, the bot tightens its entry filters to protect capital.</p>
+          <button type="button" class="faq-question-btn">
+            <span>How is risk managed?</span>
+            <svg class="faq-chevron" viewBox="0 0 24 24" width="16" height="16">
+              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <div class="faq-answer-collapse">
+            <div class="faq-answer-content">
+              <p>A configurable Stop Loss stops the session if losses exceed your limit. A Target Profit locks in gains and stops automatically. The optional Martingale recovery doubles your stake after a loss (up to a set number of steps) so a single win recovers the sequence. During recovery, the bot tightens its entry filters to protect capital.</p>
+            </div>
+          </div>
         </div>
+
         <div class="faq-item">
-          <h4 class="faq-question">Why do I need to register under your partner link?</h4>
-          <p class="faq-answer">The bot is completely free to use — no subscriptions, no hidden fees. We earn a small turnover commission from Deriv on trades placed through our affiliate link. This keeps the service free forever and aligns our incentives directly with your success.</p>
+          <button type="button" class="faq-question-btn">
+            <span>Why do I need to register under your partner link?</span>
+            <svg class="faq-chevron" viewBox="0 0 24 24" width="16" height="16">
+              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <div class="faq-answer-collapse">
+            <div class="faq-answer-content">
+              <p>The bot is completely free to use — no subscriptions, no hidden fees. We earn a small turnover commission from Deriv on trades placed through our affiliate link. This keeps the service free forever and aligns our incentives directly with your success.</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
