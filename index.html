@@ -148,267 +148,295 @@
         </div>
       </div>
 
-      <!-- Live Tick Visualizer -->
-      <div class="tick-card">
-        <div class="tick-info-left">
-          <span class="tick-label">Live V75 Price</span>
-          <span id="trendLabel" class="trend-status-text">Trend: Analyzing...</span>
-        </div>
-        <div class="tick-stream">
-          <span id="livePrice" class="tick-price">—</span>
-          <span id="tickDirection" class="tick-arrow"></span>
-        </div>
+      <!-- ═══════ sleek tab navigation bar ═══════ -->
+      <div class="console-tab-bar">
+        <button type="button" class="tab-btn active" data-tab="trade">📈 Trade</button>
+        <button type="button" class="tab-btn" data-tab="settings">⚙️ Settings</button>
+        <button type="button" class="tab-btn" data-tab="analytics">📊 Stats</button>
+        <button type="button" class="tab-btn hidden" id="adminTabBtn" data-tab="admin">⚡ Admin</button>
       </div>
 
-      <!-- Real-Time Mini Chart Visualizer -->
-      <div class="chart-card">
-        <div class="chart-header">
-          <span class="chart-title">📈 V75 Price Movement (1-Min Candles)</span>
-          <div class="chart-legend">
-            <span class="legend-item"><span class="legend-dot price"></span>Price</span>
-            <span class="legend-item"><span class="legend-dot sma10"></span>EMA-9</span>
-            <span class="legend-item"><span class="legend-dot sma20"></span>EMA-21</span>
+      <!-- ─── Tab Pane: Trade ─── -->
+      <div id="tab-trade" class="tab-pane active">
+        <!-- Live Tick Visualizer -->
+        <div class="tick-card">
+          <div class="tick-info-left">
+            <span class="tick-label">Live V75 Price</span>
+            <span id="trendLabel" class="trend-status-text">Trend: Analyzing...</span>
+          </div>
+          <div class="tick-stream">
+            <span id="livePrice" class="tick-price">—</span>
+            <span id="tickDirection" class="tick-arrow"></span>
           </div>
         </div>
-        <div class="canvas-container">
-          <canvas id="tickChart"></canvas>
-        </div>
-      </div>
 
-      <!-- Bot Parameters / Config -->
-      <div class="config-section">
-        <h3>Bot Settings</h3>
-
-        <!-- Risk Presets Selector -->
-        <div class="risk-presets-container">
-          <label style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.35rem; display: block;">Suggested Settings Wizard (Based on Balance)</label>
-          <div class="risk-buttons-grid">
-            <button type="button" id="presetConservativeBtn" class="preset-btn">Conservative 🛡️</button>
-            <button type="button" id="presetModerateBtn" class="preset-btn active">Moderate ⚖️</button>
-            <button type="button" id="presetAggressiveBtn" class="preset-btn">Aggressive 🔥</button>
-          </div>
-          <div id="presetFeedback" class="preset-info-text">⚖️ Moderate: 2% stake, 3 max recovery steps. Recommended balance: $25+</div>
-        </div>
-
-        <div class="input-grid">
-          <div class="input-group">
-            <label for="stakeInput">Stake ($)</label>
-            <input type="number" id="stakeInput" value="0.50" step="0.1" min="0.35" />
-          </div>
-          <div class="input-group">
-            <label for="targetProfitInput">Target Profit ($)</label>
-            <input type="number" id="targetProfitInput" value="2.00" step="0.5" min="0.5" />
-          </div>
-          <div class="input-group">
-            <label for="stopLossInput">Stop Loss ($)</label>
-            <input type="number" id="stopLossInput" value="5.00" step="1.0" min="1.0" />
-          </div>
-          <div id="stopLossHelper" class="grid-span-2 stop-loss-helper-text" style="font-size: 0.72rem; padding: 8px 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--panel-border); margin-top: -0.25rem; margin-bottom: 0.25rem; display: none; line-height: 1.4;"></div>
-          <div class="input-group">
-            <label for="martingaleStepsInput">Max Recovery Steps</label>
-            <input type="number" id="martingaleStepsInput" value="3" min="1" max="5" />
-          </div>
-          <div class="input-group">
-            <label for="martingaleMultiplierInput">Recovery Multiplier (x)</label>
-            <input type="number" id="martingaleMultiplierInput" value="2.0" step="0.1" min="1.0" max="5.0" />
-          </div>
-          <div class="input-group">
-            <label for="lossCooldownInput">Loss Cooldown (Candles)</label>
-            <input type="number" id="lossCooldownInput" value="3" min="0" max="20" />
-          </div>
-          <div class="input-group grid-span-2 flex-row-between">
-            <label for="strictMartingaleCheckbox" style="margin-bottom: 0; cursor: pointer;">Strict Recovery Mode <span style="font-size:0.7rem; color: var(--text-muted);">(tighter filters during martingale)</span></label>
-            <input type="checkbox" id="strictMartingaleCheckbox" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--color-primary);" checked />
-          </div>
-          <div class="input-group grid-span-2 flex-row-between">
-            <label for="notificationCheckbox" style="margin-bottom: 0; cursor: pointer;">Enable Desktop Notifications</label>
-            <input type="checkbox" id="notificationCheckbox" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--color-primary);" checked />
-          </div>
-        </div>
-      </div>
-
-      <!-- Bot Control Buttons -->
-      <div class="control-actions">
-        <!-- New Resume Container -->
-        <div id="resumeSessionContainer" class="resume-session-container hidden" style="background: rgba(255, 255, 255, 0.05); border: 1px dashed var(--color-primary); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
-          <div class="resume-info" style="font-size: 0.9rem; margin-bottom: 10px;">
-            <div class="resume-title" style="color: var(--color-primary); font-weight: bold; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-              ⏱️ Unfinished Session Found
-            </div>
-            <div class="resume-details" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; color: var(--color-neutral);">
-              <div>Step: <strong id="resumeStep" style="color: #ffffff;">0</strong></div>
-              <div>Next Stake: <strong id="resumeStake" style="color: #ffffff;">$0.00</strong></div>
-              <div style="grid-column: span 2;">Profit/Loss: <strong id="resumeProfit" style="color: #ffffff;">$0.00</strong></div>
+        <!-- Real-Time Mini Chart Visualizer -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <span class="chart-title">📈 V75 Price Movement (1-Min Candles)</span>
+            <div class="chart-legend">
+              <span class="legend-item"><span class="legend-dot price"></span>Price</span>
+              <span class="legend-item"><span class="legend-dot sma10"></span>EMA-9</span>
+              <span class="legend-item"><span class="legend-dot sma20"></span>EMA-21</span>
             </div>
           </div>
-          <div class="resume-actions" style="display: flex; gap: 8px;">
-            <button id="resumeBotBtn" class="btn btn-primary btn-sm btn-glow width-full">Resume Session</button>
-            <button id="discardSessionBtn" class="btn btn-outline btn-sm width-full" style="border-color: rgba(255,255,255,0.2); color: var(--color-neutral);">Discard</button>
+          <div class="canvas-container">
+            <canvas id="tickChart"></canvas>
           </div>
         </div>
 
-        <button id="startBotBtn" class="btn btn-success btn-glow width-full">▶ Start Smart Trend Rider</button>
-        <button id="stopBotBtn" class="btn btn-danger width-full hidden">■ Stop Bot</button>
-      </div>
-
-      <!-- Status Indicator -->
-      <div id="statusIndicator" class="status-bar status-idle">
-        <span class="status-dot"></span>
-        <span id="statusText">Bot is Idle</span>
-      </div>
-
-      <!-- Performance Analytics -->
-      <div class="performance-section margin-top-md">
-        <div class="perf-header flex-row-between">
-          <h3>Performance Analytics</h3>
-          <button id="resetStatsBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; border-color: rgba(255,255,255,0.1); color: var(--text-muted);">Reset Stats</button>
-        </div>
-        <div class="perf-grid">
-          <div class="perf-card">
-            <span class="perf-label">Wins</span>
-            <span id="statsWins" class="perf-value win-color">0</span>
-          </div>
-          <div class="perf-card">
-            <span class="perf-label">Losses</span>
-            <span id="statsLosses" class="perf-value loss-color">0</span>
-          </div>
-          <div class="perf-card">
-            <span class="perf-label">Win Rate</span>
-            <span id="statsWinRate" class="perf-value text-glow" style="color: var(--color-primary);">0%</span>
-          </div>
-          <div class="perf-card">
-            <span class="perf-label">Total Trades</span>
-            <span id="statsTotal" class="perf-value">0</span>
-          </div>
-        </div>
-        
-        <!-- Collapsible Trade History -->
-        <div class="history-toggle-container margin-top-sm">
-          <button id="toggleHistoryBtn" class="btn btn-outline btn-sm width-full" style="font-size: 11px; padding: 6px;">📋 View Trade History &amp; Share Stats</button>
-        </div>
-        
-        <div id="tradeHistorySection" class="history-card hidden">
-          <div class="history-actions flex-row-between margin-bottom-sm" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <h4 style="margin: 0; font-size: 0.85rem;">Trade History</h4>
-            <div style="display: flex; gap: 6px; align-items: center;">
-              <select id="promoTemplateSelect" style="background: rgba(15, 23, 42, 0.6); color: var(--text-light); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 4px; padding: 2px 4px; font-size: 10px; cursor: pointer; outline: none; height: 22px;">
-                <option value="raw">Raw Stats 📊</option>
-                <option value="social">Social Hook 🤖</option>
-                <option value="short">Status Hook ⚡</option>
-              </select>
-              <button id="exportCsvBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; height: 22px; display: flex; align-items: center; border-color: rgba(56, 189, 248, 0.4); color: var(--color-primary);">📥 Export CSV</button>
-              <button id="exportReportBtn" class="btn btn-primary btn-xs" style="padding: 2px 6px; font-size: 10px; height: 22px; display: flex; align-items: center;">📤 Share Stats</button>
+        <!-- Bot Control Buttons -->
+        <div class="control-actions">
+          <!-- Resume Session Container -->
+          <div id="resumeSessionContainer" class="resume-session-container hidden" style="background: rgba(255, 255, 255, 0.05); border: 1px dashed var(--color-primary); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+            <div class="resume-info" style="font-size: 0.9rem; margin-bottom: 10px;">
+              <div class="resume-title" style="color: var(--color-primary); font-weight: bold; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                ⏱️ Unfinished Session Found
+              </div>
+              <div class="resume-details" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; color: var(--color-neutral);">
+                <div>Step: <strong id="resumeStep" style="color: #ffffff;">0</strong></div>
+                <div>Next Stake: <strong id="resumeStake" style="color: #ffffff;">$0.00</strong></div>
+                <div style="grid-column: span 2;">Profit/Loss: <strong id="resumeProfit" style="color: #ffffff;">$0.00</strong></div>
+              </div>
+            </div>
+            <div class="resume-actions" style="display: flex; gap: 8px;">
+              <button id="resumeBotBtn" class="btn btn-primary btn-sm btn-glow width-full">Resume Session</button>
+              <button id="discardSessionBtn" class="btn btn-outline btn-sm width-full" style="border-color: rgba(255,255,255,0.2); color: var(--color-neutral);">Discard</button>
             </div>
           </div>
-          <div class="table-container">
-            <table class="history-table">
-              <thead>
-                <tr>
-                  <th style="width: 50px;">Index</th>
-                  <th>Time</th>
-                  <th>Type</th>
-                  <th>Stake</th>
-                  <th>Profit</th>
-                  <th>Result</th>
-                </tr>
-              </thead>
-              <tbody id="tradeHistoryBody">
-                <tr>
-                  <td colspan="6" style="text-align: center; color: var(--text-muted);">No trades recorded.</td>
-                </tr>
-              </tbody>
-            </table>
+
+          <button id="startBotBtn" class="btn btn-success btn-glow width-full">▶ Start Smart Trend Rider</button>
+          <button id="stopBotBtn" class="btn btn-danger width-full hidden">■ Stop Bot</button>
+        </div>
+
+        <!-- Status Indicator -->
+        <div id="statusIndicator" class="status-bar status-idle">
+          <span class="status-dot"></span>
+          <span id="statusText">Bot is Idle</span>
+        </div>
+
+        <!-- Live Log Console -->
+        <div class="log-section">
+          <h3>Activity Logs</h3>
+          <div id="logConsole" class="terminal-logs">
+            <div class="log-row info">&gt; System initialized. Awaiting start command...</div>
           </div>
         </div>
       </div>
 
-      <!-- Developer Admin Panel -->
-      <div id="adminPanel" class="admin-panel hidden margin-top-lg">
-        <div class="admin-header">
-          <span class="admin-title">⚡ Developer Admin Panel</span>
-          <span class="badge admin-badge">Admin</span>
-        </div>
-        <p class="admin-desc">Whitelist client Deriv Account IDs (ROT, DOT, CR) instantly to the database.</p>
-        <div class="admin-form">
-          <input type="text" id="adminWhitelistInput" class="admin-input" placeholder="e.g. DOT93132805" />
-          <button id="adminWhitelistBtn" class="btn btn-primary btn-sm admin-btn">Whitelist</button>
-        </div>
-        <div id="adminFeedback" class="admin-feedback"></div>
+      <!-- ─── Tab Pane: Settings ─── -->
+      <div id="tab-settings" class="tab-pane">
+        <!-- Bot Parameters / Config -->
+        <div class="config-section">
+          <h3>Bot Settings</h3>
 
-        <!-- Analytics Dashboard section inside Admin Panel -->
-        <div class="admin-analytics-section margin-top-lg" style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 1.25rem;">
-          <div class="flex-row-between margin-bottom-sm">
-            <span class="admin-title" style="font-size: 0.85rem;">📊 Bot Activity Analytics</span>
-            <div style="display: flex; gap: 6px;">
-              <button id="clearRealStatsBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; border-color: rgba(244, 63, 94, 0.25); color: var(--color-danger); height: 22px; display: flex; align-items: center; justify-content: center; width: auto; font-family: var(--font-family-sans); font-weight: 600;">🧹 Clear Real Stats</button>
-              <button id="refreshAnalyticsBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; border-color: rgba(56, 189, 248, 0.2); color: var(--color-primary); height: 22px; display: flex; align-items: center; justify-content: center; width: auto; font-family: var(--font-family-sans); font-weight: 600;">🔄 Refresh</button>
+          <!-- Risk Presets Selector -->
+          <div class="risk-presets-container">
+            <label style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.35rem; display: block;">Suggested Settings Wizard (Based on Balance)</label>
+            <div class="risk-buttons-grid">
+              <button type="button" id="presetConservativeBtn" class="preset-btn">Conservative 🛡️</button>
+              <button type="button" id="presetModerateBtn" class="preset-btn active">Moderate ⚖️</button>
+              <button type="button" id="presetAggressiveBtn" class="preset-btn">Aggressive 🔥</button>
+            </div>
+            <div id="presetFeedback" class="preset-info-text">⚖️ Moderate: 2% stake, 3 max recovery steps. Recommended balance: $25+</div>
+          </div>
+
+          <div class="input-grid">
+            <div class="input-group">
+              <label for="stakeInput">Stake ($)</label>
+              <input type="number" id="stakeInput" value="0.50" step="0.1" min="0.35" />
+            </div>
+            <div class="input-group">
+              <label for="targetProfitInput">Target Profit ($)</label>
+              <input type="number" id="targetProfitInput" value="2.00" step="0.5" min="0.5" />
+            </div>
+            <div class="input-group">
+              <label for="stopLossInput">Stop Loss ($)</label>
+              <input type="number" id="stopLossInput" value="5.00" step="1.0" min="1.0" />
+            </div>
+            <div id="stopLossHelper" class="grid-span-2 stop-loss-helper-text" style="font-size: 0.72rem; padding: 8px 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--panel-border); margin-top: -0.25rem; margin-bottom: 0.25rem; display: none; line-height: 1.4;"></div>
+            <div class="input-group">
+              <label for="martingaleStepsInput">Max Recovery Steps</label>
+              <input type="number" id="martingaleStepsInput" value="3" min="1" max="5" />
+            </div>
+            <div class="input-group">
+              <label for="martingaleMultiplierInput">Recovery Multiplier (x)</label>
+              <input type="number" id="martingaleMultiplierInput" value="2.0" step="0.1" min="1.0" max="5.0" />
+            </div>
+            <div class="input-group">
+              <label for="lossCooldownInput">Loss Cooldown (Candles)</label>
+              <input type="number" id="lossCooldownInput" value="3" min="0" max="20" />
+            </div>
+            <div class="input-group grid-span-2 flex-row-between">
+              <label for="strictMartingaleCheckbox" style="margin-bottom: 0; cursor: pointer;">Strict Recovery Mode <span style="font-size:0.7rem; color: var(--text-muted);">(tighter filters during martingale)</span></label>
+              <input type="checkbox" id="strictMartingaleCheckbox" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--color-primary);" checked />
+            </div>
+            <div class="input-group grid-span-2 flex-row-between">
+              <label for="notificationCheckbox" style="margin-bottom: 0; cursor: pointer;">Enable Desktop Notifications</label>
+              <input type="checkbox" id="notificationCheckbox" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--color-primary);" checked />
+            </div>
+          </div>
+        </div>
+
+        <!-- Toggleable User Guide -->
+        <div class="guide-toggle-container margin-top-md">
+          <button id="toggleGuideBtn" class="btn btn-outline btn-sm">📖 Show Settings Guide</button>
+        </div>
+
+        <div id="settingsGuide" class="guide-card hidden">
+          <h4>📖 Smart Trend Rider — Settings Guide</h4>
+          <ul>
+            <li><strong>Stake ($):</strong> Your base trade size. Deriv minimum is $0.35. We recommend $0.50–$1.00 depending on your balance.</li>
+            <li><strong>Target Profit ($):</strong> Bot stops automatically when session profit hits this. Set to $2–$5 to lock in gains daily.</li>
+            <li><strong>Stop Loss ($):</strong> Safety net — bot shuts down if losses reach this amount. Always set this.</li>
+            <li><strong>Max Recovery Steps:</strong> How many Martingale doublings to attempt after a loss. 3 steps recommended ($0.50 → $1.00 → $2.00).</li>
+            <li><strong>Loss Cooldown (Candles):</strong> Number of 1-minute candles to wait after a loss before entering again. Prevents back-to-back losses. 3 is recommended.</li>
+            <li><strong>Strict Recovery Mode:</strong> When recovering from a loss, the bot tightens RSI filters and increases candle spacing — only takes very high-confidence signals. Recommended ON.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ─── Tab Pane: Analytics ─── -->
+      <div id="tab-analytics" class="tab-pane">
+        <!-- Performance Analytics -->
+        <div class="performance-section">
+          <div class="perf-header flex-row-between">
+            <h3>Performance Analytics</h3>
+            <button id="resetStatsBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; border-color: rgba(255,255,255,0.1); color: var(--text-muted);">Reset Stats</button>
+          </div>
+
+          <!-- Dynamic Win Rate SVG Ring -->
+          <div class="win-rate-ring-container margin-top-md margin-bottom-md">
+            <svg class="win-rate-ring" width="130" height="130">
+              <circle class="ring-bg" cx="65" cy="65" r="52"></circle>
+              <circle class="ring-fg" cx="65" cy="65" r="52" id="winRateRingFg"></circle>
+            </svg>
+            <div class="ring-text">
+              <span id="statsWinRate">0.0%</span>
+              <span class="ring-text-label">Win Rate</span>
+            </div>
+          </div>
+
+          <div class="perf-grid">
+            <div class="perf-card">
+              <span class="perf-label">Wins</span>
+              <span id="statsWins" class="perf-value win-color">0</span>
+            </div>
+            <div class="perf-card">
+              <span class="perf-label">Losses</span>
+              <span id="statsLosses" class="perf-value loss-color">0</span>
+            </div>
+            <div class="perf-card">
+              <span class="perf-label">Total Trades</span>
+              <span id="statsTotal" class="perf-value">0</span>
             </div>
           </div>
           
-          <div class="analytics-metrics-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-bottom: 1rem;">
-            <div class="perf-card" style="background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
-              <span class="perf-label" style="font-size: 0.6rem;">Active Users</span>
-              <span id="adminActiveUsers" class="perf-value" style="font-size: 0.95rem; color: var(--color-primary);">0</span>
-            </div>
-            <div class="perf-card" style="background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
-              <span class="perf-label" style="font-size: 0.6rem;">Sessions Run</span>
-              <span id="adminTotalSessions" class="perf-value" style="font-size: 0.95rem; color: var(--text-main);">0</span>
-            </div>
-            <div class="perf-card" style="background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
-              <span class="perf-label" style="font-size: 0.6rem;">Traded Volume</span>
-              <span id="adminTradedVolume" class="perf-value" style="font-size: 0.95rem; color: var(--color-success);">$0.00</span>
-            </div>
-            <div class="perf-card" style="background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
-              <span class="perf-label" style="font-size: 0.6rem;">Est. Commission (1%)</span>
-              <span id="adminCommission" class="perf-value" style="font-size: 0.95rem; color: #fbbf24;">$0.00</span>
-            </div>
+          <!-- Collapsible Trade History -->
+          <div class="history-toggle-container margin-top-sm">
+            <button id="toggleHistoryBtn" class="btn btn-outline btn-sm width-full" style="font-size: 11px; padding: 6px;">📋 View Trade History &amp; Share Stats</button>
           </div>
-
-          <span class="perf-label" style="display: block; margin-bottom: 0.35rem; font-size: 0.65rem; color: var(--text-muted); font-weight: 600;">Recent User Sessions</span>
-          <div class="table-container" style="max-height: 150px; background: rgba(0,0,0,0.25);">
-            <table class="history-table" style="font-size: 0.7rem;">
-              <thead>
-                <tr>
-                  <th style="font-size: 0.65rem; padding: 4px 6px;">User ID</th>
-                  <th style="font-size: 0.65rem; padding: 4px 6px;">Type</th>
-                  <th style="font-size: 0.65rem; padding: 4px 6px;">Trades (W/L)</th>
-                  <th style="font-size: 0.65rem; padding: 4px 6px;">Net Profit</th>
-                </tr>
-              </thead>
-              <tbody id="adminSessionsBody">
-                <tr>
-                  <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 8px 0;">No active sessions found.</td>
-                </tr>
-              </tbody>
-            </table>
+          
+          <div id="tradeHistorySection" class="history-card hidden">
+            <div class="history-actions flex-row-between margin-bottom-sm" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <h4 style="margin: 0; font-size: 0.85rem;">Trade History</h4>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <select id="promoTemplateSelect" style="background: rgba(15, 23, 42, 0.6); color: var(--text-light); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 4px; padding: 2px 4px; font-size: 10px; cursor: pointer; outline: none; height: 22px;">
+                  <option value="raw">Raw Stats 📊</option>
+                  <option value="social">Social Hook 🤖</option>
+                  <option value="short">Status Hook ⚡</option>
+                </select>
+                <button id="exportCsvBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; height: 22px; display: flex; align-items: center; border-color: rgba(56, 189, 248, 0.4); color: var(--color-primary);">📥 Export CSV</button>
+                <button id="exportReportBtn" class="btn btn-primary btn-xs" style="padding: 2px 6px; font-size: 10px; height: 22px; display: flex; align-items: center;">📤 Share Stats</button>
+              </div>
+            </div>
+            <div class="table-container">
+              <table class="history-table">
+                <thead>
+                  <tr>
+                    <th style="width: 50px;">Index</th>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Stake</th>
+                    <th>Profit</th>
+                    <th>Result</th>
+                  </tr>
+                </thead>
+                <tbody id="tradeHistoryBody">
+                  <tr>
+                    <td colspan="6" style="text-align: center; color: var(--text-muted);">No trades recorded.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Toggleable User Guide -->
-      <div class="guide-toggle-container margin-top-lg">
-        <button id="toggleGuideBtn" class="btn btn-outline btn-sm">📖 Show Settings Guide</button>
-      </div>
+      <!-- ─── Tab Pane: Admin ─── -->
+      <div id="tab-admin" class="tab-pane">
+        <!-- Developer Admin Panel -->
+        <div id="adminPanel" class="admin-panel margin-top-sm">
+          <div class="admin-header">
+            <span class="admin-title">⚡ Developer Admin Panel</span>
+            <span class="badge admin-badge">Admin</span>
+          </div>
+          <p class="admin-desc">Whitelist client Deriv Account IDs (ROT, DOT, CR) instantly to the database.</p>
+          <div class="admin-form">
+            <input type="text" id="adminWhitelistInput" class="admin-input" placeholder="e.g. DOT93132805" />
+            <button id="adminWhitelistBtn" class="btn btn-primary btn-sm admin-btn">Whitelist</button>
+          </div>
+          <div id="adminFeedback" class="admin-feedback"></div>
 
-      <div id="settingsGuide" class="guide-card hidden">
-        <h4>📖 Smart Trend Rider — Settings Guide</h4>
-        <ul>
-          <li><strong>Stake ($):</strong> Your base trade size. Deriv minimum is $0.35. We recommend $0.50–$1.00 depending on your balance.</li>
-          <li><strong>Target Profit ($):</strong> Bot stops automatically when session profit hits this. Set to $2–$5 to lock in gains daily.</li>
-          <li><strong>Stop Loss ($):</strong> Safety net — bot shuts down if losses reach this amount. Always set this.</li>
-          <li><strong>Max Recovery Steps:</strong> How many Martingale doublings to attempt after a loss. 3 steps recommended ($0.50 → $1.00 → $2.00).</li>
-          <li><strong>Loss Cooldown (Candles):</strong> Number of 1-minute candles to wait after a loss before entering again. Prevents back-to-back losses. 3 is recommended.</li>
-          <li><strong>Strict Recovery Mode:</strong> When recovering from a loss, the bot tightens RSI filters and increases candle spacing — only takes very high-confidence signals. Recommended ON.</li>
-        </ul>
-      </div>
+          <!-- Analytics Dashboard section inside Admin Panel -->
+          <div class="admin-analytics-section margin-top-lg" style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 1.25rem;">
+            <div class="flex-row-between margin-bottom-sm">
+              <span class="admin-title" style="font-size: 0.85rem;">📊 Bot Activity Analytics</span>
+              <div style="display: flex; gap: 6px;">
+                <button id="clearRealStatsBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; border-color: rgba(244, 63, 94, 0.25); color: var(--color-danger); height: 22px; display: flex; align-items: center; justify-content: center; width: auto; font-family: var(--font-family-sans); font-weight: 600;">🧹 Clear Real Stats</button>
+                <button id="refreshAnalyticsBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; border-color: rgba(56, 189, 248, 0.2); color: var(--color-primary); height: 22px; display: flex; align-items: center; justify-content: center; width: auto; font-family: var(--font-family-sans); font-weight: 600;">🔄 Refresh</button>
+              </div>
+            </div>
+            
+            <div class="analytics-metrics-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-bottom: 1rem;">
+              <div class="perf-card" style="background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+                <span class="perf-label" style="font-size: 0.6rem;">Active Users</span>
+                <span id="adminActiveUsers" class="perf-value" style="font-size: 0.95rem; color: var(--color-primary);">0</span>
+              </div>
+              <div class="perf-card" style="background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+                <span class="perf-label" style="font-size: 0.6rem;">Sessions Run</span>
+                <span id="adminTotalSessions" class="perf-value" style="font-size: 0.95rem; color: var(--text-main);">0</span>
+              </div>
+              <div class="perf-card" style="background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+                <span class="perf-label" style="font-size: 0.6rem;">Traded Volume</span>
+                <span id="adminTradedVolume" class="perf-value" style="font-size: 0.95rem; color: var(--color-success);">$0.00</span>
+              </div>
+              <div class="perf-card" style="background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+                <span class="perf-label" style="font-size: 0.6rem;">Est. Commission (1%)</span>
+                <span id="adminCommission" class="perf-value" style="font-size: 0.95rem; color: #fbbf24;">$0.00</span>
+              </div>
+            </div>
 
-      <!-- Live Log Console -->
-      <div class="log-section">
-        <h3>Activity Logs</h3>
-        <div id="logConsole" class="terminal-logs">
-          <div class="log-row info">&gt; System initialized. Awaiting start command...</div>
+            <span class="perf-label" style="display: block; margin-bottom: 0.35rem; font-size: 0.65rem; color: var(--text-muted); font-weight: 600;">Recent User Sessions</span>
+            <div class="table-container" style="max-height: 150px; background: rgba(0,0,0,0.25);">
+              <table class="history-table" style="font-size: 0.7rem;">
+                <thead>
+                  <tr>
+                    <th style="font-size: 0.65rem; padding: 4px 6px;">User ID</th>
+                    <th style="font-size: 0.65rem; padding: 4px 6px;">Type</th>
+                    <th style="font-size: 0.65rem; padding: 4px 6px;">Trades (W/L)</th>
+                    <th style="font-size: 0.65rem; padding: 4px 6px;">Net Profit</th>
+                  </tr>
+                </thead>
+                <tbody id="adminSessionsBody">
+                  <tr>
+                    <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 8px 0;">No active sessions found.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
 
     </div>
 

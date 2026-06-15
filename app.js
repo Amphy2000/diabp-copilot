@@ -451,6 +451,28 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Initialize dashboard tab switching event listeners
+  const tabButtons = document.querySelectorAll('.console-tab-bar .tab-btn');
+  const tabPanes = document.querySelectorAll('.tab-pane');
+  
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tabId = btn.getAttribute('data-tab');
+      
+      // Update buttons
+      tabButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
+      // Update panes
+      tabPanes.forEach(pane => {
+        pane.classList.remove('active');
+        if (pane.id === `tab-${tabId}`) {
+          pane.classList.add('active');
+        }
+      });
+    });
+  });
+
   checkAuth();
   loadStats();
 });
@@ -989,10 +1011,27 @@ function updateExportButtonLabel() {
 function checkAdminStatus() {
   const currentAcct = localStorage.getItem('deriv_acct');
   updateExportButtonLabel();
-  if (!adminPanel) return;
-
+  
   const adminAccounts = ['ROT91833970', 'DOT93132805'];
-  if (currentAcct && adminAccounts.includes(currentAcct.trim().toUpperCase())) {
+  const isAdmin = currentAcct && adminAccounts.includes(currentAcct.trim().toUpperCase());
+  
+  const adminTabBtn = document.getElementById('adminTabBtn');
+  if (adminTabBtn) {
+    if (isAdmin) {
+      adminTabBtn.classList.remove('hidden');
+    } else {
+      adminTabBtn.classList.add('hidden');
+      // If we are currently on the admin tab but no longer admin, switch to trade tab
+      const activeTabBtn = document.querySelector('.console-tab-bar .tab-btn.active');
+      if (activeTabBtn && activeTabBtn.getAttribute('data-tab') === 'admin') {
+        const tradeTabBtn = document.querySelector('.console-tab-bar .tab-btn[data-tab="trade"]');
+        if (tradeTabBtn) tradeTabBtn.click();
+      }
+    }
+  }
+
+  if (!adminPanel) return;
+  if (isAdmin) {
     adminPanel.classList.remove('hidden');
     loadAdminAnalytics();
   } else {
@@ -2722,6 +2761,16 @@ function updateStatsUI() {
   
   const rate = stats.total > 0 ? ((stats.wins / stats.total) * 100).toFixed(1) : "0.0";
   statsWinRate.innerText = `${rate}%`;
+  
+  // Animate circular progress ring
+  const ringFg = document.getElementById('winRateRingFg');
+  if (ringFg) {
+    const radius = 52;
+    const circumference = 2 * Math.PI * radius; // 326.7256
+    const rateVal = parseFloat(rate) || 0;
+    const offset = circumference - (rateVal / 100) * circumference;
+    ringFg.style.strokeDashoffset = offset;
+  }
   
   // Populate table
   if (!tradeHistoryBody) return;
