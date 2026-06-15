@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Amphy V75 Scalper Bot</title>
+  <meta name="description" content="Automate your Deriv Volatility 75 trading with the Amphy Smart Trend Rider Bot. EMA crossover strategy with intelligent trend continuation signals." />
   <!-- Google Fonts: Outfit for body, JetBrains Mono for logs -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -25,9 +26,9 @@
     <div id="loginPanel" class="glass-panel active">
       <!-- Hero Header -->
       <div class="hero-section">
-        <span class="badge promo-badge">⚡ Volatility 75 Scalping Bot</span>
-        <h1 class="hero-title">Automate Your V75 Profits</h1>
-        <p class="hero-subtitle">High-probability 3-tick mean-reversion automator. Secure, browser-native, and optimized for consistent partner turnover.</p>
+        <span class="badge promo-badge">🤖 Smart Trend Rider · V75 Index</span>
+        <h1 class="hero-title">Trade Smarter on V75</h1>
+        <p class="hero-subtitle">AI-powered 1-minute EMA crossover bot with intelligent trend continuation signals. Trades multiple times per hour — browser-native, zero subscription fees.</p>
       </div>
 
       <!-- Live Demo / Simulator Widget -->
@@ -38,20 +39,20 @@
         </div>
         <div class="demo-body">
           <div class="demo-price-row">
-            <span class="demo-label">Simulated V75 Price:</span>
+            <span class="demo-label">Live V75 Price:</span>
             <span id="demoPrice" class="demo-price">—</span>
             <span id="demoDirection" class="demo-arrow">▲</span>
           </div>
           <div class="demo-terminal" id="demoTerminal">
-            <div class="demo-log">&gt; Strategy simulator initialized...</div>
-            <div class="demo-log info">&gt; Scanning tick micro-patterns...</div>
+            <div class="demo-log">&gt; Smart Trend Rider initialized...</div>
+            <div class="demo-log info">&gt; Scanning EMA-9 / EMA-21 crossover patterns...</div>
           </div>
         </div>
       </div>
 
       <!-- Secure Warning Alert -->
       <div class="info-card">
-        <p>🔒 <strong>Secure Connection:</strong> The bot runs 100% in your local browser and connects securely via official Deriv WebSockets. Your credentials never touch third-party servers.</p>
+        <p>🔒 <strong>Secure & Private:</strong> The bot runs 100% in your browser and connects directly to Deriv's official WebSocket API. Your API token never touches a third-party server.</p>
       </div>
 
       <!-- Call To Action (Log In) -->
@@ -66,22 +67,22 @@
           <div class="funnel-step">
             <span class="step-num">1</span>
             <div class="step-content">
-              <h4>Create Deriv Account</h4>
-              <p>Register via our <a href="https://deriv.partners/rx?sidi=9A373E8A-A450-487A-A419-064B4FE5B751&utm_campaign=dynamicworks&utm_medium=affiliate&utm_source=CU13329" target="_blank" class="partner-link">Official Partner Link</a> to qualify for whitelisting.</p>
+              <h4>Create a Deriv Account</h4>
+              <p>Register via our <a href="https://deriv.partners/rx?sidi=9A373E8A-A450-487A-A419-064B4FE5B751&utm_campaign=dynamicworks&utm_medium=affiliate&utm_source=CU13329" target="_blank" class="partner-link">Official Partner Link</a> to qualify for free whitelisting.</p>
             </div>
           </div>
           <div class="funnel-step">
             <span class="step-num">2</span>
             <div class="step-content">
               <h4>Fund Your Account</h4>
-              <p>Deposit a minimum of <strong>$15 - $20</strong> to cover your scalp trading margins.</p>
+              <p>Deposit a minimum of <strong>$25 – $50</strong> to run the bot comfortably with the recommended settings.</p>
             </div>
           </div>
           <div class="funnel-step">
             <span class="step-num">3</span>
             <div class="step-content">
-              <h4>Whitelist & Trade</h4>
-              <p>Submit your Account ID to get whitelisted instantly and activate the bot.</p>
+              <h4>Whitelist & Start Trading</h4>
+              <p>Send your Deriv Account ID to the admin to get whitelisted and activate the bot instantly.</p>
             </div>
           </div>
         </div>
@@ -90,19 +91,19 @@
       <!-- Core Features Grid -->
       <div class="features-grid">
         <div class="feature-card">
+          <span class="feature-icon">📊</span>
+          <h4>EMA Crossover Engine</h4>
+          <p>Trades on confirmed EMA-9 / EMA-21 crossovers plus intelligent trend continuation signals — multiple entries per hour.</p>
+        </div>
+        <div class="feature-card">
           <span class="feature-icon">🛡️</span>
-          <h4>Built-in Stop Loss</h4>
-          <p>Session-based capital guard automatically halts trading to protect your account balance.</p>
+          <h4>Smart Risk Management</h4>
+          <p>Configurable Stop Loss, Target Profit, Martingale recovery, and loss cooldown to protect your capital automatically.</p>
         </div>
         <div class="feature-card">
           <span class="feature-icon">⚡</span>
-          <h4>3-Tick Reversion</h4>
-          <p>Enters trades on short-term tick trend exhaustion for maximum statistical win-rate.</p>
-        </div>
-        <div class="feature-card">
-          <span class="feature-icon">🔒</span>
-          <h4>Local Execution</h4>
-          <p>Operates completely in the client-side browser directly to Deriv API servers.</p>
+          <h4>RSI-Filtered Entries</h4>
+          <p>Every entry is confirmed by RSI-14 to avoid overbought/oversold traps and maximise win-rate on each signal.</p>
         </div>
       </div>
 
@@ -110,16 +111,16 @@
       <div class="faq-section">
         <h3>Frequently Asked Questions</h3>
         <div class="faq-item">
-          <h4 class="faq-question">How does the V75 Scalper Bot work?</h4>
-          <p class="faq-answer">The bot tracks tick data from Deriv's Volatility 75 index. When it detects 3 consecutive ticks in the same direction, it buys a 1-tick contract in the opposite direction (CALL after 3 drops, PUT after 3 rises), capitalizing on the high probability of immediate mean-reversion.</p>
+          <h4 class="faq-question">How does the Amphy V75 Bot work?</h4>
+          <p class="faq-answer">The bot loads 300 historical 1-minute candles and computes EMA-9, EMA-21, and RSI-14 in real time. It fires a trade on two types of signal: (1) a fresh EMA crossover — the highest-confidence entry — and (2) a trend continuation signal when two consecutive candles confirm an ongoing trend. This means it trades actively throughout the session, not just during rare crossover events.</p>
         </div>
         <div class="faq-item">
-          <h4 class="faq-question">Is the bot really profitable? How is risk managed?</h4>
-          <p class="faq-answer">Yes, by utilizing a maximum of 3 Martingale steps ($0.50 -> $1.00 -> $2.00), the bot recovers sequence losses instantly with a single win. Because 4-tick streaks are statistically rare on V75, the bot holds a sequence win rate of ~93.6%, resulting in a highly positive mathematical expected value.</p>
+          <h4 class="faq-question">How is risk managed?</h4>
+          <p class="faq-answer">A configurable Stop Loss stops the session if losses exceed your limit. A Target Profit locks in gains and stops automatically. The optional Martingale recovery doubles your stake after a loss (up to a set number of steps) so a single win recovers the sequence. During recovery, the bot tightens its entry filters to protect capital.</p>
         </div>
         <div class="faq-item">
           <h4 class="faq-question">Why do I need to register under your partner link?</h4>
-          <p class="faq-answer">The bot is provided completely free of charge. Instead of a monthly subscription, we earn a tiny turnover commission paid by Deriv from your trades. This keeps the bot free and aligns our incentives with your success!</p>
+          <p class="faq-answer">The bot is completely free to use — no subscriptions, no hidden fees. We earn a small turnover commission from Deriv on trades placed through our affiliate link. This keeps the service free forever and aligns our incentives directly with your success.</p>
         </div>
       </div>
     </div>
@@ -204,23 +205,19 @@
           </div>
           <div id="stopLossHelper" class="grid-span-2 stop-loss-helper-text" style="font-size: 0.72rem; padding: 8px 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--panel-border); margin-top: -0.25rem; margin-bottom: 0.25rem; display: none; line-height: 1.4;"></div>
           <div class="input-group">
-            <label for="martingaleStepsInput">Max Martingale Steps</label>
+            <label for="martingaleStepsInput">Max Recovery Steps</label>
             <input type="number" id="martingaleStepsInput" value="3" min="1" max="5" />
           </div>
           <div class="input-group">
-            <label for="martingaleMultiplierInput">Martingale Multiplier (x)</label>
+            <label for="martingaleMultiplierInput">Recovery Multiplier (x)</label>
             <input type="number" id="martingaleMultiplierInput" value="2.0" step="0.1" min="1.0" max="5.0" />
           </div>
           <div class="input-group">
-            <label for="lossCooldownInput">Loss Cooldown (Ticks)</label>
-            <input type="number" id="lossCooldownInput" value="15" min="0" max="50" />
+            <label for="lossCooldownInput">Loss Cooldown (Candles)</label>
+            <input type="number" id="lossCooldownInput" value="3" min="0" max="20" />
           </div>
           <div class="input-group grid-span-2 flex-row-between">
-            <label for="sma50GuardCheckbox" style="margin-bottom: 0; cursor: pointer;">Use SMA-100 Macro Guard</label>
-            <input type="checkbox" id="sma50GuardCheckbox" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--color-primary);" checked />
-          </div>
-          <div class="input-group grid-span-2 flex-row-between">
-            <label for="strictMartingaleCheckbox" style="margin-bottom: 0; cursor: pointer;">Strict Martingale Recovery</label>
+            <label for="strictMartingaleCheckbox" style="margin-bottom: 0; cursor: pointer;">Strict Recovery Mode <span style="font-size:0.7rem; color: var(--text-muted);">(tighter filters during martingale)</span></label>
             <input type="checkbox" id="strictMartingaleCheckbox" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--color-primary);" checked />
           </div>
           <div class="input-group grid-span-2 flex-row-between">
@@ -250,8 +247,8 @@
           </div>
         </div>
 
-        <button id="startBotBtn" class="btn btn-success btn-glow width-full">Start Scalper Bot</button>
-        <button id="stopBotBtn" class="btn btn-danger width-full hidden">Stop Scalper Bot</button>
+        <button id="startBotBtn" class="btn btn-success btn-glow width-full">▶ Start Smart Trend Rider</button>
+        <button id="stopBotBtn" class="btn btn-danger width-full hidden">■ Stop Bot</button>
       </div>
 
       <!-- Status Indicator -->
@@ -287,7 +284,7 @@
         
         <!-- Collapsible Trade History -->
         <div class="history-toggle-container margin-top-sm">
-          <button id="toggleHistoryBtn" class="btn btn-outline btn-sm width-full" style="font-size: 11px; padding: 6px;">📋 View Trade History & Share Stats</button>
+          <button id="toggleHistoryBtn" class="btn btn-outline btn-sm width-full" style="font-size: 11px; padding: 6px;">📋 View Trade History &amp; Share Stats</button>
         </div>
         
         <div id="tradeHistorySection" class="history-card hidden">
@@ -394,12 +391,14 @@
       </div>
 
       <div id="settingsGuide" class="guide-card hidden">
-        <h4>📖 Volatility 75 Bot Guide</h4>
+        <h4>📖 Smart Trend Rider — Settings Guide</h4>
         <ul>
-          <li><strong>Stake ($):</strong> The initial trade size. Deriv requires a minimum of $0.35. We recommend $0.50.</li>
-          <li><strong>Target Profit ($):</strong> The amount of profit where the bot automatically stops. Set to a reasonable target like $2.00 to secure gains.</li>
-          <li><strong>Stop Loss ($):</strong> Safety net. If session loss hits this amount, the bot shuts down to protect your capital.</li>
-          <li><strong>Max Martingale Steps:</strong> Number of recovery steps. 3 steps is recommended (Stake sequence: $0.50 → $1.00 → $2.00).</li>
+          <li><strong>Stake ($):</strong> Your base trade size. Deriv minimum is $0.35. We recommend $0.50–$1.00 depending on your balance.</li>
+          <li><strong>Target Profit ($):</strong> Bot stops automatically when session profit hits this. Set to $2–$5 to lock in gains daily.</li>
+          <li><strong>Stop Loss ($):</strong> Safety net — bot shuts down if losses reach this amount. Always set this.</li>
+          <li><strong>Max Recovery Steps:</strong> How many Martingale doublings to attempt after a loss. 3 steps recommended ($0.50 → $1.00 → $2.00).</li>
+          <li><strong>Loss Cooldown (Candles):</strong> Number of 1-minute candles to wait after a loss before entering again. Prevents back-to-back losses. 3 is recommended.</li>
+          <li><strong>Strict Recovery Mode:</strong> When recovering from a loss, the bot tightens RSI filters and increases candle spacing — only takes very high-confidence signals. Recommended ON.</li>
         </ul>
       </div>
 

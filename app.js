@@ -45,10 +45,10 @@ let stopLoss = 5.00;
 let maxMartingaleSteps = 3;
 let martingaleMultiplier = 2.0;
 let currentMartingaleStep = 0;
-let lossCooldownTicks = 15;
+let lossCooldownTicks = 3; // candles to wait after a loss (1 candle = 1 minute)
 let cooldownTicksRemaining = 0;
-let useSma50Guard = true;
-let lastTradeCandleIdx = -99; // tracks which candle index the last trade fired on (for spacing)
+let useSma50Guard = false; // Removed from UI — kept as false so guard is always off
+let lastTradeCandleIdx = -99;
 let useStrictMartingale = true;
 let currentProposalId = null;
 let currentContractId = null;
@@ -118,7 +118,6 @@ const stopLossInput = document.getElementById('stopLossInput');
 const martingaleStepsInput = document.getElementById('martingaleStepsInput');
 const martingaleMultiplierInput = document.getElementById('martingaleMultiplierInput');
 const lossCooldownInput = document.getElementById('lossCooldownInput');
-const sma50GuardCheckbox = document.getElementById('sma50GuardCheckbox');
 const strictMartingaleCheckbox = document.getElementById('strictMartingaleCheckbox');
 
 // Risk Presets elements
@@ -661,7 +660,6 @@ function applyPreset(presetType) {
     if (martingaleStepsInput) martingaleStepsInput.value = calculatedSteps;
     if (martingaleMultiplierInput) martingaleMultiplierInput.value = "2.0";
     if (lossCooldownInput) lossCooldownInput.value = calculatedCooldown;
-    if (sma50GuardCheckbox) sma50GuardCheckbox.checked = calculatedSma50;
     if (strictMartingaleCheckbox) strictMartingaleCheckbox.checked = calculatedStrictMartingale;
     presetFeedback.innerText = feedbackMsg;
     
@@ -770,7 +768,6 @@ if (stopLossInput) {
 if (martingaleStepsInput) martingaleStepsInput.addEventListener('input', markCustomSettings);
 if (martingaleMultiplierInput) martingaleMultiplierInput.addEventListener('input', markCustomSettings);
 if (lossCooldownInput) lossCooldownInput.addEventListener('input', markCustomSettings);
-if (sma50GuardCheckbox) sma50GuardCheckbox.addEventListener('change', markCustomSettings);
 if (strictMartingaleCheckbox) strictMartingaleCheckbox.addEventListener('change', markCustomSettings);
 
 // Apply default on load
@@ -2259,7 +2256,7 @@ startBotBtn.addEventListener('click', () => {
 
   lossCooldownTicks = lossCooldownInput ? (parseInt(lossCooldownInput.value) || 0) : 15;
   cooldownTicksRemaining = 0;
-  useSma50Guard = sma50GuardCheckbox ? sma50GuardCheckbox.checked : true;
+  useSma50Guard = false; // guard removed from UI — always off
   useStrictMartingale = strictMartingaleCheckbox ? strictMartingaleCheckbox.checked : true;
 
   // Reset session database analytics tracking variables
@@ -2355,7 +2352,7 @@ function toggleInputs(disabled) {
   martingaleStepsInput.disabled = disabled;
   if (martingaleMultiplierInput) martingaleMultiplierInput.disabled = disabled;
   if (lossCooldownInput) lossCooldownInput.disabled = disabled;
-  if (sma50GuardCheckbox) sma50GuardCheckbox.disabled = disabled;
+  // sma50GuardCheckbox removed
   if (strictMartingaleCheckbox) strictMartingaleCheckbox.disabled = disabled;
 }
 
@@ -3323,7 +3320,7 @@ if (resumeBotBtn) {
       martingaleStepsInput.value = maxMartingaleSteps;
       if (martingaleMultiplierInput) martingaleMultiplierInput.value = martingaleMultiplier;
       if (lossCooldownInput) lossCooldownInput.value = lossCooldownTicks;
-      if (sma50GuardCheckbox) sma50GuardCheckbox.checked = useSma50Guard;
+      // sma50GuardCheckbox removed from UI
       if (strictMartingaleCheckbox) strictMartingaleCheckbox.checked = useStrictMartingale;
 
       // Update profit display
