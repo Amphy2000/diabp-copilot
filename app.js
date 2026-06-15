@@ -27,9 +27,8 @@ let socket = null;
 let isAuthorized = false;
 let currentAuthorizedAccount = null;
 let isTrading = false;
-let ticksHistory = []; // stores tick prices
-let ticksHistoryCounters = [];
-let absoluteTickCounter = 0;
+let candlesHistory = []; // stores compiled 1-minute candles
+let lastTickPrice = null;
 let chartTradeMarkers = [];
 let sessionProfit = 0.0;
 let initialStake = 0.50;
@@ -1592,15 +1591,22 @@ async function handleMessage(data, isLoginAttempt = false) {
     }
   }
 
-  else if (msgType === 'history') {
-    if (data.history && data.history.prices) {
-      ticksHistory = data.history.prices.map(price => parseFloat(price));
-      addLog(`📈 Loaded ${ticksHistory.length} historical ticks. Trend analysis active!`, "success");
+  else if (msgType === 'candles') {
+    if (data.candles) {
+      candlesHistory = data.candles.map(c => ({
+        epoch: parseInt(c.epoch),
+        open: parseFloat(c.open),
+        high: parseFloat(c.high),
+        low: parseFloat(c.low),
+        close: parseFloat(c.close)
+      }));
+      addLog(`📈 Loaded ${candlesHistory.length} historical 1-minute candles. Crossover analysis active!`, "success");
       
       // Update UI element to display current price immediately
-      if (ticksHistory.length > 0) {
-        const lastPrice = ticksHistory[ticksHistory.length - 1];
-        livePrice.innerText = lastPrice.toFixed(4);
+      if (candlesHistory.length > 0) {
+        const lastCandle = candlesHistory[candlesHistory.length - 1];
+        livePrice.innerText = lastCandle.close.toFixed(4);
+        lastTickPrice = lastCandle.close;
       }
     }
   }
@@ -1656,10 +1662,12 @@ async function handleMessage(data, isLoginAttempt = false) {
       sendPushNotification("📈 Trade Placed", `${activePurchaseProposal === 'CALL' ? 'RISE 🟢' : 'FALL 🔴'} order executed with stake $${currentStake.toFixed(2)}.`);
       
       // Record trade marker for chart visualizer
-      const lastPrice = ticksHistory.length > 0 ? ticksHistory[ticksHistory.length - 1] : 0;
+      const lastCandle = candlesHistory.length > 0 ? candlesHistory[candlesHistory.length - 1] : null;
+      const markerPrice = lastCandle ? lastCandle.close : 0;
+      const markerEpoch = lastCandle ? lastCandle.epoch : Math.floor(Date.now() / 1000);
       chartTradeMarkers.push({
-        absoluteIndex: absoluteTickCounter,
-        price: lastPrice,
+        epoch: markerEpoch,
+        price: markerPrice,
         type: activePurchaseProposal,
         result: null,
         id: currentContractId
@@ -1749,49 +1757,131 @@ function calculateRSI(period) {
   return 100 - (100 / (1 + rs));
 }
 
+function calculateCandleEMAValues(period) {
+  if (candlesHistory.length < period) return [];
+  const emaValues = new Array(candlesHistory.length).fill(null);
+  const k = 2 / (period + 1);
+  let sum = 0;
+  for (let i = 0; i < period; i++) {
+    sum += candlesHistory[i].close;
+  }
+  let ema = sum / period;
+  emaValues[period - 1] = ema;
+  for (let i = period; i < candlesHistory.length; i++) {
+    ema = (candlesHistory[i].close * k) + (ema * (1 - k));
+    emaValues[i] = ema;
+  }
+  return emaValues;
+}
+
+function calculateCandleRSIValues(period = 14) {
+  if (candlesHistory.length < period + 1) return [];
+  const rsiValues = new Array(candlesHistory.length).fill(null);
+  let gains = 0;
+  let losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = candlesHistory[i].close - candlesHistory[i - 1].close;
+    if (diff > 0) {
+      gains += diff;
+    } else {
+      losses -= diff;
+    }
+  }
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+  let rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+  let rsi = avgLoss === 0 ? 100 : 100 - (100 / (1 + rs));
+  rsiValues[period] = rsi;
+
+  for (let i = period + 1; i < candlesHistory.length; i++) {
+    const diff = candlesHistory[i].close - candlesHistory[i - 1].close;
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? -diff : 0;
+    avgGain = ((avgGain * (period - 1)) + gain) / period;
+    avgLoss = ((avgLoss * (period - 1)) + loss) / period;
+    rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    rsi = avgLoss === 0 ? 100 : 100 - (100 / (1 + rs));
+    rsiValues[i] = rsi;
+  }
+  return rsiValues;
+}
+
 function processTick(tick) {
   const price = parseFloat(tick.quote);
+  const timeEpoch = parseInt(tick.epoch);
   livePrice.innerText = price.toFixed(4);
 
   // Determine direction arrow & color
   let direction = "";
-  if (ticksHistory.length > 0) {
-    const prevPrice = ticksHistory[ticksHistory.length - 1];
-    if (price > prevPrice) {
+  if (lastTickPrice !== null) {
+    if (price > lastTickPrice) {
       direction = "▲";
       livePrice.className = "tick-price up";
       tickDirection.innerText = "▲";
       tickDirection.className = "tick-arrow profit-won";
-    } else if (price < prevPrice) {
+    } else if (price < lastTickPrice) {
       direction = "▼";
       livePrice.className = "tick-price down";
       tickDirection.innerText = "▼";
       tickDirection.className = "tick-arrow profit-lost";
     }
   }
+  lastTickPrice = price;
 
-  // Keep a record of the last 300 prices to analyze patterns and calculate moving averages
-  absoluteTickCounter++;
-  ticksHistory.push(price);
-  ticksHistoryCounters.push(absoluteTickCounter);
-  if (ticksHistory.length > 300) {
-    ticksHistory.shift();
-    ticksHistoryCounters.shift();
+  // Real-time Candle Compilation
+  const tickMinuteEpoch = Math.floor(timeEpoch / 60) * 60;
+  const lastCandle = candlesHistory[candlesHistory.length - 1];
+  let candleClosed = false;
+
+  if (lastCandle && lastCandle.epoch === tickMinuteEpoch) {
+    // Update current candle
+    lastCandle.high = Math.max(lastCandle.high, price);
+    lastCandle.low = Math.min(lastCandle.low, price);
+    lastCandle.close = price;
+  } else if (lastCandle && tickMinuteEpoch > lastCandle.epoch) {
+    // A new minute has started! That means the previous candle has officially closed.
+    candleClosed = true;
+
+    // Initialize the new candle
+    candlesHistory.push({
+      epoch: tickMinuteEpoch,
+      open: price,
+      high: price,
+      low: price,
+      close: price
+    });
+
+    if (candlesHistory.length > 300) {
+      candlesHistory.shift();
+    }
+  } else if (!lastCandle) {
+    // First candle
+    candlesHistory.push({
+      epoch: tickMinuteEpoch,
+      open: price,
+      high: price,
+      low: price,
+      close: price
+    });
   }
 
-  // Calculate moving averages for trend filtering
-  const sma10 = calculateSMA(10);
-  const sma20 = calculateSMA(20);
-  const rsi14 = calculateRSI(14);
-  
+  // Calculate moving averages/trend status based on candle history
+  const ema9Values = calculateCandleEMAValues(9);
+  const ema21Values = calculateCandleEMAValues(21);
+  const rsiValues = calculateCandleRSIValues(14);
+
+  const curEma9 = ema9Values.length > 0 ? ema9Values[ema9Values.length - 1] : null;
+  const curEma21 = ema21Values.length > 0 ? ema21Values[ema21Values.length - 1] : null;
+  const curRsi = rsiValues.length > 0 ? rsiValues[rsiValues.length - 1] : null;
+
   let trendStr = "Analyzing...";
   let trendColor = "var(--text-muted)";
-  
-  if (sma10 && sma20) {
-    if (sma10 > sma20) {
+
+  if (curEma9 !== null && curEma21 !== null) {
+    if (curEma9 > curEma21) {
       trendStr = "Bullish 📈";
       trendColor = "var(--color-success)";
-    } else if (sma10 < sma20) {
+    } else if (curEma9 < curEma21) {
       trendStr = "Bearish 📉";
       trendColor = "var(--color-danger)";
     } else {
@@ -1799,40 +1889,43 @@ function processTick(tick) {
       trendColor = "var(--text-muted)";
     }
   }
-  
-  if (rsi14 !== null) {
+
+  if (curRsi !== null) {
     let rsiCondition = "";
-    if (rsi14 < 40) {
+    if (curRsi < 40) {
       rsiCondition = " (Oversold 🟢)";
-    } else if (rsi14 > 60) {
+    } else if (curRsi > 60) {
       rsiCondition = " (Overbought 🔴)";
     }
-    trendStr += ` | RSI: ${rsi14.toFixed(1)}${rsiCondition}`;
+    trendStr += ` | RSI: ${curRsi.toFixed(1)}${rsiCondition}`;
   }
-  
+
   if (trendLabel) {
     trendLabel.innerText = `Trend: ${trendStr}`;
     trendLabel.style.color = trendColor;
   }
 
-  if (cooldownTicksRemaining > 0) {
+  // Handle candle/minutes based loss cooldown
+  if (candleClosed && cooldownTicksRemaining > 0) {
     cooldownTicksRemaining--;
     if (cooldownTicksRemaining === 0) {
-      addLog("⏱️ Loss cooldown complete. Bot is ready to evaluate trades.", "info");
+      addLog("⏱️ Loss cooldown complete. Bot is ready to evaluate crossovers.", "info");
     }
   }
 
-  // Execute strategy if trading is active and not waiting on a trade
+  // Execute strategy if trading is active, not waiting on a trade, and a candle has closed
   if (isTrading && activePurchaseProposal === null && currentContractId === null) {
     if (cooldownTicksRemaining > 0) {
-      statusText.innerText = `Cooldown: ${cooldownTicksRemaining} ticks`;
+      statusText.innerText = `Cooldown: ${cooldownTicksRemaining} min`;
       statusIndicator.className = "status-bar status-idle";
     } else {
       if (statusText.innerText.startsWith("Cooldown")) {
         statusText.innerText = "Bot is Active";
         statusIndicator.className = "status-bar status-running";
       }
-      evaluateStrategyPattern();
+      if (candleClosed) {
+        evaluateCrossoverStrategy();
+      }
     }
   }
 
@@ -1841,57 +1934,57 @@ function processTick(tick) {
   }
 }
 
-function evaluateStrategyPattern() {
-  if (ticksHistory.length < 20) return; // Need at least 20 ticks for SMA-20
+function evaluateCrossoverStrategy() {
+  if (candlesHistory.length < 21) return; // Need at least 21 candles for indicators
 
-  const sma10 = calculateSMA(10);
-  const sma20 = calculateSMA(20);
-  const rsi14 = calculateRSI(14);
-  if (!sma10 || !sma20 || rsi14 === null) return;
+  const ema9Values = calculateCandleEMAValues(9);
+  const ema21Values = calculateCandleEMAValues(21);
+  const ema200Values = calculateCandleEMAValues(200);
+  const rsiValues = calculateCandleRSIValues(14);
 
-  const sma100 = useSma50Guard ? calculateSMA(100) : null;
+  const len = candlesHistory.length;
+  if (ema9Values.length < len || ema21Values.length < len || rsiValues.length < len) return;
 
-  const len = ticksHistory.length;
-  // Extract the last 5 ticks to check for 3 drops followed by a rise, or 3 rises followed by a drop
-  const t0 = ticksHistory[len - 5];
-  const t1 = ticksHistory[len - 4];
-  const t2 = ticksHistory[len - 3];
-  const t3 = ticksHistory[len - 2];
-  const t4 = ticksHistory[len - 1]; // current price
+  const currentIdx = len - 1;
+  const prevIdx = len - 2;
 
-  const trendIsBullish = sma10 > sma20;
-  const trendIsBearish = sma10 < sma20;
+  const curEma9 = ema9Values[currentIdx];
+  const curEma21 = ema21Values[currentIdx];
+  const prevEma9 = ema9Values[prevIdx];
+  const prevEma21 = ema21Values[prevIdx];
+
+  const curEma200 = ema200Values[currentIdx];
+  const curRsi = rsiValues[currentIdx];
+
+  if (curEma9 === null || curEma21 === null || prevEma9 === null || prevEma21 === null) return;
+
+  const isBullishCrossover = (prevEma9 <= prevEma21) && (curEma9 > curEma21);
+  const isBearishCrossover = (prevEma9 >= prevEma21) && (curEma9 < curEma21);
+
+  const lastCandle = candlesHistory[currentIdx];
+  const closePrice = lastCandle.close;
+
+  // Trend filter using EMA-200
+  const isTrendBullish = curEma200 !== null ? (closePrice > curEma200) : true;
+  const isTrendBearish = curEma200 !== null ? (closePrice < curEma200) : true;
 
   const isRecoveryStep = currentMartingaleStep > 0;
   const useStrict = isRecoveryStep && useStrictMartingale;
 
-  const rsiCallThreshold = useStrict ? 40 : 45;
-  const rsiPutThreshold = useStrict ? 60 : 55;
+  const rsiCallThreshold = useStrict ? 45 : 50;
+  const rsiPutThreshold = useStrict ? 55 : 50;
 
-  // Pullback entry trigger: 3 consecutive drops/rises followed by 1 bounce tick
-  const callBounce = (t1 < t0 && t2 < t1 && t3 < t2 && t4 > t3);
-  const putBounce = (t1 > t0 && t2 > t1 && t3 > t2 && t4 < t3);
+  const isSma50CallValid = !useSma50Guard || isTrendBullish;
+  const isSma50PutValid = !useSma50Guard || isTrendBearish;
 
-  const isSma50CallValid = !useSma50Guard || !sma100 || t4 > sma100;
-  const isSma50PutValid = !useSma50Guard || !sma100 || t4 < sma100;
-
-  // 1. Trend-Following Bullish Pullback:
-  // - Trend is Bullish (SMA10 > SMA20)
-  // - RSI is oversold (< rsiCallThreshold)
-  // - Breakout Guard: Current price is above SMA20 (confirms it is a pullback, not a downward trend crash)
-  // - SMA-100 Trend Guard: Price is above SMA-100
-  // - Trigger: Pullback bounce detected (standard or strict recovery)
-  if (trendIsBullish && rsi14 < rsiCallThreshold && isSma50CallValid && callBounce) {
-    addLog(`Trend: Bullish | RSI: ${rsi14.toFixed(1)} (Threshold: ${rsiCallThreshold}) | Pullback bounce detected${useStrict ? ' [Strict Recovery]' : ''}. Buying RISE...`, "info");
+  // Evaluate CALL (RISE)
+  if (isBullishCrossover && curRsi !== null && curRsi < rsiCallThreshold && isSma50CallValid) {
+    addLog(`Trend Rider CALL: Bullish Crossover | RSI: ${curRsi.toFixed(1)} | Price above EMA-200. Buying RISE...`, "info");
     proposeTrade("CALL");
   }
-  // 2. Trend-Following Bearish Pullback:
-  // - Trend is Bearish (SMA10 < SMA20)
-  // - RSI is overbought (> rsiPutThreshold)
-  // - SMA-100 Trend Guard: Price is below SMA-100
-  // - Trigger: Pullback bounce detected (standard or strict recovery)
-  else if (trendIsBearish && rsi14 > rsiPutThreshold && isSma50PutValid && putBounce) {
-    addLog(`Trend: Bearish | RSI: ${rsi14.toFixed(1)} (Threshold: ${rsiPutThreshold}) | Pullback bounce detected${useStrict ? ' [Strict Recovery]' : ''}. Buying FALL...`, "info");
+  // Evaluate PUT (FALL)
+  else if (isBearishCrossover && curRsi !== null && curRsi > rsiPutThreshold && isSma50PutValid) {
+    addLog(`Trend Rider PUT: Bearish Crossover | RSI: ${curRsi.toFixed(1)} | Price below EMA-200. Buying FALL...`, "info");
     proposeTrade("PUT");
   }
 }
@@ -1913,8 +2006,8 @@ function proposeTrade(type) {
     basis: "stake",
     contract_type: type,
     currency: "USD",
-    duration: 5,
-    duration_unit: "t"
+    duration: 1,
+    duration_unit: "m"
   };
 
   if (socket.isNewWSApi) {
@@ -3191,54 +3284,40 @@ function drawChart() {
   // Clear background
   ctx.clearRect(0, 0, width, height);
 
-  // If no price history is loaded, show dynamic placeholder text
-  if (!ticksHistory || ticksHistory.length === 0) {
+  // If no candle history is loaded, show placeholder text
+  if (!candlesHistory || candlesHistory.length === 0) {
     ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
     ctx.font = "11px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("Waiting for live ticks feed...", width / 2, height / 2);
+    ctx.fillText("Waiting for live candles feed...", width / 2, height / 2);
     return;
   }
 
-  const prices = ticksHistory.slice(-100);
+  // Draw last 50 candles for the premium visual representation
+  const drawCandles = candlesHistory.slice(-50);
   
-  // Precompute SMA 10 and SMA 20 values for the current tick history subset
-  const sma10Values = [];
-  const sma20Values = [];
-  for (let i = 0; i < prices.length; i++) {
-    // SMA-10
-    if (i >= 9) {
-      const slice = prices.slice(i - 9, i + 1);
-      const avg = slice.reduce((a, b) => a + b, 0) / 10;
-      sma10Values.push(avg);
-    } else {
-      sma10Values.push(null);
-    }
-
-    // SMA-20
-    if (i >= 19) {
-      const slice = prices.slice(i - 19, i + 1);
-      const avg = slice.reduce((a, b) => a + b, 0) / 20;
-      sma20Values.push(avg);
-    } else {
-      sma20Values.push(null);
-    }
-  }
+  // Calculate EMA-9 and EMA-21 for indicators mapping
+  const fullEma9 = calculateCandleEMAValues(9);
+  const fullEma21 = calculateCandleEMAValues(21);
+  const ema9Values = fullEma9.slice(-50);
+  const ema21Values = fullEma21.slice(-50);
 
   // Calculate min and max bounds for y-axis scaling
   let minVal = Infinity;
   let maxVal = -Infinity;
-  for (let i = 0; i < prices.length; i++) {
-    minVal = Math.min(minVal, prices[i]);
-    maxVal = Math.max(maxVal, prices[i]);
-    if (sma10Values[i] !== null) {
-      minVal = Math.min(minVal, sma10Values[i]);
-      maxVal = Math.max(maxVal, sma10Values[i]);
+  for (let i = 0; i < drawCandles.length; i++) {
+    const c = drawCandles[i];
+    minVal = Math.min(minVal, c.low);
+    maxVal = Math.max(maxVal, c.high);
+    
+    if (ema9Values[i] !== null && ema9Values[i] !== undefined) {
+      minVal = Math.min(minVal, ema9Values[i]);
+      maxVal = Math.max(maxVal, ema9Values[i]);
     }
-    if (sma20Values[i] !== null) {
-      minVal = Math.min(minVal, sma20Values[i]);
-      maxVal = Math.max(maxVal, sma20Values[i]);
+    if (ema21Values[i] !== null && ema21Values[i] !== undefined) {
+      minVal = Math.min(minVal, ema21Values[i]);
+      maxVal = Math.max(maxVal, ema21Values[i]);
     }
   }
 
@@ -3247,7 +3326,7 @@ function drawChart() {
   minVal -= padding;
   maxVal += padding;
 
-  const rightMargin = 45; // pixels reserved for the current price badge
+  const rightMargin = 45; // pixels reserved for current price badge
   const chartWidth = width - rightMargin;
 
   // 1. Draw Grid Lines
@@ -3261,53 +3340,50 @@ function drawChart() {
   }
   ctx.stroke();
 
-  // 2. Draw Price Area Gradient
-  const points = [];
-  ctx.beginPath();
-  for (let i = 0; i < prices.length; i++) {
-    const x = (i / (prices.length - 1)) * chartWidth;
-    const y = height - ((prices[i] - minVal) / (maxVal - minVal)) * height;
-    points.push({ x, y });
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+  // 2. Draw Candlesticks
+  const candleSpace = chartWidth / drawCandles.length;
+  const candleWidth = Math.max(2, Math.floor(candleSpace * 0.65));
+
+  for (let i = 0; i < drawCandles.length; i++) {
+    const c = drawCandles[i];
+    const x = (i / (drawCandles.length - 1)) * chartWidth;
+    
+    const yOpen = height - ((c.open - minVal) / (maxVal - minVal)) * height;
+    const yClose = height - ((c.close - minVal) / (maxVal - minVal)) * height;
+    const yHigh = height - ((c.high - minVal) / (maxVal - minVal)) * height;
+    const yLow = height - ((c.low - minVal) / (maxVal - minVal)) * height;
+
+    const isBullish = c.close >= c.open;
+    const color = isBullish ? '#10b981' : '#f43f5e'; // green vs red
+
+    // Draw Wick (High to Low line)
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, yHigh);
+    ctx.lineTo(x, yLow);
+    ctx.stroke();
+
+    // Draw Body (Open to Close rectangle)
+    ctx.fillStyle = color;
+    const yTop = Math.min(yOpen, yClose);
+    const yBottom = Math.max(yOpen, yClose);
+    const bodyHeight = Math.max(1, yBottom - yTop);
+    ctx.fillRect(x - candleWidth / 2, yTop, candleWidth, bodyHeight);
   }
 
-  if (points.length > 0) {
-    ctx.lineTo(points[points.length - 1].x, height);
-    ctx.lineTo(points[0].x, height);
-    ctx.closePath();
-    const areaGrad = ctx.createLinearGradient(0, 0, 0, height);
-    areaGrad.addColorStop(0, "rgba(56, 189, 248, 0.08)");
-    areaGrad.addColorStop(1, "rgba(56, 189, 248, 0.0)");
-    ctx.fillStyle = areaGrad;
-    ctx.fill();
-  }
-
-  // 3. Draw Price Line
-  ctx.strokeStyle = "#38bdf8"; // cyan
-  ctx.lineWidth = 2;
-  ctx.shadowColor = "rgba(56, 189, 248, 0.4)";
-  ctx.shadowBlur = 4;
-  ctx.beginPath();
-  for (let i = 0; i < points.length; i++) {
-    if (i === 0) ctx.moveTo(points[i].x, points[i].y);
-    else ctx.lineTo(points[i].x, points[i].y);
-  }
-  ctx.stroke();
-  ctx.shadowBlur = 0; // reset glow
-
-  // 4. Draw SMA-10 Line
+  // 3. Draw EMA-9 Line (Gold)
   ctx.strokeStyle = "#f59e0b"; // gold
-  ctx.lineWidth = 1.25;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  let sma10Started = false;
-  for (let i = 0; i < prices.length; i++) {
-    if (sma10Values[i] !== null) {
-      const x = (i / (prices.length - 1)) * chartWidth;
-      const y = height - ((sma10Values[i] - minVal) / (maxVal - minVal)) * height;
-      if (!sma10Started) {
+  let ema9Started = false;
+  for (let i = 0; i < drawCandles.length; i++) {
+    if (ema9Values[i] !== null && ema9Values[i] !== undefined) {
+      const x = (i / (drawCandles.length - 1)) * chartWidth;
+      const y = height - ((ema9Values[i] - minVal) / (maxVal - minVal)) * height;
+      if (!ema9Started) {
         ctx.moveTo(x, y);
-        sma10Started = true;
+        ema9Started = true;
       } else {
         ctx.lineTo(x, y);
       }
@@ -3315,18 +3391,18 @@ function drawChart() {
   }
   ctx.stroke();
 
-  // 5. Draw SMA-20 Line
+  // 4. Draw EMA-21 Line (Pink)
   ctx.strokeStyle = "#ec4899"; // pink
-  ctx.lineWidth = 1.25;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  let sma20Started = false;
-  for (let i = 0; i < prices.length; i++) {
-    if (sma20Values[i] !== null) {
-      const x = (i / (prices.length - 1)) * chartWidth;
-      const y = height - ((sma20Values[i] - minVal) / (maxVal - minVal)) * height;
-      if (!sma20Started) {
+  let ema21Started = false;
+  for (let i = 0; i < drawCandles.length; i++) {
+    if (ema21Values[i] !== null && ema21Values[i] !== undefined) {
+      const x = (i / (drawCandles.length - 1)) * chartWidth;
+      const y = height - ((ema21Values[i] - minVal) / (maxVal - minVal)) * height;
+      if (!ema21Started) {
         ctx.moveTo(x, y);
-        sma20Started = true;
+        ema21Started = true;
       } else {
         ctx.lineTo(x, y);
       }
@@ -3334,9 +3410,9 @@ function drawChart() {
   }
   ctx.stroke();
 
-  // 6. Draw Horizontal Current Price level tracker line and Badge
-  const currentPrice = prices[prices.length - 1];
-  const currentY = height - ((currentPrice - minVal) / (maxVal - minVal)) * height;
+  // 5. Draw Horizontal Price level tracker and Badge
+  const lastPriceVal = drawCandles[drawCandles.length - 1].close;
+  const currentY = height - ((lastPriceVal - minVal) / (maxVal - minVal)) * height;
 
   ctx.strokeStyle = "rgba(56, 189, 248, 0.35)";
   ctx.lineWidth = 1;
@@ -3345,9 +3421,9 @@ function drawChart() {
   ctx.moveTo(0, currentY);
   ctx.lineTo(chartWidth, currentY);
   ctx.stroke();
-  ctx.setLineDash([]); // reset dash
+  ctx.setLineDash([]); // reset
 
-  // Price tag badge background
+  // Draw price badge background
   ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
   ctx.strokeStyle = "#38bdf8";
   ctx.lineWidth = 1;
@@ -3360,25 +3436,24 @@ function drawChart() {
   ctx.fill();
   ctx.stroke();
 
-  // Price text inside badge
+  // Draw price text
   ctx.fillStyle = "#38bdf8";
   ctx.font = "bold 9px monospace";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(currentPrice.toFixed(2), width - 22, currentY);
+  ctx.fillText(lastPriceVal.toFixed(2), width - 22, currentY);
 
-  // 7. Render Trade Markers
+  // 6. Draw Trade Markers
   for (let i = 0; i < chartTradeMarkers.length; i++) {
     const marker = chartTradeMarkers[i];
-    const idx = ticksHistoryCounters.indexOf(marker.absoluteIndex);
+    const idx = drawCandles.findIndex(c => c.epoch === marker.epoch);
     if (idx !== -1) {
-      const x = (idx / (prices.length - 1)) * chartWidth;
+      const x = (idx / (drawCandles.length - 1)) * chartWidth;
       const y = height - ((marker.price - minVal) / (maxVal - minVal)) * height;
 
-      // Draw glowing dot
       let markerColor = "#f59e0b"; // gold/yellow for pending
-      if (marker.result === 'win') markerColor = "#10b981"; // emerald green
-      else if (marker.result === 'loss') markerColor = "#ef4444"; // rose red
+      if (marker.result === 'win') markerColor = "#10b981"; // green
+      else if (marker.result === 'loss') markerColor = "#ef4444"; // red
 
       ctx.beginPath();
       ctx.arc(x, y, 4.5, 0, 2 * Math.PI);
@@ -3388,7 +3463,7 @@ function drawChart() {
       ctx.fill();
       ctx.shadowBlur = 0;
 
-      // Draw visual direction arrow above/below the dot
+      // Draw direction arrows
       ctx.fillStyle = markerColor;
       ctx.font = "bold 9px sans-serif";
       ctx.textAlign = "center";
