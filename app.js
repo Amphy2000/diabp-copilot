@@ -48,7 +48,7 @@ let currentMartingaleStep = 0;
 let lossCooldownTicks = 3; // candles to wait after a loss (1 candle = 1 minute)
 let cooldownTicksRemaining = 0;
 let useSma50Guard = false; // Removed from UI — kept as false so guard is always off
-let lastTradeCandleIdx = -99;
+let lastTradeCandleEpoch = 0;
 let useStrictMartingale = true;
 let currentProposalId = null;
 let currentContractId = null;
@@ -2065,8 +2065,9 @@ function evaluateCrossoverStrategy() {
   const len = candlesHistory.length;
   if (ema9Values.length < len || ema21Values.length < len || rsiValues.length < len) return;
 
-  const currentIdx = len - 1;
-  const prevIdx    = len - 2;
+  // Evaluate on the candle that just CLOSED (fully formed)
+  const currentIdx = len - 2;
+  const prevIdx    = len - 3;
 
   const curEma9   = ema9Values[currentIdx];
   const curEma21  = ema21Values[currentIdx];
@@ -2077,9 +2078,10 @@ function evaluateCrossoverStrategy() {
 
   if (curEma9 == null || curEma21 == null || prevEma9 == null || prevEma21 == null || curRsi == null) return;
 
-  const lastCandle = candlesHistory[currentIdx];
-  const prevCandle = candlesHistory[prevIdx];
+  const lastCandle = candlesHistory[currentIdx]; // the closed candle
+  const prevCandle = candlesHistory[prevIdx];    // the previous closed candle
   const closePrice = lastCandle.close;
+  const currentEpoch = lastCandle.epoch;
 
   // ── Macro trend filter (EMA-200) ──────────────────────────────────────────
   const isMacroBullish = curEma200 !== null ? (closePrice > curEma200) : true;
@@ -2102,13 +2104,13 @@ function evaluateCrossoverStrategy() {
   const crossPutRsi  = useStrict ? 45 : 35; // RSI must be ABOVE this for PUT
 
   if (isBullishCrossover && curRsi < crossCallRsi && macroBullValid) {
-    lastTradeCandleIdx = currentIdx;
+    lastTradeCandleEpoch = currentEpoch;
     addLog(`🟢 CROSSOVER CALL | EMA-9 x EMA-21 | RSI: ${curRsi.toFixed(1)} — Buying RISE`, "info");
     proposeTrade("CALL");
     return;
   }
   if (isBearishCrossover && curRsi > crossPutRsi && macroBearValid) {
-    lastTradeCandleIdx = currentIdx;
+    lastTradeCandleEpoch = currentEpoch;
     addLog(`🔴 CROSSOVER PUT | EMA-9 x EMA-21 | RSI: ${curRsi.toFixed(1)} — Buying FALL`, "info");
     proposeTrade("PUT");
     return;
@@ -2120,9 +2122,9 @@ function evaluateCrossoverStrategy() {
   //  Requires: EMA alignment + 2 consecutive confirming candles + RSI room.
   //  This ensures the bot trades multiple times per hour, not zero.
   // ══════════════════════════════════════════════════════════════
-  const candlesSinceLastTrade = currentIdx - lastTradeCandleIdx;
+  const minutesSinceLastTrade = (currentEpoch - lastTradeCandleEpoch) / 60;
   const minSpacing = useStrict ? 5 : 3;
-  if (candlesSinceLastTrade < minSpacing) return;
+  if (minutesSinceLastTrade < minSpacing) return;
 
   // EMA spread must be meaningful (not just noise at the 50-line)
   const emaSpreadPct = Math.abs(curEma9 - curEma21) / closePrice * 100;
@@ -2141,7 +2143,7 @@ function evaluateCrossoverStrategy() {
 
   // CALL continuation: uptrend, two green candles, RSI not overbought, macro supports
   if (curEma9 > curEma21 && isBullishCandle && prevIsBullish && curRsi < contCallRsi && macroBullValid) {
-    lastTradeCandleIdx = currentIdx;
+    lastTradeCandleEpoch = currentEpoch;
     addLog(`🟢 TREND CALL | EMA spread: ${emaSpreadPct.toFixed(3)}% | RSI: ${curRsi.toFixed(1)} — Buying RISE`, "info");
     proposeTrade("CALL");
     return;
@@ -2149,7 +2151,7 @@ function evaluateCrossoverStrategy() {
 
   // PUT continuation: downtrend, two red candles, RSI not oversold, macro supports
   if (curEma9 < curEma21 && isBearishCandle && prevIsBearish && curRsi > contPutRsi && macroBearValid) {
-    lastTradeCandleIdx = currentIdx;
+    lastTradeCandleEpoch = currentEpoch;
     addLog(`🔴 TREND PUT | EMA spread: ${emaSpreadPct.toFixed(3)}% | RSI: ${curRsi.toFixed(1)} — Buying FALL`, "info");
     proposeTrade("PUT");
     return;
