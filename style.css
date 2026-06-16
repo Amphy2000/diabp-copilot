@@ -1502,3 +1502,42 @@ body {
   box-shadow: 0 4px 12px rgba(56, 189, 248, 0.1) !important;
 }
 
+/* ════════════════════════════════════════════ */
+/*          ADX & REGIME STATUS BADGES          */
+/* ════════════════════════════════════════════ */
+.adx-status {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.adx-loading {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+}
+
+.adx-trending {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--color-success);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.adx-choppy {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.adx-pause {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--color-danger);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.profit-neutral {
+  color: var(--text-muted);
+}
+
+

@@ -34,6 +34,7 @@ let _cachedEma9 = [];   // EMA-9  values aligned to candlesHistory
 let _cachedEma21 = [];  // EMA-21 values aligned to candlesHistory
 let _cachedEma200 = []; // EMA-200 values aligned to candlesHistory
 let _cachedRsi14 = [];  // RSI-14 values aligned to candlesHistory
+let _cachedAdx14 = [];  // ADX-14 values aligned to candlesHistory (Layer 1: regime filter)
 let _chartDrawPending = false; // rAF gate for chart redraws
 let lastTickPrice = null;
 let chartTradeMarkers = [];
@@ -49,6 +50,20 @@ let lossCooldownTicks = 3; // candles to wait after a loss (1 candle = 1 minute)
 let cooldownTicksRemaining = 0;
 let useSma50Guard = false; // Removed from UI — kept as false so guard is always off
 let lastTradeCandleEpoch = 0;
+
+// ── Layer 1: ADX Regime Filter ────────────────────────────────────────────────
+let adxThreshold = 18; // ADX must be >= this to allow trades (18 = soft trend filter)
+
+// ── Layer 4: Consecutive Loss Guard ──────────────────────────────────────────
+let consecutiveLosses = 0;          // resets on any win
+let consecutiveLossPauseEnd = 0;    // epoch timestamp — bot pauses until this time
+const CONSECUTIVE_LOSS_LIMIT = 3;   // trigger pause after this many consecutive losses
+const CONSECUTIVE_LOSS_PAUSE_MIN = 10; // pause duration in minutes
+
+// ── Layer 5: Daily P&L Tracker ────────────────────────────────────────────────
+let dailyPnl = 0.0;          // cumulative P&L for today (loaded from localStorage)
+let dailyStopLoss = 10.00;   // daily max loss limit — bot stops for the day if exceeded
+const DAILY_PNL_KEY = 'v75bot_dailyPnl'; // localStorage key
 let useStrictMartingale = true;
 let currentProposalId = null;
 let currentContractId = null;
@@ -502,6 +517,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   checkAuth();
   loadStats();
+  loadDailyPnl();
 });
 
 // Helper to check if account is whitelisted
@@ -683,22 +699,22 @@ function applyPreset(presetType) {
     if (balance < 25) {
       calculatedStake = 0.50; // Fallback minimum stake
     }
-    calculatedSteps = 4; // Base + 3 recovery steps = 4 total steps
-    calculatedStop = Math.round((calculatedStake * (1 + 2 + 4 + 8)) * 100) / 100; // sum of stakes for 4 total steps (Stake * 15)
+    calculatedSteps = 3; // Enforced Capped Martingale: 3 total steps
+    calculatedStop = Math.round((calculatedStake * (1 + 2 + 4)) * 100) / 100; // sum of stakes for 3 total steps (Stake * 7)
     calculatedTarget = Math.max(2.00, Math.round((balance * 0.07) * 2) / 2); // 7% of balance target
     calculatedCooldown = 15;
     calculatedSma50 = true;
     calculatedStrictMartingale = true;
-    feedbackMsg = `⚖️ Moderate: 2% stake ($${calculatedStake.toFixed(2)}), 3 recovery steps, 15-tick loss cooldown. Balanced risk. Recommended balance: $25+`;
+    feedbackMsg = `⚖️ Moderate: 2% stake ($${calculatedStake.toFixed(2)}), 2 recovery steps, 15-tick loss cooldown. Balanced risk. Recommended balance: $25+`;
   } else if (presetType === 'aggressive') {
     calculatedStake = Math.max(0.50, Math.round((balance * 0.04) * 10) / 10); // 4% of balance, rounded to nearest 0.10
-    calculatedSteps = 5; // Base + 4 recovery steps = 5 total steps
-    calculatedStop = Math.round((calculatedStake * (1 + 2 + 4 + 8 + 16)) * 100) / 100; // sum of stakes for 5 total steps (Stake * 31)
+    calculatedSteps = 3; // Enforced Capped Martingale: 3 total steps
+    calculatedStop = Math.round((calculatedStake * (1 + 2 + 4)) * 100) / 100; // sum of stakes for 3 total steps (Stake * 7)
     calculatedTarget = Math.max(5.00, Math.round((balance * 0.15) * 2) / 2); // 15% of balance target
     calculatedCooldown = 10;
     calculatedSma50 = true;
     calculatedStrictMartingale = true;
-    feedbackMsg = `🔥 Aggressive: 4% stake ($${calculatedStake.toFixed(2)}), 4 recovery steps, 10-tick loss cooldown. High yield, high risk. Recommended balance: $50+`;
+    feedbackMsg = `🔥 Aggressive: 4% stake ($${calculatedStake.toFixed(2)}), 2 recovery steps, 10-tick loss cooldown. High yield, high risk. Recommended balance: $50+`;
   }
 
   // Update inputs
@@ -1888,6 +1904,81 @@ function calculateCandleRSIValues(period = 14) {
 // ════════════════════════════════════════════
 
 /**
+ * Computes ADX-14 (Average Directional Index) using Wilder's smoothing.
+ * ADX measures trend STRENGTH (not direction). Higher = stronger trend.
+ * - ADX >= 18: trending market (bot allowed to trade)
+ * - ADX <  18: choppy/ranging market (bot waits)
+ * Returns an array of ADX values aligned to candlesHistory.
+ * Returns null for indices where not enough data exists.
+ */
+function calculateCandleADXValues(period = 14) {
+  const candles = candlesHistory;
+  const n = candles.length;
+  const result = new Array(n).fill(null);
+  if (n < period * 2 + 1) return result;
+
+  // Step 1: Compute True Range (TR), +DM, -DM for each bar
+  const trArr = [];
+  const pdmArr = [];
+  const mdmArr = [];
+
+  for (let i = 1; i < n; i++) {
+    const h = candles[i].high;
+    const l = candles[i].low;
+    const pc = candles[i - 1].close;
+    const ph = candles[i - 1].high;
+    const pl = candles[i - 1].low;
+
+    const tr = Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc));
+    trArr.push(tr);
+
+    const upMove   = h - ph;
+    const downMove = pl - l;
+    pdmArr.push((upMove > downMove && upMove > 0)   ? upMove   : 0);
+    mdmArr.push((downMove > upMove && downMove > 0) ? downMove : 0);
+  }
+
+  // Step 2: Wilder's first smoothed values (sum of first `period` bars)
+  let smoothTR  = trArr.slice(0, period).reduce((a, b) => a + b, 0);
+  let smoothPDM = pdmArr.slice(0, period).reduce((a, b) => a + b, 0);
+  let smoothMDM = mdmArr.slice(0, period).reduce((a, b) => a + b, 0);
+
+  // Step 3: Compute first DX after initial period
+  const dxArr = [];
+
+  function computeDx(sTR, sPDM, sMDM) {
+    if (sTR === 0) return 0;
+    const diPlus  = 100 * sPDM / sTR;
+    const diMinus = 100 * sMDM / sTR;
+    const diSum   = diPlus + diMinus;
+    return diSum === 0 ? 0 : 100 * Math.abs(diPlus - diMinus) / diSum;
+  }
+
+  dxArr.push(computeDx(smoothTR, smoothPDM, smoothMDM));
+
+  for (let i = period; i < trArr.length; i++) {
+    // Wilder's smoothing: newSmooth = prevSmooth - prevSmooth/period + current
+    smoothTR  = smoothTR  - smoothTR  / period + trArr[i];
+    smoothPDM = smoothPDM - smoothPDM / period + pdmArr[i];
+    smoothMDM = smoothMDM - smoothMDM / period + mdmArr[i];
+    dxArr.push(computeDx(smoothTR, smoothPDM, smoothMDM));
+  }
+
+  // Step 4: ADX = Wilder's smooth of DX over `period` bars
+  if (dxArr.length < period) return result;
+  let adx = dxArr.slice(0, period).reduce((a, b) => a + b, 0) / period;
+
+  // Align result: first valid ADX corresponds to candle index (period * 2)
+  result[period * 2] = adx;
+  for (let i = period; i < dxArr.length; i++) {
+    adx = (adx * (period - 1) + dxArr[i]) / period;
+    result[period + i] = adx;
+  }
+
+  return result;
+}
+
+/**
  * Full recalculation of all indicator caches.
  * Called once per candle close (~once per minute).
  */
@@ -1896,6 +1987,7 @@ function _rebuildIndicatorCache() {
   _cachedEma21  = calculateCandleEMAValues(21);
   _cachedEma200 = calculateCandleEMAValues(200);
   _cachedRsi14  = calculateCandleRSIValues(14);
+  _cachedAdx14  = calculateCandleADXValues(14);  // Layer 1: ADX regime filter
 }
 
 /**
@@ -2083,6 +2175,47 @@ function evaluateCrossoverStrategy() {
   const closePrice = lastCandle.close;
   const currentEpoch = lastCandle.epoch;
 
+  // ── Layer 1: ADX Regime Filter ────────────────────────────────────────────
+  // Only trade in trending markets. ADX < threshold = choppy, skip all signals.
+  const curAdx = _cachedAdx14.length >= len ? _cachedAdx14[currentIdx] : null;
+  const adxReady = curAdx !== null;
+  const adxPassing = !adxReady || curAdx >= adxThreshold;
+
+  // Update trend label with ADX regime status
+  if (trendLabel) {
+    if (!adxReady) {
+      trendLabel.innerHTML = `<span class="adx-status adx-loading">⏳ Calculating ADX...</span>`;
+    } else if (adxPassing) {
+      trendLabel.innerHTML = `<span class="adx-status adx-trending">🔥 Trending | ADX: ${curAdx.toFixed(1)}</span>`;
+    } else {
+      trendLabel.innerHTML = `<span class="adx-status adx-choppy">⏸ Choppy Market | ADX: ${curAdx.toFixed(1)} &lt; ${adxThreshold}</span>`;
+    }
+  }
+
+  if (!adxPassing) {
+    addLog(`⏸ ADX ${curAdx.toFixed(1)} < ${adxThreshold} — Market choppy. Waiting for trend.`, 'warn');
+    return;
+  }
+
+  // ── Layer 5: Daily Stop Loss Gate ─────────────────────────────────────────
+  // If daily losses exceed the configured daily stop loss, halt all trading.
+  if (dailyPnl <= -dailyStopLoss) {
+    addLog(`🛑 Daily Stop Loss (-$${dailyStopLoss.toFixed(2)}) hit. Bot paused for today. Today's P&L: $${dailyPnl.toFixed(2)}`, 'error');
+    stopTrading('Daily Stop Loss Hit');
+    return;
+  }
+
+  // ── Layer 4: Consecutive Loss Guard ───────────────────────────────────────
+  // After 3 consecutive losses, force a 10-minute pause.
+  const nowEpoch = Math.floor(Date.now() / 1000);
+  if (consecutiveLossPauseEnd > nowEpoch) {
+    const minsLeft = Math.ceil((consecutiveLossPauseEnd - nowEpoch) / 60);
+    if (trendLabel) {
+      trendLabel.innerHTML = `<span class="adx-status adx-pause">🛑 3-Loss Guard Active — Cooling down (${minsLeft}m left)</span>`;
+    }
+    return;
+  }
+
   // ── Macro trend filter (EMA-200) ──────────────────────────────────────────
   const isMacroBullish = curEma200 !== null ? (closePrice > curEma200) : true;
   const isMacroBearish = curEma200 !== null ? (closePrice < curEma200) : true;
@@ -2091,6 +2224,18 @@ function evaluateCrossoverStrategy() {
 
   // ── Strict mode during martingale recovery ────────────────────────────────
   const useStrict = currentMartingaleStep > 0 && useStrictMartingale;
+
+  // ── Layer 2: Candle Body Quality Filter ───────────────────────────────────
+  // Reject doji/indecision candles (body < 35% of total range).
+  // These signal market indecision, not trend continuation.
+  function isQualityCandle(candle) {
+    const range = candle.high - candle.low;
+    if (range === 0) return false;
+    const body = Math.abs(candle.close - candle.open);
+    return (body / range) >= 0.35;
+  }
+  const lastCandleQuality = isQualityCandle(lastCandle);
+  const prevCandleQuality = isQualityCandle(prevCandle);
 
   // ══════════════════════════════════════════════════════════════
   //  SIGNAL TIER 1: EMA Crossover — highest confidence
@@ -2103,15 +2248,15 @@ function evaluateCrossoverStrategy() {
   const crossCallRsi = useStrict ? 55 : 65; // RSI must be BELOW this for CALL
   const crossPutRsi  = useStrict ? 45 : 35; // RSI must be ABOVE this for PUT
 
-  if (isBullishCrossover && curRsi < crossCallRsi && macroBullValid) {
+  if (isBullishCrossover && curRsi < crossCallRsi && macroBullValid && lastCandleQuality) {
     lastTradeCandleEpoch = currentEpoch;
-    addLog(`🟢 CROSSOVER CALL | EMA-9 x EMA-21 | RSI: ${curRsi.toFixed(1)} — Buying RISE`, "info");
+    addLog(`🟢 CROSSOVER CALL | EMA-9 x EMA-21 | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying RISE`, "info");
     proposeTrade("CALL");
     return;
   }
-  if (isBearishCrossover && curRsi > crossPutRsi && macroBearValid) {
+  if (isBearishCrossover && curRsi > crossPutRsi && macroBearValid && lastCandleQuality) {
     lastTradeCandleEpoch = currentEpoch;
-    addLog(`🔴 CROSSOVER PUT | EMA-9 x EMA-21 | RSI: ${curRsi.toFixed(1)} — Buying FALL`, "info");
+    addLog(`🔴 CROSSOVER PUT | EMA-9 x EMA-21 | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying FALL`, "info");
     proposeTrade("PUT");
     return;
   }
@@ -2220,6 +2365,8 @@ function handleTradeOutcome(contract) {
   }
   
   sessionProfit += profit;
+  dailyPnl += profit;
+  saveDailyPnl();
   updateProfitDisplay();
 
   // Update session database analytics tracking variables
@@ -2244,26 +2391,49 @@ function handleTradeOutcome(contract) {
     // Reset martingale steps
     currentStake = initialStake;
     currentMartingaleStep = 0;
+    consecutiveLosses = 0; // Reset consecutive losses on any win
   } else {
     addLog(`🚨 LOSS! Loss: -$${Math.abs(profit).toFixed(2)}`, "error");
     
-    // Apply loss cooldown if configured
-    if (lossCooldownTicks > 0) {
-      cooldownTicksRemaining = lossCooldownTicks;
-      addLog(`⏱️ Applying loss cooldown of ${lossCooldownTicks} ticks to prevent consecutive losses.`, "warn");
-    }
+    consecutiveLosses++;
 
-    // Martingale management
-    currentMartingaleStep++;
-    if (currentMartingaleStep >= maxMartingaleSteps) {
-      addLog(`⚠️ Max Martingale Steps (${maxMartingaleSteps}) reached. Resetting stake.`, "warn");
-      sendPushNotification("🚨 Trade LOST", `Loss: -$${Math.abs(profit).toFixed(2)} (Max steps hit, stake reset) | Session: $${sessionProfit.toFixed(2)}`);
+    // Layer 4: Consecutive Loss Guard (3 consecutive losses forces 10-min pause)
+    if (consecutiveLosses >= CONSECUTIVE_LOSS_LIMIT) {
+      const pauseMins = CONSECUTIVE_LOSS_PAUSE_MIN;
+      consecutiveLossPauseEnd = Math.floor(Date.now() / 1000) + (pauseMins * 60);
+      addLog(`🚨 Consecutive Loss Guard triggered! ${consecutiveLosses} losses in a row. Bot is paused for ${pauseMins} minutes to cool down.`, "error");
+      sendPushNotification("🚨 Consecutive Loss Guard", `${consecutiveLosses} consecutive losses! Bot paused for ${pauseMins} mins.`);
+      
+      // Reset martingale state and consecutive loss counter
       currentStake = initialStake;
       currentMartingaleStep = 0;
+      consecutiveLosses = 0;
+      
+      if (statusText) statusText.innerText = `Paused: 3-Loss Guard (${pauseMins}m)`;
+      if (statusIndicator) statusIndicator.className = "status-bar status-idle";
     } else {
-      currentStake = currentStake * parseFloat(martingaleStepsInput.value === '1' ? 1.0 : martingaleMultiplier);
-      addLog(`🔄 Martingale Multiplier (${martingaleMultiplier}x) applied. Next stake: $${currentStake.toFixed(2)}`, "warn");
-      sendPushNotification("🚨 Trade LOST", `Loss: -$${Math.abs(profit).toFixed(2)} (Martingale Step ${currentMartingaleStep} next: $${currentStake.toFixed(2)}) | Session: $${sessionProfit.toFixed(2)}`);
+      // Apply loss cooldown if configured
+      if (lossCooldownTicks > 0) {
+        cooldownTicksRemaining = lossCooldownTicks;
+        addLog(`⏱️ Applying loss cooldown of ${lossCooldownTicks} ticks to prevent consecutive losses.`, "warn");
+      }
+
+      // Martingale management
+      currentMartingaleStep++;
+      if (currentMartingaleStep >= maxMartingaleSteps) {
+        addLog(`⚠️ Max Martingale Steps (${maxMartingaleSteps}) reached. Resetting stake.`, "warn");
+        sendPushNotification("🚨 Trade LOST", `Loss: -$${Math.abs(profit).toFixed(2)} (Max steps hit, stake reset) | Session: $${sessionProfit.toFixed(2)}`);
+        currentStake = initialStake;
+        currentMartingaleStep = 0;
+        
+        // Layer 3: Capped Martingale recovery failure forces a 5-candle cooldown
+        cooldownTicksRemaining = 5;
+        addLog(`⏱️ Martingale recovery failed at Step ${maxMartingaleSteps - 1}. Enforcing mandatory 5-candle cooldown to protect capital.`, "warn");
+      } else {
+        currentStake = currentStake * parseFloat(martingaleStepsInput.value === '1' ? 1.0 : martingaleMultiplier);
+        addLog(`🔄 Martingale Multiplier (${martingaleMultiplier}x) applied. Next stake: $${currentStake.toFixed(2)}`, "warn");
+        sendPushNotification("🚨 Trade LOST", `Loss: -$${Math.abs(profit).toFixed(2)} (Martingale Step ${currentMartingaleStep} next: $${currentStake.toFixed(2)}) | Session: $${sessionProfit.toFixed(2)}`);
+      }
     }
   }
 
@@ -2311,9 +2481,22 @@ startBotBtn.addEventListener('click', () => {
   currentStake = initialStake;
   targetProfit = parseFloat(targetProfitInput.value);
   stopLoss = parseFloat(stopLossInput.value);
-  maxMartingaleSteps = parseInt(martingaleStepsInput.value);
+  
+  // Layer 3: Enforce capped Martingale (max 3 total steps = 2 recovery steps)
+  const stepsVal = parseInt(martingaleStepsInput.value) || 3;
+  if (stepsVal > 3) {
+    addLog(`⚠️ Capped Martingale system allows max 2 recovery steps (3 total attempts). Stake steps restricted to 3.`, "warn");
+  }
+  maxMartingaleSteps = Math.min(3, stepsVal);
+  
   currentMartingaleStep = 0;
   sessionProfit = 0.0;
+
+  const adxInput = document.getElementById('adxThresholdInput');
+  adxThreshold = adxInput ? parseInt(adxInput.value) || 18 : 18;
+
+  const dailyStopLossInput = document.getElementById('dailyStopLossInput');
+  dailyStopLoss = dailyStopLossInput ? parseFloat(dailyStopLossInput.value) || 10.00 : 10.00;
 
   const multiplierVal = parseFloat(martingaleMultiplierInput ? martingaleMultiplierInput.value : '2.0');
   if (isNaN(multiplierVal) || multiplierVal < 1.0 || multiplierVal > 5.0) {
@@ -2589,6 +2772,45 @@ function updateProfitDisplay() {
     profitText.className = "metric-value profit-lost";
   } else {
     profitText.className = "metric-value profit-neutral";
+  }
+}
+
+function getTodayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+function loadDailyPnl() {
+  const todayKey = getTodayKey();
+  const stored = localStorage.getItem(DAILY_PNL_KEY);
+  if (stored) {
+    try {
+      const data = JSON.parse(stored);
+      if (data.date === todayKey) {
+        dailyPnl = parseFloat(data.pnl) || 0.0;
+        updateDailyPnlDisplay();
+        return;
+      }
+    } catch (e) {
+      console.error("Error parsing daily P&L", e);
+    }
+  }
+  // Reset daily P&L if not found or if date is old
+  dailyPnl = 0.0;
+  saveDailyPnl();
+}
+
+function saveDailyPnl() {
+  const todayKey = getTodayKey();
+  localStorage.setItem(DAILY_PNL_KEY, JSON.stringify({ date: todayKey, pnl: dailyPnl }));
+  updateDailyPnlDisplay();
+}
+
+function updateDailyPnlDisplay() {
+  const dailyPnlText = document.getElementById('dailyPnlText');
+  if (dailyPnlText) {
+    dailyPnlText.innerText = `${dailyPnl >= 0 ? '+' : ''}$${dailyPnl.toFixed(2)}`;
+    dailyPnlText.className = dailyPnl >= 0 ? "perf-value win-color" : "perf-value loss-color";
   }
 }
 
