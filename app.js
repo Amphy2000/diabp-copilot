@@ -133,8 +133,6 @@ const targetProfitInput = document.getElementById('targetProfitInput');
 const stopLossInput = document.getElementById('stopLossInput');
 const martingaleStepsInput = document.getElementById('martingaleStepsInput');
 const martingaleMultiplierInput = document.getElementById('martingaleMultiplierInput');
-const lossCooldownInput = document.getElementById('lossCooldownInput');
-const strictMartingaleCheckbox = document.getElementById('strictMartingaleCheckbox');
 
 // Risk Presets elements
 const presetConservativeBtn = document.getElementById('presetConservativeBtn');
@@ -725,8 +723,7 @@ function applyPreset(presetType) {
     if (stopLossInput) stopLossInput.value = calculatedStop.toFixed(2);
     if (martingaleStepsInput) martingaleStepsInput.value = calculatedSteps;
     if (martingaleMultiplierInput) martingaleMultiplierInput.value = "2.0";
-    if (lossCooldownInput) lossCooldownInput.value = calculatedCooldown;
-    if (strictMartingaleCheckbox) strictMartingaleCheckbox.checked = calculatedStrictMartingale;
+    // strictMartingale always on
     presetFeedback.innerText = feedbackMsg;
     
     console.log(`Preset Applied: ${presetType}. Stake: ${calculatedStake}, Steps: ${calculatedSteps}, Stop: ${calculatedStop}, Target: ${calculatedTarget}, Cooldown: ${calculatedCooldown}`);
@@ -833,8 +830,8 @@ if (stopLossInput) {
 }
 if (martingaleStepsInput) martingaleStepsInput.addEventListener('input', markCustomSettings);
 if (martingaleMultiplierInput) martingaleMultiplierInput.addEventListener('input', markCustomSettings);
-if (lossCooldownInput) lossCooldownInput.addEventListener('input', markCustomSettings);
-if (strictMartingaleCheckbox) strictMartingaleCheckbox.addEventListener('change', markCustomSettings);
+
+
 
 // Apply default on load
 setTimeout(() => {
@@ -2464,13 +2461,13 @@ startBotBtn.addEventListener('click', () => {
   currentMartingaleStep = 0;
   sessionProfit = 0.0;
 
-  const adxInput = document.getElementById('adxThresholdInput');
+  const adxInput = null;
   adxThreshold = adxInput ? parseInt(adxInput.value) || 18 : 18;
 
-  const dailyStopLossInput = document.getElementById('dailyStopLossInput');
-  dailyStopLoss = dailyStopLossInput ? parseFloat(dailyStopLossInput.value) || 10.00 : 10.00;
-  const dailyTargetInput = document.getElementById('dailyTargetInput');
-  dailyTarget = dailyTargetInput ? parseFloat(dailyTargetInput.value) || 30.00 : 30.00;
+  const dailyStopLossInput = document.getElementById('stopLossInput');
+  dailyStopLoss = parseFloat(document.getElementById('stopLossInput')?.value) || 5.00;
+  const dailyTargetInput = document.getElementById('targetProfitInput');
+  dailyTarget = parseFloat(document.getElementById('targetProfitInput')?.value) || 5.00;
 
   const multiplierVal = parseFloat(martingaleMultiplierInput ? martingaleMultiplierInput.value : '2.0');
   if (isNaN(multiplierVal) || multiplierVal < 1.0 || multiplierVal > 5.0) {
@@ -2479,10 +2476,10 @@ startBotBtn.addEventListener('click', () => {
   }
   martingaleMultiplier = multiplierVal;
 
-  lossCooldownTicks = lossCooldownInput ? (parseInt(lossCooldownInput.value) || 0) : 15;
+  lossCooldownTicks = 3;
   cooldownTicksRemaining = 0;
   useSma50Guard = false; // guard removed from UI — always off
-  useStrictMartingale = strictMartingaleCheckbox ? strictMartingaleCheckbox.checked : true;
+  useStrictMartingale = true;
 
   // Reset session database analytics tracking variables
   activeSessionDbId = null;
@@ -2576,9 +2573,9 @@ function toggleInputs(disabled) {
   stopLossInput.disabled = disabled;
   martingaleStepsInput.disabled = disabled;
   if (martingaleMultiplierInput) martingaleMultiplierInput.disabled = disabled;
-  if (lossCooldownInput) lossCooldownInput.disabled = disabled;
+  
   // sma50GuardCheckbox removed
-  if (strictMartingaleCheckbox) strictMartingaleCheckbox.disabled = disabled;
+  
 }
 
 // ════════════════════════════════════════════
@@ -3593,9 +3590,9 @@ if (resumeBotBtn) {
       stopLossInput.value = stopLoss;
       martingaleStepsInput.value = maxMartingaleSteps;
       if (martingaleMultiplierInput) martingaleMultiplierInput.value = martingaleMultiplier;
-      if (lossCooldownInput) lossCooldownInput.value = lossCooldownTicks;
+      
       // sma50GuardCheckbox removed from UI
-      if (strictMartingaleCheckbox) strictMartingaleCheckbox.checked = useStrictMartingale;
+      // strictMartingale always on
 
       // Update profit display
       updateProfitDisplay();

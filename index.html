@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -256,94 +256,89 @@
 
       <!-- ─── Tab Pane: Settings ─── -->
       <div id="tab-settings" class="tab-pane">
-        <!-- Bot Parameters / Config -->
+        <!-- ── Settings ── -->
         <div class="config-section">
-          <h3>Bot Settings</h3>
+          <div class="settings-grid">
 
-          <!-- Risk Presets Selector -->
-          <div class="risk-presets-container">
-            <label style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.35rem; display: block;">Suggested Settings Wizard (Based on Balance)</label>
-            <div class="risk-buttons-grid">
-              <button type="button" id="presetConservativeBtn" class="preset-btn">Conservative 🛡️</button>
-              <button type="button" id="presetModerateBtn" class="preset-btn active">Moderate ⚖️</button>
-              <button type="button" id="presetAggressiveBtn" class="preset-btn">Aggressive 🔥</button>
+            <!-- ROW 1: Stake + Target Profit -->
+            <div class="input-group">
+              <label for="stakeInput">Stake per Trade ($)</label>
+              <input type="number" id="stakeInput" value="0.50" step="0.10" min="0.35" />
             </div>
-            <div id="presetFeedback" class="preset-info-text">⚖️ Moderate: 2% stake, 3 max recovery steps. Recommended balance: $25+</div>
+            <div class="input-group">
+              <label for="targetProfitInput">
+                Session Target ($)
+                <span style="font-size:0.68rem;color:var(--text-muted);">Bot auto-stops when reached</span>
+              </label>
+              <input type="number" id="targetProfitInput" value="5.00" step="0.50" min="0.50" />
+            </div>
+
+            <!-- ROW 2: Stop Loss only (replaces both old Stop Loss + Daily Stop Loss) -->
+            <div class="input-group grid-span-2">
+              <label for="stopLossInput">
+                Session Stop Loss ($)
+                <span style="font-size:0.68rem;color:var(--text-muted);">Bot auto-stops to protect your balance</span>
+              </label>
+              <input type="number" id="stopLossInput" value="5.00" step="0.50" min="0.50" style="max-width:180px;" />
+            </div>
+
+            <!-- ROW 3: Martingale Recovery -->
+            <div class="input-group">
+              <label for="martingaleStepsInput">
+                Max Recovery Steps
+                <span style="font-size:0.68rem;color:var(--text-muted);">After a loss, bot retries this many times</span>
+              </label>
+              <input type="number" id="martingaleStepsInput" value="2" min="1" max="4" />
+            </div>
+            <div class="input-group">
+              <label for="martingaleMultiplierInput">
+                Recovery Multiplier (x)
+                <span style="font-size:0.68rem;color:var(--text-muted);">Stake is multiplied by this on each retry</span>
+              </label>
+              <input type="number" id="martingaleMultiplierInput" value="2.0" step="0.5" min="1.5" max="3.0" />
+            </div>
+
+            <!-- ROW 4: Notifications toggle -->
+            <div class="input-group grid-span-2 flex-row-between" style="align-items:center;padding:0.6rem 0.75rem;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.05);">
+              <label for="notificationCheckbox" style="margin-bottom:0;cursor:pointer;font-size:0.8rem;">
+                📳 Enable Desktop Notifications
+              </label>
+              <input type="checkbox" id="notificationCheckbox" style="width:18px;height:18px;cursor:pointer;accent-color:var(--color-primary);" checked />
+            </div>
+
           </div>
 
-          <div class="input-grid">
-            <div class="input-group">
-              <label for="stakeInput">Stake ($)</label>
-              <input type="number" id="stakeInput" value="0.50" step="0.1" min="0.35" />
-            </div>
-            <div class="input-group">
-              <label for="targetProfitInput">Target Profit ($)</label>
-              <input type="number" id="targetProfitInput" value="2.00" step="0.5" min="0.5" />
-            </div>
-            <div class="input-group">
-              <label for="stopLossInput">Stop Loss ($)</label>
-              <input type="number" id="stopLossInput" value="5.00" step="1.0" min="1.0" />
-            </div>
-            <div id="stopLossHelper" class="grid-span-2 stop-loss-helper-text" style="font-size: 0.72rem; padding: 8px 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--panel-border); margin-top: -0.25rem; margin-bottom: 0.25rem; display: none; line-height: 1.4;"></div>
-            <div class="input-group">
-              <label for="martingaleStepsInput">Max Recovery Steps</label>
-              <input type="number" id="martingaleStepsInput" value="3" min="1" max="5" />
-            </div>
-            <div class="input-group">
-              <label for="martingaleMultiplierInput">Recovery Multiplier (x)</label>
-              <input type="number" id="martingaleMultiplierInput" value="2.0" step="0.1" min="1.0" max="5.0" />
-            </div>
-            <div class="input-group">
-              <label for="lossCooldownInput">Loss Cooldown (Candles)</label>
-              <input type="number" id="lossCooldownInput" value="3" min="0" max="20" />
-            </div>
-            <div class="input-group">
-              <label for="adxThresholdInput">ADX Trend Filter</label>
-              <input type="number" id="adxThresholdInput" value="18" min="10" max="35" />
-            </div>
-            <div class="input-group">
-              <label for="dailyStopLossInput">Daily Stop Loss ($)</label>
-              <input type="number" id="dailyStopLossInput" value="10.00" step="1.0" min="1.0" />
-            </div>
-            <div class="input-group grid-span-2 flex-row-between">
-              <label for="strictMartingaleCheckbox" style="margin-bottom: 0; cursor: pointer;">Strict Recovery Mode <span style="font-size:0.7rem; color: var(--text-muted);">(tighter filters during martingale)</span></label>
-              <input type="checkbox" id="strictMartingaleCheckbox" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--color-primary);" checked />
-            </div>
-            <div class="input-group grid-span-2 flex-row-between">
-              <label for="notificationCheckbox" style="margin-bottom: 0; cursor: pointer;">Enable Desktop Notifications</label>
-              <input type="checkbox" id="notificationCheckbox" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--color-primary);" checked />
+          <!-- Martingale Cost Preview -->
+          <div id="alignedRiskBanner" class="aligned-risk-banner" style="margin-top:0.75rem;">
+            <span class="aligned-icon">✅</span>
+            <span id="alignedRiskText">Configure your stake and recovery steps above.</span>
+          </div>
+
+          <!-- Settings Guide toggle -->
+          <div style="text-align:center;margin-top:0.6rem;">
+            <button id="toggleSettingsGuide" class="btn btn-outline btn-sm" style="font-size:0.7rem;padding:4px 12px;opacity:0.7;">
+              📖 Show Settings Guide
+            </button>
+          </div>
+          <div id="settingsGuideSection" class="hidden" style="margin-top:0.75rem;">
+            <div style="background:rgba(56,189,248,0.06);border:1px solid rgba(56,189,248,0.15);border-radius:10px;padding:0.9rem;font-size:0.75rem;line-height:1.7;color:var(--text-muted);">
+              <b style="color:var(--text-light);">How it works:</b><br/>
+              Each trade uses your <b>Stake</b>. If the trade loses, the bot retries with a bigger stake
+              (<b>Stake × Multiplier</b>) up to <b>Max Recovery Steps</b> times to recover the loss.
+              When the <b>Session Target</b> is hit, the bot stops and locks your profit.
+              When the <b>Stop Loss</b> is hit, the bot stops to protect you from further losses.<br/><br/>
+              <b style="color:var(--text-light);">Rule of thumb:</b> Stop Loss = 10× your stake. Target = 3× your Stop Loss.
             </div>
           </div>
         </div>
 
-        <!-- Toggleable User Guide -->
-        <div class="guide-toggle-container margin-top-md">
-          <button id="toggleGuideBtn" class="btn btn-outline btn-sm">📖 Show Settings Guide</button>
-        </div>
-
-        <div id="settingsGuide" class="guide-card hidden">
-          <h4>📖 Smart Trend Rider — Settings Guide</h4>
-          <ul>
-            <li><strong>Stake ($):</strong> Your base trade size. Deriv minimum is $0.35. We recommend $0.50–$1.00 depending on your balance.</li>
-            <li><strong>Target Profit ($):</strong> Bot stops automatically when session profit hits this. Set to $2–$5 to lock in gains daily.</li>
-            <li><strong>Stop Loss ($):</strong> Safety net — bot shuts down if losses reach this amount. Always set this.</li>
-            <li><strong>Max Recovery Steps:</strong> How many Martingale doublings to attempt after a loss. 3 steps recommended ($0.50 → $1.00 → $2.00).</li>
-            <li><strong>Loss Cooldown (Candles):</strong> Number of 1-minute candles to wait after a loss before entering again. Prevents back-to-back losses. 3 is recommended.</li>
-            <li><strong>Strict Recovery Mode:</strong> When recovering from a loss, the bot tightens RSI filters and increases candle spacing — only takes very high-confidence signals. Recommended ON.</li>
-          </ul>
-        </div>
-      </div>
-
-      <!-- ─── Tab Pane: Analytics ─── -->
-      <div id="tab-analytics" class="tab-pane">
-        <!-- Performance Analytics -->
-        <div class="performance-section">
-          <div class="perf-header flex-row-between">
+        <!-- ── Analytics ── -->
+        <div class="analytics-section margin-top-sm">
+          <div class="flex-row-between margin-bottom-sm">
             <h3>Performance Analytics</h3>
-            <button id="resetStatsBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; border-color: rgba(255,255,255,0.1); color: var(--text-muted);">Reset Stats</button>
+            <button id="resetStatsBtn" class="btn btn-outline btn-xs" style="padding:2px 6px;font-size:10px;border-color:rgba(255,255,255,0.1);color:var(--text-muted);">Reset Stats</button>
           </div>
 
-          <!-- Dynamic Win Rate SVG Ring -->
           <div class="win-rate-ring-container margin-top-md margin-bottom-md">
             <svg class="win-rate-ring" width="130" height="130">
               <circle class="ring-bg" cx="65" cy="65" r="52"></circle>
@@ -369,34 +364,33 @@
               <span id="statsTotal" class="perf-value">0</span>
             </div>
             <div class="perf-card">
-              <span class="perf-label">Today's P&L</span>
+              <span class="perf-label">Today's P&amp;L</span>
               <span id="dailyPnlText" class="perf-value profit-neutral">$0.00</span>
             </div>
           </div>
-          
-          <!-- Collapsible Trade History -->
+
           <div class="history-toggle-container margin-top-sm">
-            <button id="toggleHistoryBtn" class="btn btn-outline btn-sm width-full" style="font-size: 11px; padding: 6px;">📋 View Trade History &amp; Share Stats</button>
+            <button id="toggleHistoryBtn" class="btn btn-outline btn-sm width-full" style="font-size:11px;padding:6px;">📋 View Trade History &amp; Share Stats</button>
           </div>
-          
+
           <div id="tradeHistorySection" class="history-card hidden">
-            <div class="history-actions flex-row-between margin-bottom-sm" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
-              <h4 style="margin: 0; font-size: 0.85rem;">Trade History</h4>
-              <div style="display: flex; gap: 6px; align-items: center;">
-                <select id="promoTemplateSelect" style="background: rgba(15, 23, 42, 0.6); color: var(--text-light); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 4px; padding: 2px 4px; font-size: 10px; cursor: pointer; outline: none; height: 22px;">
+            <div class="history-actions flex-row-between margin-bottom-sm" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+              <h4 style="margin:0;font-size:0.85rem;">Trade History</h4>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <select id="promoTemplateSelect" style="background:rgba(15,23,42,0.6);color:var(--text-light);border:1px solid rgba(56,189,248,0.2);border-radius:4px;padding:2px 4px;font-size:10px;cursor:pointer;outline:none;height:22px;">
                   <option value="raw">Raw Stats 📊</option>
                   <option value="social">Social Hook 🤖</option>
                   <option value="short">Status Hook ⚡</option>
                 </select>
-                <button id="exportCsvBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; height: 22px; display: flex; align-items: center; border-color: rgba(56, 189, 248, 0.4); color: var(--color-primary);">📥 Export CSV</button>
-                <button id="exportReportBtn" class="btn btn-primary btn-xs" style="padding: 2px 6px; font-size: 10px; height: 22px; display: flex; align-items: center;">📤 Share Stats</button>
+                <button id="exportCsvBtn" class="btn btn-outline btn-xs" style="padding:2px 6px;font-size:10px;height:22px;display:flex;align-items:center;border-color:rgba(56,189,248,0.4);color:var(--color-primary);">📥 Export CSV</button>
+                <button id="exportReportBtn" class="btn btn-primary btn-xs" style="padding:2px 6px;font-size:10px;height:22px;display:flex;align-items:center;">📤 Share Stats</button>
               </div>
             </div>
             <div class="table-container">
               <table class="history-table">
                 <thead>
                   <tr>
-                    <th style="width: 50px;">Index</th>
+                    <th style="width:50px;">Index</th>
                     <th>Time</th>
                     <th>Type</th>
                     <th>Stake</th>
@@ -406,7 +400,7 @@
                 </thead>
                 <tbody id="tradeHistoryBody">
                   <tr>
-                    <td colspan="6" style="text-align: center; color: var(--text-muted);">No trades recorded.</td>
+                    <td colspan="6" style="text-align:center;color:var(--text-muted);">No trades recorded.</td>
                   </tr>
                 </tbody>
               </table>
@@ -414,8 +408,7 @@
           </div>
         </div>
       </div>
-
-      <!-- ─── Tab Pane: Admin ─── -->
+<!-- ─── Tab Pane: Admin ─── -->
       <div id="tab-admin" class="tab-pane">
         <!-- Developer Admin Panel -->
         <div id="adminPanel" class="admin-panel margin-top-sm">
