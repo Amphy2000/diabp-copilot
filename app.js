@@ -1,4 +1,4 @@
-// ════════════════════════════════════════════
+﻿// ════════════════════════════════════════════
 //              BOT CONFIGURATION & RULES
 // ════════════════════════════════════════════
 
@@ -2236,67 +2236,72 @@ function evaluateCrossoverStrategy() {
   const lastCandleQuality = isQualityCandle(lastCandle);
 
   // ══════════════════════════════════════════════════════════════
-  //  SIGNAL TIER 1: EMA Crossover — highest confidence
-  //  Fires the moment EMA-9 crosses EMA-21.
-  //  No body filter — crossovers are already clean signals by definition.
-  //  RSI guard only (relaxed to 65/35) to avoid overbought entries.
+  //  SIGNAL TIER 1: EMA Crossover with 1-candle confirmation
+  //  We detect the crossover on the PREVIOUS closed candle (prevIdx → prevIdx-1),
+  //  then confirm the trend HELD on the most recent closed candle (currentIdx).
+  //  This prevents entering immediately after the move (which reverses),
+  //  and instead enters once the new trend direction is confirmed.
   // ══════════════════════════════════════════════════════════════
-  const isBullishCrossover = (prevEma9 <= prevEma21) && (curEma9 > curEma21);
-  const isBearishCrossover = (prevEma9 >= prevEma21) && (curEma9 < curEma21);
+  const prevPrevIdx   = len - 4;
+  const prevPrevEma9  = ema9Values.length  > prevPrevIdx ? ema9Values[prevPrevIdx]  : null;
+  const prevPrevEma21 = ema21Values.length > prevPrevIdx ? ema21Values[prevPrevIdx] : null;
 
   const crossCallRsi = useStrict ? 55 : 65;
   const crossPutRsi  = useStrict ? 45 : 35;
 
-  if (isBullishCrossover && curRsi < crossCallRsi && macroBullValid) {
+  // Bullish crossover confirmed: EMA crossed up 1 candle ago AND still bullish now
+  const wasBullishCrossover = prevPrevEma9 !== null && prevPrevEma21 !== null &&
+    (prevPrevEma9 <= prevPrevEma21) && (prevEma9 > prevEma21);
+  const isBullishNow = curEma9 > curEma21;
+  const lastCandleBullish = lastCandle.close > lastCandle.open;
+
+  if (wasBullishCrossover && isBullishNow && lastCandleBullish && curRsi < crossCallRsi && macroBullValid) {
     lastTradeCandleEpoch = currentEpoch;
-    addLog(`🟢 CROSSOVER CALL | EMA-9 x EMA-21 | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying RISE`, "info");
+    addLog(`🟢 CONFIRMED CALL | EMA crossover held | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying RISE`, "info");
     proposeTrade("CALL");
     return;
   }
-  if (isBearishCrossover && curRsi > crossPutRsi && macroBearValid) {
+
+  // Bearish crossover confirmed: EMA crossed down 1 candle ago AND still bearish now
+  const wasBearishCrossover = prevPrevEma9 !== null && prevPrevEma21 !== null &&
+    (prevPrevEma9 >= prevPrevEma21) && (prevEma9 < prevEma21);
+  const isBearishNow = curEma9 < curEma21;
+  const lastCandleBearish = lastCandle.close < lastCandle.open;
+
+  if (wasBearishCrossover && isBearishNow && lastCandleBearish && curRsi > crossPutRsi && macroBearValid) {
     lastTradeCandleEpoch = currentEpoch;
-    addLog(`🔴 CROSSOVER PUT | EMA-9 x EMA-21 | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying FALL`, "info");
+    addLog(`🔴 CONFIRMED PUT | EMA crossover held | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying FALL`, "info");
     proposeTrade("PUT");
     return;
   }
 
   // ══════════════════════════════════════════════════════════════
-  //  SIGNAL TIER 2: Trend Continuation
-  //  Fires every 3 candles when a clear trend is running.
-  //  Requires: EMA alignment + 2 consecutive confirming candles + RSI room.
-  //  This ensures the bot trades multiple times per hour, not zero.
+  //  SIGNAL TIER 2: RSI Mean-Reversion Bounce
+  //  V75 is a synthetic index that mean-reverts aggressively.
+  //  Trend continuation (buying AFTER the move) consistently loses.
+  //  Instead: buy the BOUNCE when RSI hits an extreme.
+  //    - RSI < 25 (deeply oversold) → price likely bouncing UP → CALL
+  //    - RSI > 75 (deeply overbought) → price likely bouncing DOWN → PUT
+  //  Spacing: min 3 candles between trades (5 in strict/martingale mode).
   // ══════════════════════════════════════════════════════════════
   const minutesSinceLastTrade = (currentEpoch - lastTradeCandleEpoch) / 60;
   const minSpacing = useStrict ? 5 : 3;
   if (minutesSinceLastTrade < minSpacing) return;
 
-  // EMA spread must be meaningful (not just noise at the 50-line)
-  const emaSpreadPct = Math.abs(curEma9 - curEma21) / closePrice * 100;
-  const isClearTrend = emaSpreadPct >= 0.01; // at least 0.01% spread
-  if (!isClearTrend) return;
+  // RSI mean-reversion thresholds (aggressive enough to fire, tight enough to be selective)
+  const rsiOversoldLevel    = useStrict ? 20 : 25;  // below this → bounce UP expected
+  const rsiOverboughtLevel  = useStrict ? 80 : 75;  // above this → bounce DOWN expected
 
-  // Two consecutive confirming candles for momentum
-  const isBullishCandle = lastCandle.close > lastCandle.open;
-  const isBearishCandle = lastCandle.close < lastCandle.open;
-  const prevIsBullish   = prevCandle.close > prevCandle.open;
-  const prevIsBearish   = prevCandle.close < prevCandle.open;
-
-  // RSI limits: avoid entries at extremes
-  const contCallRsi = useStrict ? 50 : 60; // RSI below this for CALL continuation
-  const contPutRsi  = useStrict ? 50 : 40; // RSI above this for PUT continuation
-
-  // CALL: EMA uptrend + 2 green candles + RSI not overbought + quality candle
-  if (curEma9 > curEma21 && isBullishCandle && prevIsBullish && curRsi < contCallRsi && macroBullValid && lastCandleQuality) {
+  if (curRsi < rsiOversoldLevel) {
     lastTradeCandleEpoch = currentEpoch;
-    addLog(`🟢 TREND CALL | EMA: ${emaSpreadPct.toFixed(3)}% | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying RISE`, "info");
+    addLog(`🟢 RSI BOUNCE CALL | RSI: ${curRsi.toFixed(1)} (Oversold) | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying RISE`, "info");
     proposeTrade("CALL");
     return;
   }
 
-  // PUT: EMA downtrend + 2 red candles + RSI not oversold + quality candle
-  if (curEma9 < curEma21 && isBearishCandle && prevIsBearish && curRsi > contPutRsi && macroBearValid && lastCandleQuality) {
+  if (curRsi > rsiOverboughtLevel) {
     lastTradeCandleEpoch = currentEpoch;
-    addLog(`🔴 TREND PUT | EMA: ${emaSpreadPct.toFixed(3)}% | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying FALL`, "info");
+    addLog(`🔴 RSI BOUNCE PUT | RSI: ${curRsi.toFixed(1)} (Overbought) | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying FALL`, "info");
     proposeTrade("PUT");
     return;
   }
