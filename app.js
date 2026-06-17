@@ -2146,172 +2146,133 @@ function processTick(tick) {
 }
 
 function evaluateCrossoverStrategy() {
-  if (candlesHistory.length < 21) return;
+  // Need at least 22 candles before we can compute EMA-21
+  if (candlesHistory.length < 22) return;
 
-  // Use cached indicator arrays (computed once per candle close)
-  const ema9Values   = _cachedEma9;
-  const ema21Values  = _cachedEma21;
-  const ema200Values = _cachedEma200;
-  const rsiValues    = _cachedRsi14;
+  const ema9Values  = _cachedEma9;
+  const ema21Values = _cachedEma21;
+  const rsiValues   = _cachedRsi14;
+  const len         = candlesHistory.length;
 
-  const len = candlesHistory.length;
   if (ema9Values.length < len || ema21Values.length < len || rsiValues.length < len) return;
 
-  // Evaluate on the candle that just CLOSED (fully formed)
-  const currentIdx = len - 2;
-  const prevIdx    = len - 3;
+  const currentIdx = len - 2;  // last CLOSED candle
+  const prevIdx    = len - 3;  // candle before that
 
-  const curEma9   = ema9Values[currentIdx];
-  const curEma21  = ema21Values[currentIdx];
-  const prevEma9  = ema9Values[prevIdx];
-  const prevEma21 = ema21Values[prevIdx];
-  const curEma200 = ema200Values.length >= len ? ema200Values[currentIdx] : null;
-  const curRsi    = rsiValues[currentIdx];
+  const curEma9  = ema9Values[currentIdx];
+  const curEma21 = ema21Values[currentIdx];
+  const prevEma9 = ema9Values[prevIdx];
+  const prevEma21= ema21Values[prevIdx];
+  const curRsi   = rsiValues[currentIdx];
 
   if (curEma9 == null || curEma21 == null || prevEma9 == null || prevEma21 == null || curRsi == null) return;
 
-  const lastCandle = candlesHistory[currentIdx]; // the closed candle
-  const prevCandle = candlesHistory[prevIdx];    // the previous closed candle
-  const closePrice = lastCandle.close;
+  const lastCandle   = candlesHistory[currentIdx];
   const currentEpoch = lastCandle.epoch;
+  const closePrice   = lastCandle.close;
 
-  // ── Layer 1: ADX Regime Filter ────────────────────────────────────────────
-  // Only trade in trending markets. ADX < threshold = choppy, skip all signals.
-  const curAdx = _cachedAdx14.length >= len ? _cachedAdx14[currentIdx] : null;
+  // ── Live ADX label (display only, NOT a trading filter) ──────────────────
+  const curAdx   = _cachedAdx14.length >= len ? _cachedAdx14[currentIdx] : null;
   const adxReady = curAdx !== null;
-  const adxPassing = !adxReady || curAdx >= adxThreshold;
-
-  // Update trend label with live ADX reading every candle close
   if (trendLabel) {
     if (!adxReady) {
-      trendLabel.innerHTML = `<span class="adx-status adx-loading">⏳ Calculating ADX...</span>`;
-    } else if (adxPassing) {
+      trendLabel.innerHTML = `<span class="adx-status adx-loading">⏳ Warming up...</span>`;
+    } else if (curAdx >= 20) {
       trendLabel.innerHTML = `<span class="adx-status adx-trending">🔥 Trending | ADX: ${curAdx.toFixed(1)}</span>`;
     } else {
-      trendLabel.innerHTML = `<span class="adx-status adx-choppy">⏸ Choppy | ADX: ${curAdx.toFixed(1)} / ${adxThreshold}</span>`;
+      trendLabel.innerHTML = `<span class="adx-status adx-choppy">〰 Ranging | ADX: ${curAdx.toFixed(1)}</span>`;
     }
   }
 
-  if (!adxPassing) {
-    // Silent skip — no log spam on every choppy candle
-    return;
-  }
-
-  // ── Layer 5: Daily Stop Loss Gate ─────────────────────────────────────────
+  // ── Daily Stop Loss Gate ──────────────────────────────────────────────────
   if (dailyPnl <= -dailyStopLoss) {
-    addLog(`🛑 Daily Stop Loss (-$${dailyStopLoss.toFixed(2)}) reached. Bot paused for today. P&L: $${dailyPnl.toFixed(2)}`, 'error');
+    addLog(`🛑 Daily Stop Loss hit (-$${dailyStopLoss.toFixed(2)}). Bot paused. Today P&L: $${dailyPnl.toFixed(2)}`, 'error');
     stopTrading('Daily Stop Loss Hit');
     return;
   }
 
-  // ── Layer 4: Consecutive Loss Guard ───────────────────────────────────────
+  // ── Consecutive Loss Cooldown ─────────────────────────────────────────────
   const nowEpoch = Math.floor(Date.now() / 1000);
   if (consecutiveLossPauseEnd > nowEpoch) {
     const minsLeft = Math.ceil((consecutiveLossPauseEnd - nowEpoch) / 60);
-    if (trendLabel) {
-      trendLabel.innerHTML = `<span class="adx-status adx-pause">🛑 3-Loss Guard — ${minsLeft}m cooldown</span>`;
-    }
+    if (trendLabel) trendLabel.innerHTML =
+      `<span class="adx-status adx-pause">🛑 Cooling down — ${minsLeft}m left</span>`;
     return;
   }
 
-  // ── Macro trend filter (EMA-200) ──────────────────────────────────────────
-  const isMacroBullish = curEma200 !== null ? (closePrice > curEma200) : true;
-  const isMacroBearish = curEma200 !== null ? (closePrice < curEma200) : true;
-  const macroBullValid = !useSma50Guard || isMacroBullish;
-  const macroBearValid = !useSma50Guard || isMacroBearish;
-
-  // ── Strict mode during martingale recovery ────────────────────────────────
+  // ── Minimum spacing between trades ───────────────────────────────────────
   const useStrict = currentMartingaleStep > 0 && useStrictMartingale;
+  const minSpacingMins = useStrict ? 4 : 2;
+  const minsSinceLast  = (currentEpoch - lastTradeCandleEpoch) / 60;
+  if (minsSinceLast < minSpacingMins) return;
 
-  // ── Layer 2: Candle Body Quality Filter ───────────────────────────────────
-  // ONLY applied to Tier 2 trend continuation. Tier 1 crossovers are already
-  // highest-confidence signals and bypass body filtering entirely.
-  // Threshold relaxed to 20% — rejects only extreme spike/doji candles.
-  function isQualityCandle(candle) {
-    const range = candle.high - candle.low;
-    if (range === 0) return false;
-    const body = Math.abs(candle.close - candle.open);
-    return (body / range) >= 0.20;
-  }
-  const lastCandleQuality = isQualityCandle(lastCandle);
+  // ══════════════════════════════════════════════════════════════════════════
+  //  SIGNAL A — EMA Crossover (momentum at the START of a new trend)
+  //  Fire the moment EMA-9 crosses EMA-21 on the freshly closed candle.
+  //  No extra confirmation needed — crossover IS the signal.
+  // ══════════════════════════════════════════════════════════════════════════
+  const isBullCross = (prevEma9 <= prevEma21) && (curEma9 > curEma21);
+  const iBearCross  = (prevEma9 >= prevEma21) && (curEma9 < curEma21);
 
-  // ══════════════════════════════════════════════════════════════
-  //  SIGNAL TIER 1: EMA Crossover with 1-candle confirmation
-  //  We detect the crossover on the PREVIOUS closed candle (prevIdx → prevIdx-1),
-  //  then confirm the trend HELD on the most recent closed candle (currentIdx).
-  //  This prevents entering immediately after the move (which reverses),
-  //  and instead enters once the new trend direction is confirmed.
-  // ══════════════════════════════════════════════════════════════
-  const prevPrevIdx   = len - 4;
-  const prevPrevEma9  = ema9Values.length  > prevPrevIdx ? ema9Values[prevPrevIdx]  : null;
-  const prevPrevEma21 = ema21Values.length > prevPrevIdx ? ema21Values[prevPrevIdx] : null;
-
-  const crossCallRsi = useStrict ? 55 : 65;
-  const crossPutRsi  = useStrict ? 45 : 35;
-
-  // Bullish crossover confirmed: EMA crossed up 1 candle ago AND still bullish now
-  const wasBullishCrossover = prevPrevEma9 !== null && prevPrevEma21 !== null &&
-    (prevPrevEma9 <= prevPrevEma21) && (prevEma9 > prevEma21);
-  const isBullishNow = curEma9 > curEma21;
-  const lastCandleBullish = lastCandle.close > lastCandle.open;
-
-  if (wasBullishCrossover && isBullishNow && lastCandleBullish && curRsi < crossCallRsi && macroBullValid) {
+  if (isBullCross && curRsi < 68) {
     lastTradeCandleEpoch = currentEpoch;
-    addLog(`🟢 CONFIRMED CALL | EMA crossover held | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying RISE`, "info");
-    proposeTrade("CALL");
+    addLog(`🟢 EMA CROSS → RISE | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : '…'}`, 'info');
+    proposeTrade('CALL');
+    return;
+  }
+  if (iBearCross && curRsi > 32) {
+    lastTradeCandleEpoch = currentEpoch;
+    addLog(`🔴 EMA CROSS → FALL | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : '…'}`, 'info');
+    proposeTrade('PUT');
     return;
   }
 
-  // Bearish crossover confirmed: EMA crossed down 1 candle ago AND still bearish now
-  const wasBearishCrossover = prevPrevEma9 !== null && prevPrevEma21 !== null &&
-    (prevPrevEma9 >= prevPrevEma21) && (prevEma9 < prevEma21);
-  const isBearishNow = curEma9 < curEma21;
-  const lastCandleBearish = lastCandle.close < lastCandle.open;
-
-  if (wasBearishCrossover && isBearishNow && lastCandleBearish && curRsi > crossPutRsi && macroBearValid) {
+  // ══════════════════════════════════════════════════════════════════════════
+  //  SIGNAL B — RSI Extreme Reversal (bounce from overbought/oversold)
+  //  V75 is synthetic and CANNOT stay at RSI extremes for long.
+  //  When RSI hits 30 or 70, expect a snap-back — we trade that snap.
+  //  Thresholds: 30 / 70 (fires regularly, not just at rare 25/75 extremes).
+  // ══════════════════════════════════════════════════════════════════════════
+  if (curRsi <= 30) {
     lastTradeCandleEpoch = currentEpoch;
-    addLog(`🔴 CONFIRMED PUT | EMA crossover held | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying FALL`, "info");
-    proposeTrade("PUT");
+    addLog(`🟢 RSI OVERSOLD → RISE | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : '…'}`, 'info');
+    proposeTrade('CALL');
+    return;
+  }
+  if (curRsi >= 70) {
+    lastTradeCandleEpoch = currentEpoch;
+    addLog(`🔴 RSI OVERBOUGHT → FALL | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : '…'}`, 'info');
+    proposeTrade('PUT');
     return;
   }
 
-  // ══════════════════════════════════════════════════════════════
-  //  SIGNAL TIER 2: RSI Mean-Reversion Bounce
-  //  V75 is a synthetic index that mean-reverts aggressively.
-  //  Trend continuation (buying AFTER the move) consistently loses.
-  //  Instead: buy the BOUNCE when RSI hits an extreme.
-  //    - RSI < 25 (deeply oversold) → price likely bouncing UP → CALL
-  //    - RSI > 75 (deeply overbought) → price likely bouncing DOWN → PUT
-  //  Spacing: min 3 candles between trades (5 in strict/martingale mode).
-  // ══════════════════════════════════════════════════════════════
-  const minutesSinceLastTrade = (currentEpoch - lastTradeCandleEpoch) / 60;
-  const minSpacing = useStrict ? 5 : 3;
-  if (minutesSinceLastTrade < minSpacing) return;
+  // ══════════════════════════════════════════════════════════════════════════
+  //  SIGNAL C — EMA Trend Continuation (trade with an established trend)
+  //  Only fires every 4+ minutes and ONLY when RSI is in neutral zone
+  //  (between 40–60), meaning the trend has room to continue.
+  //  This adds steady trade frequency between crossovers.
+  // ══════════════════════════════════════════════════════════════════════════
+  if (minsSinceLast < 4) return;  // trend-continuation needs wider spacing
 
-  // RSI mean-reversion thresholds (aggressive enough to fire, tight enough to be selective)
-  const rsiOversoldLevel    = useStrict ? 20 : 25;  // below this → bounce UP expected
-  const rsiOverboughtLevel  = useStrict ? 80 : 75;  // above this → bounce DOWN expected
+  const emaSpread = Math.abs(curEma9 - curEma21) / closePrice * 100;
+  if (emaSpread < 0.005) return;  // EMAs too close — no clear trend
 
-  if (curRsi < rsiOversoldLevel) {
+  const rsiInNeutralBull = curRsi >= 40 && curRsi <= 58;
+  const rsiInNeutralBear = curRsi >= 42 && curRsi <= 60;
+
+  if (curEma9 > curEma21 && rsiInNeutralBull) {
     lastTradeCandleEpoch = currentEpoch;
-    addLog(`🟢 RSI BOUNCE CALL | RSI: ${curRsi.toFixed(1)} (Oversold) | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying RISE`, "info");
-    proposeTrade("CALL");
+    addLog(`🟢 TREND → RISE | EMA spread: ${emaSpread.toFixed(3)}% | RSI: ${curRsi.toFixed(1)}`, 'info');
+    proposeTrade('CALL');
     return;
   }
-
-  if (curRsi > rsiOverboughtLevel) {
+  if (curEma9 < curEma21 && rsiInNeutralBear) {
     lastTradeCandleEpoch = currentEpoch;
-    addLog(`🔴 RSI BOUNCE PUT | RSI: ${curRsi.toFixed(1)} (Overbought) | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying FALL`, "info");
-    proposeTrade("PUT");
+    addLog(`🔴 TREND → FALL | EMA spread: ${emaSpread.toFixed(3)}% | RSI: ${curRsi.toFixed(1)}`, 'info');
+    proposeTrade('PUT');
     return;
   }
 }
-
-
-// ════════════════════════════════════════════
-//             TRADING ACTIONS
-// ════════════════════════════════════════════
-
 function proposeTrade(type) {
   if (!socket || socket.readyState !== WebSocket.OPEN) return;
 
