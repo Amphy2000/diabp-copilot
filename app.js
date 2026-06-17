@@ -63,7 +63,10 @@ const CONSECUTIVE_LOSS_PAUSE_MIN = 10; // pause duration in minutes
 // ── Layer 5: Daily P&L Tracker ────────────────────────────────────────────────
 let dailyPnl = 0.0;          // cumulative P&L for today (loaded from localStorage)
 let dailyTarget  = 30.00;   // daily profit target - bot auto-stops when reached
-let dailyStopLoss = 10.00;   // daily max loss limit — bot stops for the day if exceeded
+let stopLossMode = 'fixed';   // 'fixed' = dollar amount, 'percent' = % of account balance
+let stopLossPercent = 5.0;    // % of balance (used when stopLossMode = 'percent')
+let accountBalance = 0;       // live balance from Deriv API - used for % stop loss calculation
+let dailyStopLoss = 9999.00;  // safe default — real value always read from UI when bot starts   // daily max loss limit — bot stops for the day if exceeded
 const DAILY_PNL_KEY = 'v75bot_dailyPnl'; // localStorage key
 let useStrictMartingale = true;
 let currentProposalId = null;
@@ -2935,6 +2938,28 @@ setInterval(runSimulator, 1500);
 // ════════════════════════════════════════════
 //             CONSOLE USER GUIDE TOGGLE
 // ════════════════════════════════════════════
+// ── Stop Loss Mode Toggle (Fixed $ vs % of Balance) ──────────────────────────
+const stopLossModeSelect = document.getElementById('stopLossModeSelect');
+const fixedStopLossRow   = document.getElementById('fixedStopLossRow');
+const percentStopLossRow = document.getElementById('percentStopLossRow');
+
+function applyStopLossMode(mode) {
+  if (!fixedStopLossRow || !percentStopLossRow) return;
+  if (mode === 'percent') {
+    fixedStopLossRow.classList.add('hidden');
+    percentStopLossRow.classList.remove('hidden');
+  } else {
+    fixedStopLossRow.classList.remove('hidden');
+    percentStopLossRow.classList.add('hidden');
+  }
+}
+
+if (stopLossModeSelect) {
+  stopLossModeSelect.addEventListener('change', () => {
+    applyStopLossMode(stopLossModeSelect.value);
+  });
+  applyStopLossMode(stopLossModeSelect.value);
+}
 if (toggleGuideBtn && settingsGuide) {
   toggleGuideBtn.addEventListener('click', () => {
     const isHidden = settingsGuide.classList.contains('hidden');
