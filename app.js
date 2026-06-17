@@ -2181,37 +2181,35 @@ function evaluateCrossoverStrategy() {
   const adxReady = curAdx !== null;
   const adxPassing = !adxReady || curAdx >= adxThreshold;
 
-  // Update trend label with ADX regime status
+  // Update trend label with live ADX reading every candle close
   if (trendLabel) {
     if (!adxReady) {
       trendLabel.innerHTML = `<span class="adx-status adx-loading">⏳ Calculating ADX...</span>`;
     } else if (adxPassing) {
       trendLabel.innerHTML = `<span class="adx-status adx-trending">🔥 Trending | ADX: ${curAdx.toFixed(1)}</span>`;
     } else {
-      trendLabel.innerHTML = `<span class="adx-status adx-choppy">⏸ Choppy Market | ADX: ${curAdx.toFixed(1)} &lt; ${adxThreshold}</span>`;
+      trendLabel.innerHTML = `<span class="adx-status adx-choppy">⏸ Choppy | ADX: ${curAdx.toFixed(1)} / ${adxThreshold}</span>`;
     }
   }
 
   if (!adxPassing) {
-    addLog(`⏸ ADX ${curAdx.toFixed(1)} < ${adxThreshold} — Market choppy. Waiting for trend.`, 'warn');
+    // Silent skip — no log spam on every choppy candle
     return;
   }
 
   // ── Layer 5: Daily Stop Loss Gate ─────────────────────────────────────────
-  // If daily losses exceed the configured daily stop loss, halt all trading.
   if (dailyPnl <= -dailyStopLoss) {
-    addLog(`🛑 Daily Stop Loss (-$${dailyStopLoss.toFixed(2)}) hit. Bot paused for today. Today's P&L: $${dailyPnl.toFixed(2)}`, 'error');
+    addLog(`🛑 Daily Stop Loss (-$${dailyStopLoss.toFixed(2)}) reached. Bot paused for today. P&L: $${dailyPnl.toFixed(2)}`, 'error');
     stopTrading('Daily Stop Loss Hit');
     return;
   }
 
   // ── Layer 4: Consecutive Loss Guard ───────────────────────────────────────
-  // After 3 consecutive losses, force a 10-minute pause.
   const nowEpoch = Math.floor(Date.now() / 1000);
   if (consecutiveLossPauseEnd > nowEpoch) {
     const minsLeft = Math.ceil((consecutiveLossPauseEnd - nowEpoch) / 60);
     if (trendLabel) {
-      trendLabel.innerHTML = `<span class="adx-status adx-pause">🛑 3-Loss Guard Active — Cooling down (${minsLeft}m left)</span>`;
+      trendLabel.innerHTML = `<span class="adx-status adx-pause">🛑 3-Loss Guard — ${minsLeft}m cooldown</span>`;
     }
     return;
   }
@@ -2226,35 +2224,36 @@ function evaluateCrossoverStrategy() {
   const useStrict = currentMartingaleStep > 0 && useStrictMartingale;
 
   // ── Layer 2: Candle Body Quality Filter ───────────────────────────────────
-  // Reject doji/indecision candles (body < 35% of total range).
-  // These signal market indecision, not trend continuation.
+  // ONLY applied to Tier 2 trend continuation. Tier 1 crossovers are already
+  // highest-confidence signals and bypass body filtering entirely.
+  // Threshold relaxed to 20% — rejects only extreme spike/doji candles.
   function isQualityCandle(candle) {
     const range = candle.high - candle.low;
     if (range === 0) return false;
     const body = Math.abs(candle.close - candle.open);
-    return (body / range) >= 0.35;
+    return (body / range) >= 0.20;
   }
   const lastCandleQuality = isQualityCandle(lastCandle);
-  const prevCandleQuality = isQualityCandle(prevCandle);
 
   // ══════════════════════════════════════════════════════════════
   //  SIGNAL TIER 1: EMA Crossover — highest confidence
   //  Fires the moment EMA-9 crosses EMA-21.
-  //  Relaxed RSI thresholds (65/35) so good crossovers aren't blocked.
+  //  No body filter — crossovers are already clean signals by definition.
+  //  RSI guard only (relaxed to 65/35) to avoid overbought entries.
   // ══════════════════════════════════════════════════════════════
   const isBullishCrossover = (prevEma9 <= prevEma21) && (curEma9 > curEma21);
   const isBearishCrossover = (prevEma9 >= prevEma21) && (curEma9 < curEma21);
 
-  const crossCallRsi = useStrict ? 55 : 65; // RSI must be BELOW this for CALL
-  const crossPutRsi  = useStrict ? 45 : 35; // RSI must be ABOVE this for PUT
+  const crossCallRsi = useStrict ? 55 : 65;
+  const crossPutRsi  = useStrict ? 45 : 35;
 
-  if (isBullishCrossover && curRsi < crossCallRsi && macroBullValid && lastCandleQuality) {
+  if (isBullishCrossover && curRsi < crossCallRsi && macroBullValid) {
     lastTradeCandleEpoch = currentEpoch;
     addLog(`🟢 CROSSOVER CALL | EMA-9 x EMA-21 | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying RISE`, "info");
     proposeTrade("CALL");
     return;
   }
-  if (isBearishCrossover && curRsi > crossPutRsi && macroBearValid && lastCandleQuality) {
+  if (isBearishCrossover && curRsi > crossPutRsi && macroBearValid) {
     lastTradeCandleEpoch = currentEpoch;
     addLog(`🔴 CROSSOVER PUT | EMA-9 x EMA-21 | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying FALL`, "info");
     proposeTrade("PUT");
@@ -2286,18 +2285,18 @@ function evaluateCrossoverStrategy() {
   const contCallRsi = useStrict ? 50 : 60; // RSI below this for CALL continuation
   const contPutRsi  = useStrict ? 50 : 40; // RSI above this for PUT continuation
 
-  // CALL continuation: uptrend, two green candles, RSI not overbought, macro supports
-  if (curEma9 > curEma21 && isBullishCandle && prevIsBullish && curRsi < contCallRsi && macroBullValid) {
+  // CALL: EMA uptrend + 2 green candles + RSI not overbought + quality candle
+  if (curEma9 > curEma21 && isBullishCandle && prevIsBullish && curRsi < contCallRsi && macroBullValid && lastCandleQuality) {
     lastTradeCandleEpoch = currentEpoch;
-    addLog(`🟢 TREND CALL | EMA spread: ${emaSpreadPct.toFixed(3)}% | RSI: ${curRsi.toFixed(1)} — Buying RISE`, "info");
+    addLog(`🟢 TREND CALL | EMA: ${emaSpreadPct.toFixed(3)}% | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying RISE`, "info");
     proposeTrade("CALL");
     return;
   }
 
-  // PUT continuation: downtrend, two red candles, RSI not oversold, macro supports
-  if (curEma9 < curEma21 && isBearishCandle && prevIsBearish && curRsi > contPutRsi && macroBearValid) {
+  // PUT: EMA downtrend + 2 red candles + RSI not oversold + quality candle
+  if (curEma9 < curEma21 && isBearishCandle && prevIsBearish && curRsi > contPutRsi && macroBearValid && lastCandleQuality) {
     lastTradeCandleEpoch = currentEpoch;
-    addLog(`🔴 TREND PUT | EMA spread: ${emaSpreadPct.toFixed(3)}% | RSI: ${curRsi.toFixed(1)} — Buying FALL`, "info");
+    addLog(`🔴 TREND PUT | EMA: ${emaSpreadPct.toFixed(3)}% | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : 'N/A'} — Buying FALL`, "info");
     proposeTrade("PUT");
     return;
   }
