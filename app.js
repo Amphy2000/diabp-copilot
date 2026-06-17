@@ -62,6 +62,7 @@ const CONSECUTIVE_LOSS_PAUSE_MIN = 10; // pause duration in minutes
 
 // ── Layer 5: Daily P&L Tracker ────────────────────────────────────────────────
 let dailyPnl = 0.0;          // cumulative P&L for today (loaded from localStorage)
+let dailyTarget  = 30.00;   // daily profit target - bot auto-stops when reached
 let dailyStopLoss = 10.00;   // daily max loss limit — bot stops for the day if exceeded
 const DAILY_PNL_KEY = 'v75bot_dailyPnl'; // localStorage key
 let useStrictMartingale = true;
@@ -2190,6 +2191,12 @@ function evaluateCrossoverStrategy() {
     stopTrading('Daily Stop Loss Hit');
     return;
   }
+  // ── Daily Profit Target Gate ──────────────────────────────────────────────
+  if (dailyTarget > 0 && dailyPnl >= dailyTarget) {
+    addLog(`🎯 Daily Target reached ($${dailyTarget.toFixed(2)})! Locking in profits. Today P&L: +$${dailyPnl.toFixed(2)}`, 'success');
+    stopTrading('Daily Target Reached');
+    return;
+  }
 
   // ── Consecutive Loss Cooldown ─────────────────────────────────────────────
   const nowEpoch = Math.floor(Date.now() / 1000);
@@ -2462,6 +2469,8 @@ startBotBtn.addEventListener('click', () => {
 
   const dailyStopLossInput = document.getElementById('dailyStopLossInput');
   dailyStopLoss = dailyStopLossInput ? parseFloat(dailyStopLossInput.value) || 10.00 : 10.00;
+  const dailyTargetInput = document.getElementById('dailyTargetInput');
+  dailyTarget = dailyTargetInput ? parseFloat(dailyTargetInput.value) || 30.00 : 30.00;
 
   const multiplierVal = parseFloat(martingaleMultiplierInput ? martingaleMultiplierInput.value : '2.0');
   if (isNaN(multiplierVal) || multiplierVal < 1.0 || multiplierVal > 5.0) {
