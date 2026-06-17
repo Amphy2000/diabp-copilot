@@ -1,4 +1,4 @@
-﻿// ════════════════════════════════════════════
+// ════════════════════════════════════════════
 //              BOT CONFIGURATION & RULES
 // ════════════════════════════════════════════
 
@@ -2464,13 +2464,19 @@ startBotBtn.addEventListener('click', () => {
   currentMartingaleStep = 0;
   sessionProfit = 0.0;
 
-  const adxInput = null;
-  adxThreshold = adxInput ? parseInt(adxInput.value) || 18 : 18;
+  // ADX threshold is always 18 internally
+  adxThreshold = 18;
 
-  const dailyStopLossInput = document.getElementById('stopLossInput');
-  dailyStopLoss = parseFloat(document.getElementById('stopLossInput')?.value) || 5.00;
-  const dailyTargetInput = document.getElementById('targetProfitInput');
-  dailyTarget = parseFloat(document.getElementById('targetProfitInput')?.value) || 5.00;
+  // IMPORTANT: dailyStopLoss reads from the DAILY STOP LOSS field
+  // NOT from stopLossInput (which shows the martingale cycle cost)
+  const dslEl = document.getElementById('dailyStopLossInput');
+  dailyStopLoss = dslEl ? Math.max(0.50, parseFloat(dslEl.value) || 50.00) : 9999.00;
+
+  // Daily target reads from targetProfitInput
+  const tpEl = document.getElementById('targetProfitInput');
+  dailyTarget = tpEl ? Math.max(0.50, parseFloat(tpEl.value) || 5.00) : 9999.00;
+
+  addLog(`ℹ️ Session limits set — Stop Loss: $${dailyStopLoss.toFixed(2)} | Target: $${dailyTarget.toFixed(2)}`, 'info');
 
   const multiplierVal = parseFloat(martingaleMultiplierInput ? martingaleMultiplierInput.value : '2.0');
   if (isNaN(multiplierVal) || multiplierVal < 1.0 || multiplierVal > 5.0) {

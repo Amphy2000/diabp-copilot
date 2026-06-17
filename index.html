@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -18,17 +18,17 @@
     
     <!-- PWA Install Banner -->
     <div id="pwaInstallBanner" class="pwa-banner hidden">
-      <span>≡ƒô▒ Install Amphy Bot on your home screen for quick access!</span>
+      <span>📱 Install Amphy Bot on your home screen for quick access!</span>
       <button id="pwaInstallBtn" class="btn btn-sm">Install</button>
     </div>
     
-    <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ LANDING PAGE & LOGIN PANEL ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+    <!-- ═══════ LANDING PAGE & LOGIN PANEL ═══════ -->
     <div id="loginPanel" class="glass-panel active">
       <!-- Hero Header -->
       <div class="hero-section">
-        <span class="badge promo-badge">≡ƒñû Smart Trend Rider ┬╖ V75 Index</span>
+        <span class="badge promo-badge">🤖 Smart Trend Rider · V75 Index</span>
         <h1 class="hero-title">Trade Smarter on V75</h1>
-        <p class="hero-subtitle">AI-powered 1-minute EMA crossover bot with intelligent trend continuation signals. Trades multiple times per hour ΓÇö browser-native, zero subscription fees.</p>
+        <p class="hero-subtitle">AI-powered 1-minute EMA crossover bot with intelligent trend continuation signals. Trades multiple times per hour — browser-native, zero subscription fees.</p>
       </div>
 
       <!-- Live Demo / Simulator Widget -->
@@ -40,8 +40,8 @@
         <div class="demo-body">
           <div class="demo-price-row">
             <span class="demo-label">Live V75 Price:</span>
-            <span id="demoPrice" class="demo-price">ΓÇö</span>
-            <span id="demoDirection" class="demo-arrow">Γû▓</span>
+            <span id="demoPrice" class="demo-price">—</span>
+            <span id="demoDirection" class="demo-arrow">▲</span>
           </div>
           <div class="demo-terminal" id="demoTerminal">
             <div class="demo-log">&gt; Smart Trend Rider initialized...</div>
@@ -52,7 +52,7 @@
 
       <!-- Secure Warning Alert -->
       <div class="info-card">
-        <p>≡ƒöÆ <strong>Secure & Private:</strong> The bot runs 100% in your browser and connects directly to Deriv's official WebSocket API. Your API token never touches a third-party server.</p>
+        <p>🔒 <strong>Secure & Private:</strong> The bot runs 100% in your browser and connects directly to Deriv's official WebSocket API. Your API token never touches a third-party server.</p>
       </div>
 
       <!-- Call To Action (Log In) -->
@@ -75,7 +75,7 @@
             <span class="step-num">2</span>
             <div class="step-content">
               <h4>Fund Your Account</h4>
-              <p>Deposit a minimum of <strong>$25 ΓÇô $50</strong> to run the bot comfortably with the recommended settings.</p>
+              <p>Deposit a minimum of <strong>$25 – $50</strong> to run the bot comfortably with the recommended settings.</p>
             </div>
           </div>
           <div class="funnel-step">
@@ -91,17 +91,17 @@
       <!-- Core Features Grid -->
       <div class="features-grid">
         <div class="feature-card">
-          <span class="feature-icon">≡ƒôè</span>
+          <span class="feature-icon">📊</span>
           <h4>EMA Crossover Engine</h4>
-          <p>Trades on confirmed EMA-9 / EMA-21 crossovers plus intelligent trend continuation signals ΓÇö multiple entries per hour.</p>
+          <p>Trades on confirmed EMA-9 / EMA-21 crossovers plus intelligent trend continuation signals — multiple entries per hour.</p>
         </div>
         <div class="feature-card">
-          <span class="feature-icon">≡ƒ¢í∩╕Å</span>
+          <span class="feature-icon">🛡️</span>
           <h4>Smart Risk Management</h4>
           <p>Configurable Stop Loss, Target Profit, Martingale recovery, and loss cooldown to protect your capital automatically.</p>
         </div>
         <div class="feature-card">
-          <span class="feature-icon">ΓÜí</span>
+          <span class="feature-icon">⚡</span>
           <h4>RSI-Filtered Entries</h4>
           <p>Every entry is confirmed by RSI-14 to avoid overbought/oversold traps and maximise win-rate on each signal.</p>
         </div>
@@ -120,7 +120,7 @@
           </button>
           <div class="faq-answer-collapse">
             <div class="faq-answer-content">
-              <p>The bot loads 300 historical 1-minute candles and computes EMA-9, EMA-21, and RSI-14 in real time. It fires a trade on two types of signal: (1) a fresh EMA crossover ΓÇö the highest-confidence entry ΓÇö and (2) a trend continuation signal when two consecutive candles confirm an ongoing trend. This means it trades actively throughout the session, not just during rare crossover events.</p>
+              <p>The bot loads 300 historical 1-minute candles and computes EMA-9, EMA-21, and RSI-14 in real time. It fires a trade on two types of signal: (1) a fresh EMA crossover — the highest-confidence entry — and (2) a trend continuation signal when two consecutive candles confirm an ongoing trend. This means it trades actively throughout the session, not just during rare crossover events.</p>
             </div>
           </div>
         </div>
@@ -148,14 +148,14 @@
           </button>
           <div class="faq-answer-collapse">
             <div class="faq-answer-content">
-              <p>The bot is completely free to use ΓÇö no subscriptions, no hidden fees. We earn a small turnover commission from Deriv on trades placed through our affiliate link. This keeps the service free forever and aligns our incentives directly with your success.</p>
+              <p>The bot is completely free to use — no subscriptions, no hidden fees. We earn a small turnover commission from Deriv on trades placed through our affiliate link. This keeps the service free forever and aligns our incentives directly with your success.</p>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ TRADING CONSOLE (Hidden by default) ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+    <!-- ═══════ TRADING CONSOLE (Hidden by default) ═══════ -->
     <div id="consolePanel" class="glass-panel">
       <!-- Top Account Status -->
       <div class="console-header">
@@ -178,15 +178,15 @@
         </div>
       </div>
 
-      <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ sleek tab navigation bar ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+      <!-- ═══════ sleek tab navigation bar ═══════ -->
       <div class="console-tab-bar">
-        <button type="button" class="tab-btn active" data-tab="trade">≡ƒôê Trade</button>
-        <button type="button" class="tab-btn" data-tab="settings">ΓÜÖ∩╕Å Settings</button>
-        <button type="button" class="tab-btn" data-tab="analytics">≡ƒôè Stats</button>
-        <button type="button" class="tab-btn hidden" id="adminTabBtn" data-tab="admin">ΓÜí Admin</button>
+        <button type="button" class="tab-btn active" data-tab="trade">📈 Trade</button>
+        <button type="button" class="tab-btn" data-tab="settings">⚙️ Settings</button>
+        <button type="button" class="tab-btn" data-tab="analytics">📊 Stats</button>
+        <button type="button" class="tab-btn hidden" id="adminTabBtn" data-tab="admin">⚡ Admin</button>
       </div>
 
-      <!-- ΓöÇΓöÇΓöÇ Tab Pane: Trade ΓöÇΓöÇΓöÇ -->
+      <!-- ─── Tab Pane: Trade ─── -->
       <div id="tab-trade" class="tab-pane active">
         <!-- Live Tick Visualizer -->
         <div class="tick-card">
@@ -195,7 +195,7 @@
             <span id="trendLabel" class="trend-status-text">Trend: Analyzing...</span>
           </div>
           <div class="tick-stream">
-            <span id="livePrice" class="tick-price">ΓÇö</span>
+            <span id="livePrice" class="tick-price">—</span>
             <span id="tickDirection" class="tick-arrow"></span>
           </div>
         </div>
@@ -203,7 +203,7 @@
         <!-- Real-Time Mini Chart Visualizer -->
         <div class="chart-card">
           <div class="chart-header">
-            <span class="chart-title">≡ƒôê V75 Price Movement (1-Min Candles)</span>
+            <span class="chart-title">📈 V75 Price Movement (1-Min Candles)</span>
             <div class="chart-legend">
               <span class="legend-item"><span class="legend-dot price"></span>Price</span>
               <span class="legend-item"><span class="legend-dot sma10"></span>EMA-9</span>
@@ -221,7 +221,7 @@
           <div id="resumeSessionContainer" class="resume-session-container hidden" style="background: rgba(255, 255, 255, 0.05); border: 1px dashed var(--color-primary); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
             <div class="resume-info" style="font-size: 0.9rem; margin-bottom: 10px;">
               <div class="resume-title" style="color: var(--color-primary); font-weight: bold; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-                ΓÅ▒∩╕Å Unfinished Session Found
+                ⏱️ Unfinished Session Found
               </div>
               <div class="resume-details" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; color: var(--color-neutral);">
                 <div>Step: <strong id="resumeStep" style="color: #ffffff;">0</strong></div>
@@ -235,8 +235,8 @@
             </div>
           </div>
 
-          <button id="startBotBtn" class="btn btn-success btn-glow width-full">Γû╢ Start Smart Trend Rider</button>
-          <button id="stopBotBtn" class="btn btn-danger width-full hidden">Γûá Stop Bot</button>
+          <button id="startBotBtn" class="btn btn-success btn-glow width-full">▶ Start Smart Trend Rider</button>
+          <button id="stopBotBtn" class="btn btn-danger width-full hidden">■ Stop Bot</button>
         </div>
 
         <!-- Status Indicator -->
@@ -254,7 +254,7 @@
         </div>
       </div>
 
-      <!-- ΓöÇΓöÇΓöÇ Tab Pane: Settings ΓöÇΓöÇΓöÇ -->
+      <!-- ─── Tab Pane: Settings ─── -->
       <div id="tab-settings" class="tab-pane">
         <!-- Bot Parameters / Config -->
         <div class="config-section">
@@ -264,11 +264,11 @@
           <div class="risk-presets-container">
             <label style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.35rem; display: block;">Suggested Settings Wizard (Based on Balance)</label>
             <div class="risk-buttons-grid">
-              <button type="button" id="presetConservativeBtn" class="preset-btn">Conservative ≡ƒ¢í∩╕Å</button>
-              <button type="button" id="presetModerateBtn" class="preset-btn active">Moderate ΓÜû∩╕Å</button>
-              <button type="button" id="presetAggressiveBtn" class="preset-btn">Aggressive ≡ƒöÑ</button>
+              <button type="button" id="presetConservativeBtn" class="preset-btn">Conservative 🛡️</button>
+              <button type="button" id="presetModerateBtn" class="preset-btn active">Moderate ⚖️</button>
+              <button type="button" id="presetAggressiveBtn" class="preset-btn">Aggressive 🔥</button>
             </div>
-            <div id="presetFeedback" class="preset-info-text">ΓÜû∩╕Å Moderate: 2% stake, 3 max recovery steps. Recommended balance: $25+</div>
+            <div id="presetFeedback" class="preset-info-text">⚖️ Moderate: 2% stake, 3 max recovery steps. Recommended balance: $25+</div>
           </div>
 
           <div class="input-grid">
@@ -302,8 +302,8 @@
               <input type="number" id="adxThresholdInput" value="18" min="10" max="35" />
             </div>
             <div class="input-group">
-              <label for="dailyStopLossInput">Daily Stop Loss ($)</label>
-              <input type="number" id="dailyStopLossInput" value="10.00" step="1.0" min="1.0" />
+              <label for="dailyStopLossInput">Daily Stop Loss ($) <span style="font-size:0.68rem;color:var(--text-muted);">— max you can lose per day</span></label>
+              <input type="number" id="dailyStopLossInput" value="50.00" step="5.0" min="1.0" />
             </div>
             <div class="input-group grid-span-2 flex-row-between">
               <label for="strictMartingaleCheckbox" style="margin-bottom: 0; cursor: pointer;">Strict Recovery Mode <span style="font-size:0.7rem; color: var(--text-muted);">(tighter filters during martingale)</span></label>
@@ -318,23 +318,23 @@
 
         <!-- Toggleable User Guide -->
         <div class="guide-toggle-container margin-top-md">
-          <button id="toggleGuideBtn" class="btn btn-outline btn-sm">≡ƒôû Show Settings Guide</button>
+          <button id="toggleGuideBtn" class="btn btn-outline btn-sm">📖 Show Settings Guide</button>
         </div>
 
         <div id="settingsGuide" class="guide-card hidden">
-          <h4>≡ƒôû Smart Trend Rider ΓÇö Settings Guide</h4>
+          <h4>📖 Smart Trend Rider — Settings Guide</h4>
           <ul>
-            <li><strong>Stake ($):</strong> Your base trade size. Deriv minimum is $0.35. We recommend $0.50ΓÇô$1.00 depending on your balance.</li>
-            <li><strong>Target Profit ($):</strong> Bot stops automatically when session profit hits this. Set to $2ΓÇô$5 to lock in gains daily.</li>
-            <li><strong>Stop Loss ($):</strong> Safety net ΓÇö bot shuts down if losses reach this amount. Always set this.</li>
-            <li><strong>Max Recovery Steps:</strong> How many Martingale doublings to attempt after a loss. 3 steps recommended ($0.50 ΓåÆ $1.00 ΓåÆ $2.00).</li>
+            <li><strong>Stake ($):</strong> Your base trade size. Deriv minimum is $0.35. We recommend $0.50–$1.00 depending on your balance.</li>
+            <li><strong>Target Profit ($):</strong> Bot stops automatically when session profit hits this. Set to $2–$5 to lock in gains daily.</li>
+            <li><strong>Stop Loss ($):</strong> Safety net — bot shuts down if losses reach this amount. Always set this.</li>
+            <li><strong>Max Recovery Steps:</strong> How many Martingale doublings to attempt after a loss. 3 steps recommended ($0.50 → $1.00 → $2.00).</li>
             <li><strong>Loss Cooldown (Candles):</strong> Number of 1-minute candles to wait after a loss before entering again. Prevents back-to-back losses. 3 is recommended.</li>
-            <li><strong>Strict Recovery Mode:</strong> When recovering from a loss, the bot tightens RSI filters and increases candle spacing ΓÇö only takes very high-confidence signals. Recommended ON.</li>
+            <li><strong>Strict Recovery Mode:</strong> When recovering from a loss, the bot tightens RSI filters and increases candle spacing — only takes very high-confidence signals. Recommended ON.</li>
           </ul>
         </div>
       </div>
 
-      <!-- ΓöÇΓöÇΓöÇ Tab Pane: Analytics ΓöÇΓöÇΓöÇ -->
+      <!-- ─── Tab Pane: Analytics ─── -->
       <div id="tab-analytics" class="tab-pane">
         <!-- Performance Analytics -->
         <div class="performance-section">
@@ -376,7 +376,7 @@
           
           <!-- Collapsible Trade History -->
           <div class="history-toggle-container margin-top-sm">
-            <button id="toggleHistoryBtn" class="btn btn-outline btn-sm width-full" style="font-size: 11px; padding: 6px;">≡ƒôï View Trade History &amp; Share Stats</button>
+            <button id="toggleHistoryBtn" class="btn btn-outline btn-sm width-full" style="font-size: 11px; padding: 6px;">📋 View Trade History &amp; Share Stats</button>
           </div>
           
           <div id="tradeHistorySection" class="history-card hidden">
@@ -384,12 +384,12 @@
               <h4 style="margin: 0; font-size: 0.85rem;">Trade History</h4>
               <div style="display: flex; gap: 6px; align-items: center;">
                 <select id="promoTemplateSelect" style="background: rgba(15, 23, 42, 0.6); color: var(--text-light); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 4px; padding: 2px 4px; font-size: 10px; cursor: pointer; outline: none; height: 22px;">
-                  <option value="raw">Raw Stats ≡ƒôè</option>
-                  <option value="social">Social Hook ≡ƒñû</option>
-                  <option value="short">Status Hook ΓÜí</option>
+                  <option value="raw">Raw Stats 📊</option>
+                  <option value="social">Social Hook 🤖</option>
+                  <option value="short">Status Hook ⚡</option>
                 </select>
-                <button id="exportCsvBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; height: 22px; display: flex; align-items: center; border-color: rgba(56, 189, 248, 0.4); color: var(--color-primary);">≡ƒôÑ Export CSV</button>
-                <button id="exportReportBtn" class="btn btn-primary btn-xs" style="padding: 2px 6px; font-size: 10px; height: 22px; display: flex; align-items: center;">≡ƒôñ Share Stats</button>
+                <button id="exportCsvBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; height: 22px; display: flex; align-items: center; border-color: rgba(56, 189, 248, 0.4); color: var(--color-primary);">📥 Export CSV</button>
+                <button id="exportReportBtn" class="btn btn-primary btn-xs" style="padding: 2px 6px; font-size: 10px; height: 22px; display: flex; align-items: center;">📤 Share Stats</button>
               </div>
             </div>
             <div class="table-container">
@@ -415,12 +415,12 @@
         </div>
       </div>
 
-      <!-- ΓöÇΓöÇΓöÇ Tab Pane: Admin ΓöÇΓöÇΓöÇ -->
+      <!-- ─── Tab Pane: Admin ─── -->
       <div id="tab-admin" class="tab-pane">
         <!-- Developer Admin Panel -->
         <div id="adminPanel" class="admin-panel margin-top-sm">
           <div class="admin-header">
-            <span class="admin-title">ΓÜí Developer Admin Panel</span>
+            <span class="admin-title">⚡ Developer Admin Panel</span>
             <span class="badge admin-badge">Admin</span>
           </div>
           <p class="admin-desc">Whitelist client Deriv Account IDs (ROT, DOT, CR) instantly to the database.</p>
@@ -433,10 +433,10 @@
           <!-- Analytics Dashboard section inside Admin Panel -->
           <div class="admin-analytics-section margin-top-lg" style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 1.25rem;">
             <div class="flex-row-between margin-bottom-sm">
-              <span class="admin-title" style="font-size: 0.85rem;">≡ƒôè Bot Activity Analytics</span>
+              <span class="admin-title" style="font-size: 0.85rem;">📊 Bot Activity Analytics</span>
               <div style="display: flex; gap: 6px;">
-                <button id="clearRealStatsBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; border-color: rgba(244, 63, 94, 0.25); color: var(--color-danger); height: 22px; display: flex; align-items: center; justify-content: center; width: auto; font-family: var(--font-family-sans); font-weight: 600;">≡ƒº╣ Clear Real Stats</button>
-                <button id="refreshAnalyticsBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; border-color: rgba(56, 189, 248, 0.2); color: var(--color-primary); height: 22px; display: flex; align-items: center; justify-content: center; width: auto; font-family: var(--font-family-sans); font-weight: 600;">≡ƒöä Refresh</button>
+                <button id="clearRealStatsBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; border-color: rgba(244, 63, 94, 0.25); color: var(--color-danger); height: 22px; display: flex; align-items: center; justify-content: center; width: auto; font-family: var(--font-family-sans); font-weight: 600;">🧹 Clear Real Stats</button>
+                <button id="refreshAnalyticsBtn" class="btn btn-outline btn-xs" style="padding: 2px 6px; font-size: 10px; border-color: rgba(56, 189, 248, 0.2); color: var(--color-primary); height: 22px; display: flex; align-items: center; justify-content: center; width: auto; font-family: var(--font-family-sans); font-weight: 600;">🔄 Refresh</button>
               </div>
             </div>
             
