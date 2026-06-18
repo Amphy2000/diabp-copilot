@@ -1458,13 +1458,13 @@ function connectWebSocket(isLoginAttempt = false) {
           subscribe: 1
         }));
 
-        // Fetch historical 1-minute candles (one-time) to populate indicator calculations
+        // Fetch historical 5-minute candles (one-time) to populate indicator calculations
         socket.send(JSON.stringify({
           ticks_history: 'R_75',
           adjust_start_time: 1,
-          count: 300,
+          count: 150,
           end: 'latest',
-          granularity: 60,
+          granularity: 300,
           style: 'candles'
         }));
 
@@ -1657,13 +1657,13 @@ async function handleMessage(data, isLoginAttempt = false) {
         subscribe: 1
       }));
 
-      // Fetch historical 1-minute candles (one-time) to populate indicator calculations
+      // Fetch historical 5-minute candles (one-time) to populate indicator calculations
       socket.send(JSON.stringify({
         ticks_history: 'R_75',
         adjust_start_time: 1,
-        count: 300,
+        count: 150,
         end: 'latest',
-        granularity: 60,
+        granularity: 300,
         style: 'candles'
       }));
 
@@ -1697,7 +1697,7 @@ async function handleMessage(data, isLoginAttempt = false) {
       }));
       // Immediately build indicator cache so the chart renders with full data
       _rebuildIndicatorCache();
-      addLog(`📈 Loaded ${candlesHistory.length} historical 1-minute candles. Crossover analysis active!`, "success");
+      addLog(`📈 Loaded ${candlesHistory.length} historical 5-minute candles. Analysis ready!`, "success");
       
       // Update UI element to display current price immediately
       if (candlesHistory.length > 0) {
@@ -2044,7 +2044,7 @@ function processTick(tick) {
   if (tickPrices.length > 30) tickPrices.shift();
 
   // Real-time Candle Compilation
-  const tickMinuteEpoch = Math.floor(timeEpoch / 60) * 60;
+  const tickMinuteEpoch = Math.floor(timeEpoch / 300) * 300; // 5-minute candle buckets
   const lastCandle = candlesHistory[candlesHistory.length - 1];
   let candleClosed = false;
 
@@ -2206,7 +2206,7 @@ function evaluateCrossoverStrategy() {
 
   // ── Minimum gap between trades ────────────────────────────────────────────
   const minsSinceLast = (nowEpoch - lastTradeCandleEpoch) / 60;
-  const minGap = currentMartingaleStep > 0 ? 3 : 2;
+  const minGap = currentMartingaleStep > 0 ? 10 : 5; // 1-2 full 5-min candles between trades
   if (minsSinceLast < minGap) return;
 
   // ── EMA trend direction (the single source of truth) ─────────────────────
@@ -2246,7 +2246,7 @@ function evaluateCrossoverStrategy() {
   // ── SIGNAL C: Trend continuation ─────────────────────────────────────────
   // Only fires when EMAs are well separated (clear trend) and RSI is neutral
   // (trend has room to continue — not overextended).
-  if (minsSinceLast < 4) return;
+  if (minsSinceLast < 10) return; // need 2 full 5-min candles before trend continuation
 
   const spread = Math.abs(curEma9 - curEma21) / candle.close * 100;
   if (spread < 0.005) return; // EMAs too close — no clear trend
@@ -2283,8 +2283,8 @@ function proposeTrade(type) {
     basis: "stake",
     contract_type: type,
     currency: "USD",
-    duration: 5,
-    duration_unit: "t"  // 5-tick contract ~ 15 seconds
+    duration: 1,
+    duration_unit: "m"  // 1-minute contract aligned with 5-min candle signal
   };
 
   if (socket.isNewWSApi) {
