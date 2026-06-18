@@ -43,7 +43,7 @@ let initialStake = 0.50;
 let currentStake = 0.50;
 let targetProfit = 2.00;
 let stopLoss = 5.00;
-let maxMartingaleSteps = 3;
+let maxMartingaleSteps = 2;
 let martingaleMultiplier = 2.0;
 let currentMartingaleStep = 0;
 let lossCooldownTicks = 3; // candles to wait after a loss (1 candle = 1 minute)
@@ -2130,13 +2130,16 @@ function processTick(tick) {
     }
   }
 
-  // Fire tick-based strategy on every tick
-  if (isTrading) {
+  // Execute strategy ONLY on candle close (quality signal gate)
+  // Still uses 5-tick contracts for fast settlement
+  if (isTrading && !tradeInProgress && activePurchaseProposal === null && currentContractId === null) {
     if (tickCooldownRemaining > 0) {
       tickCooldownRemaining--;
-      statusText.innerText = `Cooldown: ${tickCooldownRemaining} ticks`;
-      statusIndicator.className = 'status-bar status-idle';
-    } else {
+      if (candleClosed) {
+        statusText.innerText = `Cooldown: ${Math.ceil(tickCooldownRemaining / 10)} candles`;
+        statusIndicator.className = 'status-bar status-idle';
+      }
+    } else if (candleClosed) {
       if (statusText.innerText.startsWith('Cooldown')) {
         statusText.innerText = 'Bot is Active';
         statusIndicator.className = 'status-bar status-running';
@@ -2156,139 +2159,119 @@ function processTick(tick) {
 }
 
 function evaluateCrossoverStrategy() {
-  // Need at least 22 candles before we can compute EMA-21
-  if (candlesHistory.length < 22) return;
+  // Need at least 22 candles to compute EMA-21
+  if (candlesHistory.length < 22) {
+    addLog('Warming up... need ' + (22 - candlesHistory.length) + ' more candles.', 'info');
+    return;
+  }
 
-  const ema9Values  = _cachedEma9;
-  const ema21Values = _cachedEma21;
-  const rsiValues   = _cachedRsi14;
-  const len         = candlesHistory.length;
+  const len = candlesHistory.length;
+  const ema9  = _cachedEma9;
+  const ema21 = _cachedEma21;
+  const rsi   = _cachedRsi14;
 
-  if (ema9Values.length < len || ema21Values.length < len || rsiValues.length < len) return;
+  if (ema9.length < len || ema21.length < len || rsi.length < len) return;
 
-  const currentIdx = len - 2;  // last CLOSED candle
-  const prevIdx    = len - 3;  // candle before that
+  const ci = len - 2;  // last CLOSED candle index
+  const pi = len - 3;  // previous candle
 
-  const curEma9  = ema9Values[currentIdx];
-  const curEma21 = ema21Values[currentIdx];
-  const prevEma9 = ema9Values[prevIdx];
-  const prevEma21= ema21Values[prevIdx];
-  const curRsi   = rsiValues[currentIdx];
+  const curEma9  = ema9[ci],  prevEma9  = ema9[pi];
+  const curEma21 = ema21[ci], prevEma21 = ema21[pi];
+  const curRsi   = rsi[ci];
 
   if (curEma9 == null || curEma21 == null || prevEma9 == null || prevEma21 == null || curRsi == null) return;
 
-  const lastCandle   = candlesHistory[currentIdx];
-  const currentEpoch = lastCandle.epoch;
-  const closePrice   = lastCandle.close;
+  const candle = candlesHistory[ci];
+  const nowEpoch = candle.epoch;
 
-  // ── Live ADX label (display only, NOT a trading filter) ──────────────────
-  const curAdx   = _cachedAdx14.length >= len ? _cachedAdx14[currentIdx] : null;
-  const adxReady = curAdx !== null;
-  if (trendLabel) {
-    if (!adxReady) {
-      trendLabel.innerHTML = `<span class="adx-status adx-loading">⏳ Warming up...</span>`;
-    } else if (curAdx >= 20) {
-      trendLabel.innerHTML = `<span class="adx-status adx-trending">🔥 Trending | ADX: ${curAdx.toFixed(1)}</span>`;
-    } else {
-      trendLabel.innerHTML = `<span class="adx-status adx-choppy">〰 Ranging | ADX: ${curAdx.toFixed(1)}</span>`;
-    }
-  }
-
-  // ── Daily Stop Loss Gate ──────────────────────────────────────────────────
+  // ── Daily limits ─────────────────────────────────────────────────────────
   if (dailyPnl <= -dailyStopLoss) {
-    addLog(`🛑 Daily Stop Loss hit (-$${dailyStopLoss.toFixed(2)}). Bot paused. Today P&L: $${dailyPnl.toFixed(2)}`, 'error');
     stopTrading('Daily Stop Loss Hit');
+    addLog('Daily stop loss hit. Session ended.', 'error');
     return;
   }
-  // ── Daily Profit Target Gate ──────────────────────────────────────────────
   if (dailyTarget > 0 && dailyPnl >= dailyTarget) {
-    addLog(`🎯 Daily Target reached ($${dailyTarget.toFixed(2)})! Locking in profits. Today P&L: +$${dailyPnl.toFixed(2)}`, 'success');
     stopTrading('Daily Target Reached');
+    addLog('Daily target reached! Well done.', 'success');
     return;
   }
 
-  // ── Consecutive Loss Cooldown ─────────────────────────────────────────────
-  const nowEpoch = Math.floor(Date.now() / 1000);
-  if (consecutiveLossPauseEnd > nowEpoch) {
-    const minsLeft = Math.ceil((consecutiveLossPauseEnd - nowEpoch) / 60);
-    if (trendLabel) trendLabel.innerHTML =
-      `<span class="adx-status adx-pause">🛑 Cooling down — ${minsLeft}m left</span>`;
+  // ── Consecutive loss pause ────────────────────────────────────────────────
+  const now = Math.floor(Date.now() / 1000);
+  if (consecutiveLossPauseEnd > now) {
+    const m = Math.ceil((consecutiveLossPauseEnd - now) / 60);
+    if (trendLabel) trendLabel.innerHTML = '<span style="color:#f43f5e">Cooling down ' + m + 'm after 3 losses</span>';
     return;
   }
 
-  // ── Minimum spacing between trades ───────────────────────────────────────
-  const useStrict = currentMartingaleStep > 0 && useStrictMartingale;
-  const minSpacingMins = useStrict ? 4 : 2;
-  const minsSinceLast  = (currentEpoch - lastTradeCandleEpoch) / 60;
-  if (minsSinceLast < minSpacingMins) return;
+  // ── Minimum 2-minute gap between trades (prevents rapid-fire) ────────────
+  const minsSinceLast = (nowEpoch - lastTradeCandleEpoch) / 60;
+  const minGap = currentMartingaleStep > 0 ? 3 : 2; // wider gap during recovery
+  if (minsSinceLast < minGap) return;
 
-  // ══════════════════════════════════════════════════════════════════════════
-  //  SIGNAL A — EMA Crossover (momentum at the START of a new trend)
-  //  Fire the moment EMA-9 crosses EMA-21 on the freshly closed candle.
-  //  No extra confirmation needed — crossover IS the signal.
-  // ══════════════════════════════════════════════════════════════════════════
-  const isBullCross = (prevEma9 <= prevEma21) && (curEma9 > curEma21);
-  const iBearCross  = (prevEma9 >= prevEma21) && (curEma9 < curEma21);
+  // ── EMA trend status display ─────────────────────────────────────────────
+  if (trendLabel) {
+    const bullish = curEma9 > curEma21;
+    trendLabel.innerText = 'Trend: ' + (bullish ? 'Bullish' : 'Bearish') + ' | RSI: ' + curRsi.toFixed(1);
+    trendLabel.style.color = bullish ? 'var(--color-success)' : 'var(--color-danger)';
+  }
 
-  if (isBullCross && curRsi < 68) {
-    lastTradeCandleEpoch = currentEpoch;
-    addLog(`🟢 EMA CROSS → RISE | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : '…'}`, 'info');
+  // ── SIGNAL A: EMA Crossover ───────────────────────────────────────────────
+  const bullCross = (prevEma9 <= prevEma21) && (curEma9 > curEma21);
+  const bearCross = (prevEma9 >= prevEma21) && (curEma9 < curEma21);
+
+  if (bullCross && curRsi < 70) {
+    lastTradeCandleEpoch = nowEpoch;
+    addLog('EMA CROSS UP -> RISE | RSI: ' + curRsi.toFixed(1), 'info');
+    tradeInProgress = true;
     proposeTrade('CALL');
     return;
   }
-  if (iBearCross && curRsi > 32) {
-    lastTradeCandleEpoch = currentEpoch;
-    addLog(`🔴 EMA CROSS → FALL | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : '…'}`, 'info');
+  if (bearCross && curRsi > 30) {
+    lastTradeCandleEpoch = nowEpoch;
+    addLog('EMA CROSS DOWN -> FALL | RSI: ' + curRsi.toFixed(1), 'info');
+    tradeInProgress = true;
     proposeTrade('PUT');
     return;
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  //  SIGNAL B — RSI Extreme Reversal (bounce from overbought/oversold)
-  //  V75 is synthetic and CANNOT stay at RSI extremes for long.
-  //  When RSI hits 30 or 70, expect a snap-back — we trade that snap.
-  //  Thresholds: 30 / 70 (fires regularly, not just at rare 25/75 extremes).
-  // ══════════════════════════════════════════════════════════════════════════
-  if (curRsi <= 30) {
-    lastTradeCandleEpoch = currentEpoch;
-    addLog(`🟢 RSI OVERSOLD → RISE | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : '…'}`, 'info');
+  // ── SIGNAL B: RSI Extreme Bounce (only very extreme levels) ─────────────
+  if (curRsi <= 22) {
+    lastTradeCandleEpoch = nowEpoch;
+    addLog('RSI EXTREME OVERSOLD -> RISE | RSI: ' + curRsi.toFixed(1), 'info');
+    tradeInProgress = true;
     proposeTrade('CALL');
     return;
   }
-  if (curRsi >= 70) {
-    lastTradeCandleEpoch = currentEpoch;
-    addLog(`🔴 RSI OVERBOUGHT → FALL | RSI: ${curRsi.toFixed(1)} | ADX: ${adxReady ? curAdx.toFixed(1) : '…'}`, 'info');
+  if (curRsi >= 78) {
+    lastTradeCandleEpoch = nowEpoch;
+    addLog('RSI EXTREME OVERBOUGHT -> FALL | RSI: ' + curRsi.toFixed(1), 'info');
+    tradeInProgress = true;
     proposeTrade('PUT');
     return;
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  //  SIGNAL C — EMA Trend Continuation (trade with an established trend)
-  //  Only fires every 4+ minutes and ONLY when RSI is in neutral zone
-  //  (between 40–60), meaning the trend has room to continue.
-  //  This adds steady trade frequency between crossovers.
-  // ══════════════════════════════════════════════════════════════════════════
-  if (minsSinceLast < 4) return;  // trend-continuation needs wider spacing
+  // ── SIGNAL C: Trend continuation (only after 4+ min gap, RSI neutral) ───
+  if (minsSinceLast < 4) return;
+  const spread = Math.abs(curEma9 - curEma21) / candle.close * 100;
+  if (spread < 0.005) return; // EMAs too close, no clear trend
 
-  const emaSpread = Math.abs(curEma9 - curEma21) / closePrice * 100;
-  if (emaSpread < 0.005) return;  // EMAs too close — no clear trend
-
-  const rsiInNeutralBull = curRsi >= 40 && curRsi <= 58;
-  const rsiInNeutralBear = curRsi >= 42 && curRsi <= 60;
-
-  if (curEma9 > curEma21 && rsiInNeutralBull) {
-    lastTradeCandleEpoch = currentEpoch;
-    addLog(`🟢 TREND → RISE | EMA spread: ${emaSpread.toFixed(3)}% | RSI: ${curRsi.toFixed(1)}`, 'info');
+  if (curEma9 > curEma21 && curRsi >= 42 && curRsi <= 57) {
+    lastTradeCandleEpoch = nowEpoch;
+    addLog('TREND RIDE -> RISE | EMA spread: ' + spread.toFixed(3) + '% | RSI: ' + curRsi.toFixed(1), 'info');
+    tradeInProgress = true;
     proposeTrade('CALL');
     return;
   }
-  if (curEma9 < curEma21 && rsiInNeutralBear) {
-    lastTradeCandleEpoch = currentEpoch;
-    addLog(`🔴 TREND → FALL | EMA spread: ${emaSpread.toFixed(3)}% | RSI: ${curRsi.toFixed(1)}`, 'info');
+  if (curEma9 < curEma21 && curRsi >= 43 && curRsi <= 58) {
+    lastTradeCandleEpoch = nowEpoch;
+    addLog('TREND RIDE -> FALL | EMA spread: ' + spread.toFixed(3) + '% | RSI: ' + curRsi.toFixed(1), 'info');
+    tradeInProgress = true;
     proposeTrade('PUT');
     return;
   }
 }
+
 function proposeTrade(type) {
   if (!socket || socket.readyState !== WebSocket.OPEN) return;
 
@@ -2395,8 +2378,9 @@ function handleTradeOutcome(contract) {
     } else {
       // Apply loss cooldown if configured
       // 20-tick cooldown after each loss (~20 seconds)
-      tickCooldownRemaining = 20;
-      addLog("Cooling 20 ticks before next trade.", "warn");
+      // 30-tick cooldown = ~1 candle of breathing room after each loss
+      tickCooldownRemaining = 30;
+      addLog("Loss cooldown: 30 ticks before next trade.", "warn");
 
       // Martingale management
       currentMartingaleStep++;
@@ -2468,7 +2452,7 @@ startBotBtn.addEventListener('click', () => {
   if (stepsVal > 3) {
     addLog(`⚠️ Capped Martingale system allows max 2 recovery steps (3 total attempts). Stake steps restricted to 3.`, "warn");
   }
-  maxMartingaleSteps = Math.min(3, stepsVal);
+  maxMartingaleSteps = Math.min(2, stepsVal); // hard cap at 2 steps to prevent account blowup
   
   currentMartingaleStep = 0;
   sessionProfit = 0.0;

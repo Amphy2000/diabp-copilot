@@ -286,8 +286,8 @@
             </div>
             <div id="stopLossHelper" class="grid-span-2 stop-loss-helper-text" style="font-size: 0.72rem; padding: 8px 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--panel-border); margin-top: -0.25rem; margin-bottom: 0.25rem; display: none; line-height: 1.4;"></div>
             <div class="input-group">
-              <label for="martingaleStepsInput">Max Recovery Steps</label>
-              <input type="number" id="martingaleStepsInput" value="3" min="1" max="5" />
+              <label for="martingaleStepsInput">Max Recovery Steps <span style="font-size:0.68rem;color:var(--text-muted);">— max 2 to protect capital</span></label>
+              <input type="number" id="martingaleStepsInput" value="2" min="1" max="2" />
             </div>
             <div class="input-group">
               <label for="martingaleMultiplierInput">Recovery Multiplier (x)</label>
@@ -327,7 +327,7 @@
             <li><strong>Stake ($):</strong> Your base trade size. Deriv minimum is $0.35. We recommend $0.50–$1.00 depending on your balance.</li>
             <li><strong>Target Profit ($):</strong> Bot stops automatically when session profit hits this. Set to $2–$5 to lock in gains daily.</li>
             <li><strong>Stop Loss ($):</strong> Safety net — bot shuts down if losses reach this amount. Always set this.</li>
-            <li><strong>Max Recovery Steps:</strong> How many Martingale doublings to attempt after a loss. 3 steps recommended ($0.50 → $1.00 → $2.00).</li>
+            <li><strong>Max Recovery Steps:</strong> Maximum 2. After a loss the bot doubles your stake once to recover. If that fails too, it resets and waits — protecting you from a chain of big losses.</li>
             <li><strong>Loss Cooldown (Candles):</strong> Number of 1-minute candles to wait after a loss before entering again. Prevents back-to-back losses. 3 is recommended.</li>
             <li><strong>Strict Recovery Mode:</strong> When recovering from a loss, the bot tightens RSI filters and increases candle spacing — only takes very high-confidence signals. Recommended ON.</li>
           </ul>
