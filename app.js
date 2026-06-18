@@ -51,6 +51,12 @@ let cooldownTicksRemaining = 0;
 let useSma50Guard = false; // Removed from UI — kept as false so guard is always off
 let lastTradeCandleEpoch = 0;
 
+// Tick Momentum Buffer
+let tickPrices = [];
+const MIN_TICKS_BEFORE_TRADE = 10;
+let tradeInProgress = false;
+let tickCooldownRemaining = 0;
+
 // ── Layer 1: ADX Regime Filter ────────────────────────────────────────────────
 let adxThreshold = 18; // ADX must be >= this to allow trades (18 = soft trend filter)
 
@@ -2033,6 +2039,10 @@ function processTick(tick) {
   }
   lastTickPrice = price;
 
+  // Tick buffer: rolling 30-price window for momentum
+  tickPrices.push(price);
+  if (tickPrices.length > 30) tickPrices.shift();
+
   // Real-time Candle Compilation
   const tickMinuteEpoch = Math.floor(timeEpoch / 60) * 60;
   const lastCandle = candlesHistory[candlesHistory.length - 1];
@@ -2120,19 +2130,18 @@ function processTick(tick) {
     }
   }
 
-  // Execute strategy if trading is active, not waiting on a trade, and a candle has closed
-  if (isTrading && activePurchaseProposal === null && currentContractId === null) {
-    if (cooldownTicksRemaining > 0) {
-      statusText.innerText = `Cooldown: ${cooldownTicksRemaining} min`;
-      statusIndicator.className = "status-bar status-idle";
+  // Fire tick-based strategy on every tick
+  if (isTrading) {
+    if (tickCooldownRemaining > 0) {
+      tickCooldownRemaining--;
+      statusText.innerText = `Cooldown: ${tickCooldownRemaining} ticks`;
+      statusIndicator.className = 'status-bar status-idle';
     } else {
-      if (statusText.innerText.startsWith("Cooldown")) {
-        statusText.innerText = "Bot is Active";
-        statusIndicator.className = "status-bar status-running";
+      if (statusText.innerText.startsWith('Cooldown')) {
+        statusText.innerText = 'Bot is Active';
+        statusIndicator.className = 'status-bar status-running';
       }
-      if (candleClosed) {
-        evaluateCrossoverStrategy();
-      }
+      evaluateCrossoverStrategy();
     }
   }
 
@@ -2293,8 +2302,8 @@ function proposeTrade(type) {
     basis: "stake",
     contract_type: type,
     currency: "USD",
-    duration: 1,
-    duration_unit: "m"
+    duration: 5,
+    duration_unit: "t"  // 5-tick contract ~ 15 seconds
   };
 
   if (socket.isNewWSApi) {
@@ -2385,10 +2394,9 @@ function handleTradeOutcome(contract) {
       if (statusIndicator) statusIndicator.className = "status-bar status-idle";
     } else {
       // Apply loss cooldown if configured
-      if (lossCooldownTicks > 0) {
-        cooldownTicksRemaining = lossCooldownTicks;
-        addLog(`⏱️ Applying loss cooldown of ${lossCooldownTicks} ticks to prevent consecutive losses.`, "warn");
-      }
+      // 20-tick cooldown after each loss (~20 seconds)
+      tickCooldownRemaining = 20;
+      addLog("Cooling 20 ticks before next trade.", "warn");
 
       // Martingale management
       currentMartingaleStep++;
@@ -2399,8 +2407,8 @@ function handleTradeOutcome(contract) {
         currentMartingaleStep = 0;
         
         // Layer 3: Capped Martingale recovery failure forces a 5-candle cooldown
-        cooldownTicksRemaining = 5;
-        addLog(`⏱️ Martingale recovery failed at Step ${maxMartingaleSteps - 1}. Enforcing mandatory 5-candle cooldown to protect capital.`, "warn");
+        tickCooldownRemaining = 60;
+        addLog("Martingale exhausted. Cooling 60 ticks before next entry.", "warn");
       } else {
         currentStake = currentStake * parseFloat(martingaleStepsInput.value === '1' ? 1.0 : martingaleMultiplier);
         addLog(`🔄 Martingale Multiplier (${martingaleMultiplier}x) applied. Next stake: $${currentStake.toFixed(2)}`, "warn");
@@ -2413,6 +2421,7 @@ function handleTradeOutcome(contract) {
   activePurchaseProposal = null;
   currentProposalId = null;
   currentContractId = null;
+  tradeInProgress = false;
 
   // Save active session state in real-time
   if (isTrading) {
@@ -2463,6 +2472,11 @@ startBotBtn.addEventListener('click', () => {
   
   currentMartingaleStep = 0;
   sessionProfit = 0.0;
+
+  // Reset tick state for fresh session
+  tickPrices = [];
+  tradeInProgress = false;
+  tickCooldownRemaining = 0;
 
   // ADX threshold is always 18 internally
   adxThreshold = 18;
