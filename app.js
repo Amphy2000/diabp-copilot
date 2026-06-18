@@ -2251,18 +2251,20 @@ function evaluateCrossoverStrategy() {
   const spread = Math.abs(curEma9 - curEma21) / candle.close * 100;
   if (spread < 0.005) return; // EMAs too close — no clear trend
 
-  // CALL only when EMA confirms bullish trend AND RSI is neutral (not overbought)
-  if (emaBullish && curRsi >= 42 && curRsi <= 57) {
+  // CALL only when EMA confirms bullish trend, RSI is neutral, EMA-9 is sloping upwards, and the closed candle was green
+  const isBullishCandle = candle.close > candle.open;
+  if (emaBullish && curRsi >= 42 && curRsi <= 57 && curEma9 > prevEma9 && isBullishCandle) {
     lastTradeCandleEpoch = nowEpoch;
-    addLog('TREND -> RISE | EMA spread: ' + spread.toFixed(3) + '% | RSI: ' + curRsi.toFixed(1), 'info');
+    addLog('TREND -> RISE | EMA spread: ' + spread.toFixed(3) + '% | RSI: ' + curRsi.toFixed(1) + ' | Slope: Up', 'info');
     tradeInProgress = true;
     proposeTrade('CALL');
     return;
   }
-  // PUT only when EMA confirms bearish trend AND RSI is neutral (not oversold)
-  if (emaBearish && curRsi >= 43 && curRsi <= 58) {
+  // PUT only when EMA confirms bearish trend, RSI is neutral, EMA-9 is sloping downwards, and the closed candle was red
+  const isBearishCandle = candle.close < candle.open;
+  if (emaBearish && curRsi >= 43 && curRsi <= 58 && curEma9 < prevEma9 && isBearishCandle) {
     lastTradeCandleEpoch = nowEpoch;
-    addLog('TREND -> FALL | EMA spread: ' + spread.toFixed(3) + '% | RSI: ' + curRsi.toFixed(1), 'info');
+    addLog('TREND -> FALL | EMA spread: ' + spread.toFixed(3) + '% | RSI: ' + curRsi.toFixed(1) + ' | Slope: Down', 'info');
     tradeInProgress = true;
     proposeTrade('PUT');
     return;
