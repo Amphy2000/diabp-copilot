@@ -2181,7 +2181,7 @@ function evaluateCrossoverStrategy() {
 
   if (curEma9 == null || curEma21 == null || prevEma9 == null || prevEma21 == null || curRsi == null) return;
 
-  const candle = candlesHistory[ci];
+  const candle   = candlesHistory[ci];
   const nowEpoch = candle.epoch;
 
   // ── Daily limits ─────────────────────────────────────────────────────────
@@ -2204,19 +2204,22 @@ function evaluateCrossoverStrategy() {
     return;
   }
 
-  // ── Minimum 2-minute gap between trades (prevents rapid-fire) ────────────
+  // ── Minimum gap between trades ────────────────────────────────────────────
   const minsSinceLast = (nowEpoch - lastTradeCandleEpoch) / 60;
-  const minGap = currentMartingaleStep > 0 ? 3 : 2; // wider gap during recovery
+  const minGap = currentMartingaleStep > 0 ? 3 : 2;
   if (minsSinceLast < minGap) return;
 
-  // ── EMA trend status display ─────────────────────────────────────────────
+  // ── EMA trend direction (the single source of truth) ─────────────────────
+  const emaBullish = curEma9 > curEma21;
+  const emaBearish = curEma9 < curEma21;
+
   if (trendLabel) {
-    const bullish = curEma9 > curEma21;
-    trendLabel.innerText = 'Trend: ' + (bullish ? 'Bullish' : 'Bearish') + ' | RSI: ' + curRsi.toFixed(1);
-    trendLabel.style.color = bullish ? 'var(--color-success)' : 'var(--color-danger)';
+    trendLabel.innerText = 'Trend: ' + (emaBullish ? 'Bullish' : (emaBearish ? 'Bearish' : 'Neutral')) + ' | RSI: ' + curRsi.toFixed(1);
+    trendLabel.style.color = emaBullish ? 'var(--color-success)' : (emaBearish ? 'var(--color-danger)' : 'var(--text-muted)');
   }
 
   // ── SIGNAL A: EMA Crossover ───────────────────────────────────────────────
+  // Fresh crossover = strongest signal. RSI just confirms we're not at extremes.
   const bullCross = (prevEma9 <= prevEma21) && (curEma9 > curEma21);
   const bearCross = (prevEma9 >= prevEma21) && (curEma9 < curEma21);
 
@@ -2235,42 +2238,37 @@ function evaluateCrossoverStrategy() {
     return;
   }
 
-  // ── SIGNAL B: RSI Extreme Bounce (only very extreme levels) ─────────────
-  if (curRsi <= 22) {
-    lastTradeCandleEpoch = nowEpoch;
-    addLog('RSI EXTREME OVERSOLD -> RISE | RSI: ' + curRsi.toFixed(1), 'info');
-    tradeInProgress = true;
-    proposeTrade('CALL');
-    return;
-  }
-  if (curRsi >= 78) {
-    lastTradeCandleEpoch = nowEpoch;
-    addLog('RSI EXTREME OVERBOUGHT -> FALL | RSI: ' + curRsi.toFixed(1), 'info');
-    tradeInProgress = true;
-    proposeTrade('PUT');
-    return;
-  }
+  // ── NOTE: RSI extreme bounce (Signal B) is intentionally removed ─────────
+  // During a downtrend, RSI gets oversold — but that does NOT mean price will
+  // bounce. Betting RISE against a falling EMA = contradictory = losses.
+  // We only trade WITH the EMA direction, never against it.
 
-  // ── SIGNAL C: Trend continuation (only after 4+ min gap, RSI neutral) ───
+  // ── SIGNAL C: Trend continuation ─────────────────────────────────────────
+  // Only fires when EMAs are well separated (clear trend) and RSI is neutral
+  // (trend has room to continue — not overextended).
   if (minsSinceLast < 4) return;
-  const spread = Math.abs(curEma9 - curEma21) / candle.close * 100;
-  if (spread < 0.005) return; // EMAs too close, no clear trend
 
-  if (curEma9 > curEma21 && curRsi >= 42 && curRsi <= 57) {
+  const spread = Math.abs(curEma9 - curEma21) / candle.close * 100;
+  if (spread < 0.005) return; // EMAs too close — no clear trend
+
+  // CALL only when EMA confirms bullish trend AND RSI is neutral (not overbought)
+  if (emaBullish && curRsi >= 42 && curRsi <= 57) {
     lastTradeCandleEpoch = nowEpoch;
-    addLog('TREND RIDE -> RISE | EMA spread: ' + spread.toFixed(3) + '% | RSI: ' + curRsi.toFixed(1), 'info');
+    addLog('TREND -> RISE | EMA spread: ' + spread.toFixed(3) + '% | RSI: ' + curRsi.toFixed(1), 'info');
     tradeInProgress = true;
     proposeTrade('CALL');
     return;
   }
-  if (curEma9 < curEma21 && curRsi >= 43 && curRsi <= 58) {
+  // PUT only when EMA confirms bearish trend AND RSI is neutral (not oversold)
+  if (emaBearish && curRsi >= 43 && curRsi <= 58) {
     lastTradeCandleEpoch = nowEpoch;
-    addLog('TREND RIDE -> FALL | EMA spread: ' + spread.toFixed(3) + '% | RSI: ' + curRsi.toFixed(1), 'info');
+    addLog('TREND -> FALL | EMA spread: ' + spread.toFixed(3) + '% | RSI: ' + curRsi.toFixed(1), 'info');
     tradeInProgress = true;
     proposeTrade('PUT');
     return;
   }
 }
+
 
 function proposeTrade(type) {
   if (!socket || socket.readyState !== WebSocket.OPEN) return;
