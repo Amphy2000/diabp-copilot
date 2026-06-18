@@ -2090,6 +2090,7 @@ function processTick(tick) {
   const curEma9  = _cachedEma9.length  > 0 ? _cachedEma9[_cachedEma9.length - 1]   : null;
   const curEma21 = _cachedEma21.length > 0 ? _cachedEma21[_cachedEma21.length - 1] : null;
   const curRsi   = _cachedRsi14.length > 0 ? _cachedRsi14[_cachedRsi14.length - 1] : null;
+  const curAdx   = _cachedAdx14.length > 0 ? _cachedAdx14[_cachedAdx14.length - 1] : null;
 
   let trendStr = "Analyzing...";
   let trendColor = "var(--text-muted)";
@@ -2115,6 +2116,14 @@ function processTick(tick) {
       rsiCondition = " (Overbought 🔴)";
     }
     trendStr += ` | RSI: ${curRsi.toFixed(1)}${rsiCondition}`;
+  }
+
+  if (curAdx !== null) {
+    const isChoppy = curAdx < adxThreshold;
+    trendStr += ` | ADX: ${curAdx.toFixed(1)} ${isChoppy ? '⏸ (Choppy)' : '🔥 (Trending)'}`;
+    if (isChoppy) {
+      trendColor = "var(--text-muted)";
+    }
   }
 
   if (trendLabel) {
@@ -2159,9 +2168,9 @@ function processTick(tick) {
 }
 
 function evaluateCrossoverStrategy() {
-  // Need at least 22 candles to compute EMA-21
-  if (candlesHistory.length < 22) {
-    addLog('Warming up... need ' + (22 - candlesHistory.length) + ' more candles.', 'info');
+  // Need at least 30 candles to compute ADX-14 (requires 29 bars)
+  if (candlesHistory.length < 30) {
+    addLog('Warming up... need ' + (30 - candlesHistory.length) + ' more candles for indicators.', 'info');
     return;
   }
 
@@ -2169,8 +2178,9 @@ function evaluateCrossoverStrategy() {
   const ema9  = _cachedEma9;
   const ema21 = _cachedEma21;
   const rsi   = _cachedRsi14;
+  const adx   = _cachedAdx14;
 
-  if (ema9.length < len || ema21.length < len || rsi.length < len) return;
+  if (ema9.length < len || ema21.length < len || rsi.length < len || adx.length < len) return;
 
   const ci = len - 2;  // last CLOSED candle index
   const pi = len - 3;  // previous candle
@@ -2178,8 +2188,9 @@ function evaluateCrossoverStrategy() {
   const curEma9  = ema9[ci],  prevEma9  = ema9[pi];
   const curEma21 = ema21[ci], prevEma21 = ema21[pi];
   const curRsi   = rsi[ci];
+  const curAdx   = adx[ci];
 
-  if (curEma9 == null || curEma21 == null || prevEma9 == null || prevEma21 == null || curRsi == null) return;
+  if (curEma9 == null || curEma21 == null || prevEma9 == null || prevEma21 == null || curRsi == null || curAdx == null) return;
 
   const candle   = candlesHistory[ci];
   const nowEpoch = candle.epoch;
@@ -2209,12 +2220,21 @@ function evaluateCrossoverStrategy() {
   const minGap = currentMartingaleStep > 0 ? 10 : 5; // 1-2 full 5-min candles between trades
   if (minsSinceLast < minGap) return;
 
+  // ── Layer 1: ADX Regime Filter ────────────────────────────────────────────
+  if (curAdx < adxThreshold) {
+    if (trendLabel) {
+      trendLabel.innerText = `Trend: Choppy ⏸ | ADX: ${curAdx.toFixed(1)} < ${adxThreshold}`;
+      trendLabel.style.color = "var(--text-muted)";
+    }
+    return;
+  }
+
   // ── EMA trend direction (the single source of truth) ─────────────────────
   const emaBullish = curEma9 > curEma21;
   const emaBearish = curEma9 < curEma21;
 
   if (trendLabel) {
-    trendLabel.innerText = 'Trend: ' + (emaBullish ? 'Bullish' : (emaBearish ? 'Bearish' : 'Neutral')) + ' | RSI: ' + curRsi.toFixed(1);
+    trendLabel.innerText = 'Trend: ' + (emaBullish ? 'Bullish' : (emaBearish ? 'Bearish' : 'Neutral')) + ' | RSI: ' + curRsi.toFixed(1) + ' | ADX: ' + curAdx.toFixed(1);
     trendLabel.style.color = emaBullish ? 'var(--color-success)' : (emaBearish ? 'var(--color-danger)' : 'var(--text-muted)');
   }
 
@@ -2251,9 +2271,18 @@ function evaluateCrossoverStrategy() {
   const spread = Math.abs(curEma9 - curEma21) / candle.close * 100;
   if (spread < 0.005) return; // EMAs too close — no clear trend
 
+  // Layer 2: Candle Body Quality Filter (reject indecision Doji candles)
+  const body = Math.abs(candle.close - candle.open);
+  const range = candle.high - candle.low;
+  const bodyRatio = range > 0 ? (body / range) : 0;
+
   // CALL only when EMA confirms bullish trend, RSI is neutral, EMA-9 is sloping upwards, and the closed candle was green
   const isBullishCandle = candle.close > candle.open;
   if (emaBullish && curRsi >= 42 && curRsi <= 57 && curEma9 > prevEma9 && isBullishCandle) {
+    if (bodyRatio < 0.35) {
+      addLog(`TREND -> RISE skipped: Indecision candle (body ratio ${bodyRatio.toFixed(2)} < 0.35)`, 'info');
+      return;
+    }
     lastTradeCandleEpoch = nowEpoch;
     addLog('TREND -> RISE | EMA spread: ' + spread.toFixed(3) + '% | RSI: ' + curRsi.toFixed(1) + ' | Slope: Up', 'info');
     tradeInProgress = true;
@@ -2263,6 +2292,10 @@ function evaluateCrossoverStrategy() {
   // PUT only when EMA confirms bearish trend, RSI is neutral, EMA-9 is sloping downwards, and the closed candle was red
   const isBearishCandle = candle.close < candle.open;
   if (emaBearish && curRsi >= 43 && curRsi <= 58 && curEma9 < prevEma9 && isBearishCandle) {
+    if (bodyRatio < 0.35) {
+      addLog(`TREND -> FALL skipped: Indecision candle (body ratio ${bodyRatio.toFixed(2)} < 0.35)`, 'info');
+      return;
+    }
     lastTradeCandleEpoch = nowEpoch;
     addLog('TREND -> FALL | EMA spread: ' + spread.toFixed(3) + '% | RSI: ' + curRsi.toFixed(1) + ' | Slope: Down', 'info');
     tradeInProgress = true;
@@ -2462,8 +2495,9 @@ startBotBtn.addEventListener('click', () => {
   tradeInProgress = false;
   tickCooldownRemaining = 0;
 
-  // ADX threshold is always 18 internally
-  adxThreshold = 18;
+  // Parse ADX threshold from UI input
+  const adxInputEl = document.getElementById('adxThresholdInput');
+  adxThreshold = adxInputEl ? parseInt(adxInputEl.value) || 18 : 18;
 
   // IMPORTANT: dailyStopLoss reads from the DAILY STOP LOSS field
   // NOT from stopLossInput (which shows the martingale cycle cost)
