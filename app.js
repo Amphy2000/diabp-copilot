@@ -27,7 +27,8 @@ let socket = null;
 let isAuthorized = false;
 let currentAuthorizedAccount = null;
 let isTrading = false;
-let candlesHistory = []; // stores compiled 1-minute candles
+let candlesHistory = []; // stores compiled candles
+let candleGranularity = 300; // default 5 minutes (300s)
 
 // ── Cached indicator arrays (recalculated only on candle close, not every tick) ──
 let _cachedEma9 = [];   // EMA-9  values aligned to candlesHistory
@@ -840,6 +841,15 @@ if (stopLossInput) {
 if (martingaleStepsInput) martingaleStepsInput.addEventListener('input', markCustomSettings);
 if (martingaleMultiplierInput) martingaleMultiplierInput.addEventListener('input', markCustomSettings);
 
+const tfSelectElement = document.getElementById('timeframeSelect');
+if (tfSelectElement) {
+  tfSelectElement.addEventListener('change', () => {
+    markCustomSettings();
+    candleGranularity = parseInt(tfSelectElement.value) || 300;
+    fetchHistoricalCandles();
+  });
+}
+
 
 
 // Apply default on load
@@ -1458,15 +1468,8 @@ function connectWebSocket(isLoginAttempt = false) {
           subscribe: 1
         }));
 
-        // Fetch historical 5-minute candles (one-time) to populate indicator calculations
-        socket.send(JSON.stringify({
-          ticks_history: 'R_75',
-          adjust_start_time: 1,
-          count: 150,
-          end: 'latest',
-          granularity: 300,
-          style: 'candles'
-        }));
+        // Fetch historical candles to populate indicator calculations
+        fetchHistoricalCandles();
 
         // Subscribe to live ticks separately to ensure reliable tick stream delivery
         socket.send(JSON.stringify({
@@ -1657,15 +1660,8 @@ async function handleMessage(data, isLoginAttempt = false) {
         subscribe: 1
       }));
 
-      // Fetch historical 5-minute candles (one-time) to populate indicator calculations
-      socket.send(JSON.stringify({
-        ticks_history: 'R_75',
-        adjust_start_time: 1,
-        count: 150,
-        end: 'latest',
-        granularity: 300,
-        style: 'candles'
-      }));
+      // Fetch historical candles to populate indicator calculations
+      fetchHistoricalCandles();
 
       // Subscribe to live ticks separately to ensure reliable tick stream delivery
       socket.send(JSON.stringify({
@@ -1697,7 +1693,7 @@ async function handleMessage(data, isLoginAttempt = false) {
       }));
       // Immediately build indicator cache so the chart renders with full data
       _rebuildIndicatorCache();
-      addLog(`📈 Loaded ${candlesHistory.length} historical 5-minute candles. Analysis ready!`, "success");
+      addLog(`📈 Loaded ${candlesHistory.length} historical ${candleGranularity === 60 ? '1-minute' : '5-minute'} candles. Analysis ready!`, "success");
       
       // Update UI element to display current price immediately
       if (candlesHistory.length > 0) {
@@ -1986,6 +1982,37 @@ function calculateCandleADXValues(period = 14) {
 }
 
 /**
+ * Fetch historical candles of the selected granularity from Deriv.
+ */
+function fetchHistoricalCandles() {
+  if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+  // Clear existing history to force warm up and clean state
+  candlesHistory = [];
+  _cachedEma9 = [];
+  _cachedEma21 = [];
+  _cachedEma200 = [];
+  _cachedRsi14 = [];
+  _cachedAdx14 = [];
+
+  const tfSelect = document.getElementById('timeframeSelect');
+  if (tfSelect) {
+    candleGranularity = parseInt(tfSelect.value) || 300;
+  }
+
+  addLog(`Requesting historical ${candleGranularity === 60 ? '1-minute' : '5-minute'} candles...`, 'info');
+
+  socket.send(JSON.stringify({
+    ticks_history: 'R_75',
+    adjust_start_time: 1,
+    count: 150,
+    end: 'latest',
+    granularity: candleGranularity,
+    style: 'candles'
+  }));
+}
+
+/**
  * Full recalculation of all indicator caches.
  * Called once per candle close (~once per minute).
  */
@@ -2044,7 +2071,7 @@ function processTick(tick) {
   if (tickPrices.length > 30) tickPrices.shift();
 
   // Real-time Candle Compilation
-  const tickMinuteEpoch = Math.floor(timeEpoch / 300) * 300; // 5-minute candle buckets
+  const tickMinuteEpoch = Math.floor(timeEpoch / candleGranularity) * candleGranularity;
   const lastCandle = candlesHistory[candlesHistory.length - 1];
   let candleClosed = false;
 
@@ -2312,14 +2339,16 @@ function proposeTrade(type) {
   statusText.innerText = "Proposing Order...";
   statusIndicator.className = "status-bar status-running";
 
+  const tradeDuration = candleGranularity === 60 ? 1 : 5;
+
   const req = {
     proposal: 1,
     amount: currentStake,
     basis: "stake",
     contract_type: type,
     currency: "USD",
-    duration: 1,
-    duration_unit: "m"  // 1-minute contract aligned with 5-min candle signal
+    duration: tradeDuration,
+    duration_unit: "m"  // contract duration matches signal candle timeframe
   };
 
   if (socket.isNewWSApi) {
@@ -2475,6 +2504,9 @@ startBotBtn.addEventListener('click', () => {
   }
 
   // Parse Inputs
+  const tfSelect = document.getElementById('timeframeSelect');
+  candleGranularity = tfSelect ? parseInt(tfSelect.value) || 300 : 300;
+
   initialStake = parseFloat(stakeInput.value);
   currentStake = initialStake;
   targetProfit = parseFloat(targetProfitInput.value);
@@ -2615,8 +2647,8 @@ function toggleInputs(disabled) {
   martingaleStepsInput.disabled = disabled;
   if (martingaleMultiplierInput) martingaleMultiplierInput.disabled = disabled;
   
-  // sma50GuardCheckbox removed
-  
+  const tfSelect = document.getElementById('timeframeSelect');
+  if (tfSelect) tfSelect.disabled = disabled;
 }
 
 // ════════════════════════════════════════════

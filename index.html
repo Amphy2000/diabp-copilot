@@ -302,6 +302,13 @@
               <input type="number" id="adxThresholdInput" value="18" min="10" max="35" />
             </div>
             <div class="input-group">
+              <label for="timeframeSelect">Timeframe & Contract</label>
+              <select id="timeframeSelect" style="width: 100%; height: 38px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 6px; padding: 0 10px; cursor: pointer;">
+                <option value="60">1 Min Candles / 1 Min Trades</option>
+                <option value="300" selected>5 Min Candles / 5 Min Trades</option>
+              </select>
+            </div>
+            <div class="input-group">
               <label for="dailyStopLossInput">Daily Stop Loss ($) <span style="font-size:0.68rem;color:var(--text-muted);">— max you can lose per day</span></label>
               <input type="number" id="dailyStopLossInput" value="50.00" step="5.0" min="1.0" />
             </div>
