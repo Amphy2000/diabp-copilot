@@ -2303,9 +2303,9 @@ function evaluateCrossoverStrategy() {
   const range = candle.high - candle.low;
   const bodyRatio = range > 0 ? (body / range) : 0;
 
-  // CALL only when EMA confirms bullish trend, RSI is neutral, EMA-9 is sloping upwards, and the closed candle was green
+  // CALL only when EMA confirms bullish trend, RSI is not overbought (<75), EMA-9 is sloping upwards, and the closed candle was green
   const isBullishCandle = candle.close > candle.open;
-  if (emaBullish && curRsi >= 42 && curRsi <= 57 && curEma9 > prevEma9 && isBullishCandle) {
+  if (emaBullish && curRsi < 75 && curEma9 > prevEma9 && isBullishCandle) {
     if (bodyRatio < 0.35) {
       addLog(`TREND -> RISE skipped: Indecision candle (body ratio ${bodyRatio.toFixed(2)} < 0.35)`, 'info');
       return;
@@ -2316,9 +2316,9 @@ function evaluateCrossoverStrategy() {
     proposeTrade('CALL');
     return;
   }
-  // PUT only when EMA confirms bearish trend, RSI is neutral, EMA-9 is sloping downwards, and the closed candle was red
+  // PUT only when EMA confirms bearish trend, RSI is not oversold (>25), EMA-9 is sloping downwards, and the closed candle was red
   const isBearishCandle = candle.close < candle.open;
-  if (emaBearish && curRsi >= 43 && curRsi <= 58 && curEma9 < prevEma9 && isBearishCandle) {
+  if (emaBearish && curRsi > 25 && curEma9 < prevEma9 && isBearishCandle) {
     if (bodyRatio < 0.35) {
       addLog(`TREND -> FALL skipped: Indecision candle (body ratio ${bodyRatio.toFixed(2)} < 0.35)`, 'info');
       return;
