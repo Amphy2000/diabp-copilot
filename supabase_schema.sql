@@ -1,4 +1,25 @@
--- 1. Create Patient Profiles Table
+-- 1. Create Clinics Table
+CREATE TABLE IF NOT EXISTS ncd_clinics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  address TEXT NOT NULL,
+  city TEXT NOT NULL, -- e.g. "Abuja", "Kaduna"
+  contact_phone TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 2. Create Pharmacies Table
+CREATE TABLE IF NOT EXISTS ncd_pharmacies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  address TEXT NOT NULL,
+  city TEXT NOT NULL,
+  contact_phone TEXT NOT NULL,
+  is_verified BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 3. Create Patient Profiles Table
 CREATE TABLE IF NOT EXISTS ncd_profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
@@ -9,10 +30,12 @@ CREATE TABLE IF NOT EXISTS ncd_profiles (
   target_glucose_range TEXT NOT NULL,
   streak_days INT DEFAULT 0,
   active_meds TEXT[] NOT NULL,
+  assigned_clinic_id UUID REFERENCES ncd_clinics(id) ON DELETE SET NULL,
+  assigned_pharmacy_id UUID REFERENCES ncd_pharmacies(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 2. Create Vitals Logs Table (BP + Glucose)
+-- 4. Create Vitals Logs Table (BP + Glucose)
 CREATE TABLE IF NOT EXISTS ncd_vitals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   patient_id UUID REFERENCES ncd_profiles(id) ON DELETE CASCADE,
@@ -24,7 +47,7 @@ CREATE TABLE IF NOT EXISTS ncd_vitals (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 3. Create Foot Scans Table
+-- 5. Create Foot Scans Table
 CREATE TABLE IF NOT EXISTS ncd_foot_scans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   patient_id UUID REFERENCES ncd_profiles(id) ON DELETE CASCADE,
@@ -36,7 +59,7 @@ CREATE TABLE IF NOT EXISTS ncd_foot_scans (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 4. Create Refill Orders Table
+-- 6. Create Refill Orders Table
 CREATE TABLE IF NOT EXISTS ncd_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   patient_id UUID REFERENCES ncd_profiles(id) ON DELETE CASCADE,
@@ -47,5 +70,6 @@ CREATE TABLE IF NOT EXISTS ncd_orders (
   status TEXT NOT NULL,
   prescription_required BOOLEAN NOT NULL,
   prescription_uploaded BOOLEAN NOT NULL,
+  pharmacy_id UUID REFERENCES ncd_pharmacies(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );

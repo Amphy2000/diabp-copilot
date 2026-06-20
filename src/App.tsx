@@ -13,9 +13,11 @@ import {
   placeRefillOrder as servicePlaceOrder,
   updateOrderStatus as serviceUpdateStatus,
   logVitalsEntry as serviceLogVitals,
-  savePatientProfile
+  savePatientProfile,
+  getClinics,
+  getPharmacies
 } from './services/ncdService';
-import type { PatientNcdProfile, NcdRefillOrder } from './services/ncdService';
+import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy } from './services/ncdService';
 import { PatientNcdDashboard } from './components/PatientNcdDashboard';
 import { NcdSafeMeds } from './components/NcdSafeMeds';
 import { ClinicianNcdDashboard } from './components/ClinicianNcdDashboard';
@@ -27,6 +29,8 @@ function App() {
   // Centralized Application State
   const [patientProfile, setPatientProfile] = useState<PatientNcdProfile | null>(null);
   const [orders, setOrders] = useState<NcdRefillOrder[]>([]);
+  const [clinics, setClinics] = useState<NcdClinic[]>([]);
+  const [pharmacies, setPharmacies] = useState<NcdPharmacy[]>([]);
   
   // Navigation State
   const [currentRole, setCurrentRole] = useState<'patient' | 'pharmacist'>('patient');
@@ -38,8 +42,13 @@ function App() {
       try {
         const profile = await getPatientProfile();
         const refillOrders = await getRefillOrders();
+        const clinicsList = await getClinics();
+        const pharmaciesList = await getPharmacies();
+        
         setPatientProfile(profile);
         setOrders(refillOrders);
+        setClinics(clinicsList);
+        setPharmacies(pharmaciesList);
       } catch (err) {
         console.error("Failed to load initial NCD data:", err);
       } finally {
@@ -187,6 +196,8 @@ function App() {
               <PatientNcdDashboard 
                 profile={patientProfile} 
                 onUpdateProfile={handleUpdateProfile} 
+                clinics={clinics}
+                pharmacies={pharmacies}
               />
             )}
             
@@ -194,6 +205,8 @@ function App() {
               <NcdSafeMeds 
                 orders={orders} 
                 onPlaceOrder={handlePlaceOrder} 
+                profile={patientProfile}
+                pharmacies={pharmacies}
               />
             )}
 
@@ -212,6 +225,8 @@ function App() {
               orders={orders} 
               onUpdateOrderStatus={handleUpdateOrderStatus} 
               patientProfile={patientProfile} 
+              clinics={clinics}
+              pharmacies={pharmacies}
             />
           </div>
         )}

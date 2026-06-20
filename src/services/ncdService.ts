@@ -39,6 +39,8 @@ export interface PatientNcdProfile {
   footScanHistory: FootScanRecord[];
   streakDays: number;
   activeMeds: string[];
+  assignedClinicId: string | null;
+  assignedPharmacyId: string | null;
 }
 
 export interface NcdRefillOrder {
@@ -49,6 +51,24 @@ export interface NcdRefillOrder {
   status: 'Pending Verification' | 'Approved' | 'Out for Delivery' | 'Delivered';
   prescriptionRequired: boolean;
   prescriptionUploaded: boolean;
+  pharmacyId: string | null;
+}
+
+export interface NcdClinic {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  contactPhone: string;
+}
+
+export interface NcdPharmacy {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  contactPhone: string;
+  isVerified: boolean;
 }
 
 // Initial fallback mock datasets representing Chief Chinedu Eze
@@ -94,7 +114,9 @@ export const INITIAL_NCD_PATIENT: PatientNcdProfile = {
         "Pharmacist check-in recommended to audit peripheral sensation (monofilament check)."
       ]
     }
-  ]
+  ],
+  assignedClinicId: null,
+  assignedPharmacyId: null
 };
 
 export const INITIAL_NCD_ORDERS: NcdRefillOrder[] = [
@@ -105,8 +127,21 @@ export const INITIAL_NCD_ORDERS: NcdRefillOrder[] = [
     totalNaira: 30000,
     status: "Pending Verification",
     prescriptionRequired: true,
-    prescriptionUploaded: true
+    prescriptionUploaded: true,
+    pharmacyId: "pharmacy-1"
   }
+];
+
+export const MOCK_CLINICS: NcdClinic[] = [
+  { id: "clinic-1", name: "Abuja Heart & Vascular Clinic", address: "Plot 1042, Constitution Ave, Wuse II", city: "Abuja", contactPhone: "+234 803 111 2222" },
+  { id: "clinic-2", name: "National Hospital NCD Center", address: "Central Business District", city: "Abuja", contactPhone: "+234 809 333 4444" },
+  { id: "clinic-3", name: "Kaduna Specialist Hospital", address: "Waff Road", city: "Kaduna", contactPhone: "+234 812 555 6666" }
+];
+
+export const MOCK_PHARMACIES: NcdPharmacy[] = [
+  { id: "pharmacy-1", name: "H-Medix Pharmacy Wuse II", address: "Adetokunbo Ademola Crescent", city: "Abuja", contactPhone: "+234 805 777 8888", isVerified: true },
+  { id: "pharmacy-2", name: "Net Pharmacy Kaduna", address: "Yakubu Gowon Way", city: "Kaduna", contactPhone: "+234 802 999 0000", isVerified: true },
+  { id: "pharmacy-3", name: "Garki Community Chemist", address: "Garki Area 11", city: "Abuja", contactPhone: "+234 803 444 5555", isVerified: false }
 ];
 
 export const NCD_MEDICATIONS = [
@@ -215,6 +250,8 @@ export async function getPatientProfile(): Promise<PatientNcdProfile> {
         targetGlucoseRange: profileData.target_glucose_range,
         streakDays: profileData.streak_days,
         activeMeds: profileData.active_meds,
+        assignedClinicId: profileData.assigned_clinic_id,
+        assignedPharmacyId: profileData.assigned_pharmacy_id,
         bpHistory: bpHistory.length > 0 ? bpHistory : INITIAL_NCD_PATIENT.bpHistory,
         glucoseHistory: glucoseHistory.length > 0 ? glucoseHistory : INITIAL_NCD_PATIENT.glucoseHistory,
         footScanHistory: footScanHistory.length > 0 ? footScanHistory : INITIAL_NCD_PATIENT.footScanHistory
@@ -246,7 +283,9 @@ export async function savePatientProfile(profile: PatientNcdProfile): Promise<vo
         baseline_bp: profile.baselineBp,
         target_glucose_range: profile.targetGlucoseRange,
         streak_days: profile.streakDays,
-        active_meds: profile.activeMeds
+        active_meds: profile.activeMeds,
+        assigned_clinic_id: profile.assignedClinicId,
+        assigned_pharmacy_id: profile.assignedPharmacyId
       };
 
       if (existing && existing.length > 0) {
@@ -353,7 +392,8 @@ export async function getRefillOrders(): Promise<NcdRefillOrder[]> {
           totalNaira: o.total_naira,
           status: o.status as any,
           prescriptionRequired: o.prescription_required,
-          prescriptionUploaded: o.prescription_uploaded
+          prescriptionUploaded: o.prescription_uploaded,
+          pharmacyId: o.pharmacy_id
         }));
       }
     } catch (err) {
@@ -383,7 +423,8 @@ export async function placeRefillOrder(order: NcdRefillOrder): Promise<void> {
           total_naira: order.totalNaira,
           status: order.status,
           prescription_required: order.prescriptionRequired,
-          prescription_uploaded: order.prescriptionUploaded
+          prescription_uploaded: order.prescriptionUploaded,
+          pharmacy_id: order.pharmacyId
         }]);
       }
     } catch (err) {
@@ -662,4 +703,88 @@ function getHealthyFootRecord(): FootScanRecord {
       "Apply moisturizing lotion to the dry areas, avoiding the spaces between toes."
     ]
   };
+}
+
+async function seedClinics() {
+  try {
+    await supabase.from('ncd_clinics').insert(MOCK_CLINICS.map(c => ({
+      id: c.id,
+      name: c.name,
+      address: c.address,
+      city: c.city,
+      contact_phone: c.contactPhone
+    })));
+  } catch (err) {
+    console.error("Failed to seed clinics:", err);
+  }
+}
+
+async function seedPharmacies() {
+  try {
+    await supabase.from('ncd_pharmacies').insert(MOCK_PHARMACIES.map(p => ({
+      id: p.id,
+      name: p.name,
+      address: p.address,
+      city: p.city,
+      contact_phone: p.contactPhone,
+      is_verified: p.isVerified
+    })));
+  } catch (err) {
+    console.error("Failed to seed pharmacies:", err);
+  }
+}
+
+export async function getClinics(): Promise<NcdClinic[]> {
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase.from('ncd_clinics').select('*');
+      if (error) {
+        if (error.code === '42P01') return MOCK_CLINICS;
+        throw error;
+      }
+      if (data && data.length > 0) {
+        return data.map(c => ({
+          id: c.id,
+          name: c.name,
+          address: c.address,
+          city: c.city,
+          contactPhone: c.contact_phone
+        }));
+      } else {
+        await seedClinics();
+        return MOCK_CLINICS;
+      }
+    } catch (err) {
+      console.error("Supabase clinics load failed, using mock data:", err);
+    }
+  }
+  return MOCK_CLINICS;
+}
+
+export async function getPharmacies(): Promise<NcdPharmacy[]> {
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase.from('ncd_pharmacies').select('*');
+      if (error) {
+        if (error.code === '42P01') return MOCK_PHARMACIES;
+        throw error;
+      }
+      if (data && data.length > 0) {
+        return data.map(p => ({
+          id: p.id,
+          name: p.name,
+          address: p.address,
+          city: p.city,
+          contactPhone: p.contact_phone,
+          isVerified: p.is_verified
+        }));
+      } else {
+        await seedPharmacies();
+        return MOCK_PHARMACIES;
+      }
+    } catch (err) {
+      console.error("Supabase pharmacies load failed, using mock data:", err);
+    }
+  }
+  return MOCK_PHARMACIES;
 }

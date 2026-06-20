@@ -10,14 +10,16 @@ import {
   MapPin 
 } from 'lucide-react';
 import { NCD_MEDICATIONS } from '../services/ncdService';
-import type { NcdRefillOrder } from '../services/ncdService';
+import type { NcdRefillOrder, PatientNcdProfile, NcdPharmacy } from '../services/ncdService';
 
 interface NcdSafeMedsProps {
   orders: NcdRefillOrder[];
   onPlaceOrder: (order: NcdRefillOrder) => void;
+  profile: PatientNcdProfile;
+  pharmacies: NcdPharmacy[];
 }
 
-export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder }) => {
+export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, profile, pharmacies }) => {
   const [selectedMeds, setSelectedMeds] = useState<string[]>(['bundle']);
   const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -63,6 +65,11 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder }
   const handleCheckout = () => {
     if (selectedMeds.length === 0) return;
     
+    if (!profile.assignedPharmacyId) {
+      alert("Please select a Preferred Refill Pharmacy in your Care Dashboard before requesting a refill.");
+      return;
+    }
+
     const requiresRx = selectedMeds.some(medId => {
       const med = NCD_MEDICATIONS.find(m => m.id === medId);
       return med?.rxRequired;
@@ -85,7 +92,8 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder }
       totalNaira: calculateTotal(),
       status: 'Pending Verification',
       prescriptionRequired: requiresRx,
-      prescriptionUploaded: !!prescriptionFile
+      prescriptionUploaded: !!prescriptionFile,
+      pharmacyId: profile.assignedPharmacyId
     };
 
     onPlaceOrder(newOrder);
@@ -314,6 +322,19 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder }
                 )}
               </div>
             )}
+
+            {/* Fulfilling Pharmacy Route Display */}
+            <div style={{ marginTop: '1.25rem', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px' }}>
+                Fulfilling Partner Pharmacy:
+              </div>
+              <div style={{ fontSize: '0.85rem', color: profile.assignedPharmacyId ? 'white' : '#f87171', fontWeight: 'bold' }}>
+                {(() => {
+                  const ph = pharmacies.find(p => p.id === profile.assignedPharmacyId);
+                  return ph ? `${ph.name} (${ph.city})` : "❌ No Pharmacy Selected (Go to Care Dashboard)";
+                })()}
+              </div>
+            </div>
 
             <button
               onClick={handleCheckout}

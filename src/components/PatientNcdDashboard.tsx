@@ -16,14 +16,16 @@ import {
   logVitalsEntry,
   logFootScanRecord
 } from '../services/ncdService';
-import type { PatientNcdProfile, FootScanRecord } from '../services/ncdService';
+import type { PatientNcdProfile, FootScanRecord, NcdClinic, NcdPharmacy } from '../services/ncdService';
 
 interface PatientNcdDashboardProps {
   profile: PatientNcdProfile;
   onUpdateProfile: (updated: PatientNcdProfile) => void;
+  clinics: NcdClinic[];
+  pharmacies: NcdPharmacy[];
 }
 
-export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profile, onUpdateProfile }) => {
+export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profile, onUpdateProfile, clinics, pharmacies }) => {
   // Input fields
   const [systolic, setSystolic] = useState<number>(140);
   const [diastolic, setDiastolic] = useState<number>(90);
@@ -260,6 +262,66 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
               </div>
 
             </form>
+          </div>
+
+          {/* Primary Care Team Configuration */}
+          <div className="glass-panel">
+            <div className="card-header-divider">
+              <h3 className="card-title">
+                <Compass className="card-title-icon text-teal-400" />
+                Primary Care Team
+              </h3>
+            </div>
+            
+            <div className="form-layout" style={{ gap: '16px', display: 'flex', flexDirection: 'column' }}>
+              <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label className="input-label" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                  Assigned Medical Clinic (Doctor/MD Consultant)
+                </label>
+                <select
+                  value={profile.assignedClinicId || ''}
+                  onChange={(e) => {
+                    onUpdateProfile({
+                      ...profile,
+                      assignedClinicId: e.target.value || null
+                    });
+                  }}
+                  className="select-control"
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', padding: '10px', borderRadius: '8px' }}
+                >
+                  <option value="" style={{ background: '#1c1c1e' }}>-- No Clinic Assigned (Self-Managed) --</option>
+                  {clinics.map(c => (
+                    <option key={c.id} value={c.id} style={{ background: '#1c1c1e' }}>
+                      {c.name} ({c.city})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label className="input-label" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                  Preferred Refill Pharmacy (SafeMeds Deliveries)
+                </label>
+                <select
+                  value={profile.assignedPharmacyId || ''}
+                  onChange={(e) => {
+                    onUpdateProfile({
+                      ...profile,
+                      assignedPharmacyId: e.target.value || null
+                    });
+                  }}
+                  className="select-control"
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', padding: '10px', borderRadius: '8px' }}
+                >
+                  <option value="" style={{ background: '#1c1c1e' }}>-- No Pharmacy Assigned --</option>
+                  {pharmacies.map(p => (
+                    <option key={p.id} value={p.id} style={{ background: '#1c1c1e' }}>
+                      {p.name} {p.isVerified ? '✓' : ''} ({p.city})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
 
           {/* Vitals History Log list */}

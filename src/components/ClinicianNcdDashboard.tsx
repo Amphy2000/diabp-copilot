@@ -11,19 +11,38 @@ import {
 import { 
   auditNcdRegimen 
 } from '../services/ncdService';
-import type { PatientNcdProfile, NcdRefillOrder } from '../services/ncdService';
+import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy } from '../services/ncdService';
 
 interface ClinicianNcdDashboardProps {
   orders: NcdRefillOrder[];
   onUpdateOrderStatus: (orderId: string, status: NcdRefillOrder['status']) => void;
   patientProfile: PatientNcdProfile;
+  clinics: NcdClinic[];
+  pharmacies: NcdPharmacy[];
 }
 
 export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({ 
   orders, 
   onUpdateOrderStatus, 
-  patientProfile 
+  patientProfile,
+  clinics,
+  pharmacies
 }) => {
+  // Simulation States for Multi-Tenant Role Switcher
+  const [activeRole, setActiveRole] = useState<'clinic' | 'pharmacy'>('clinic');
+  const [activeClinicId, setActiveClinicId] = useState<string | null>(clinics[0]?.id || null);
+  const [activePharmacyId, setActivePharmacyId] = useState<string | null>(pharmacies[0]?.id || null);
+
+  // Check if patient is assigned to simulated tenant
+  const isPatientAssigned = activeRole === 'clinic'
+    ? patientProfile.assignedClinicId === activeClinicId
+    : patientProfile.assignedPharmacyId === activePharmacyId;
+
+  // Filter orders matching simulated tenant
+  const filteredOrders = activeRole === 'pharmacy'
+    ? orders.filter(o => o.pharmacyId === activePharmacyId)
+    : orders.filter(o => isPatientAssigned); // clinics only see orders if patient belongs to their clinic
+
   // Extract latest logs for audit initial states
   const latestBp = patientProfile.bpHistory[patientProfile.bpHistory.length - 1] || { systolic: 120, diastolic: 80 };
   const latestGlucose = patientProfile.glucoseHistory[patientProfile.glucoseHistory.length - 1] || { level: 100, type: 'Fasting' };
@@ -49,7 +68,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   );
 
   const handleNudge = (patientName: string, issue: string) => {
-    alert(`Nudge dispatched! Simulated WhatsApp alert sent to ${patientName}: \n"Good day, this is your clinical pharmacist. We noticed your ${issue}. Please stay hydrated, adjust salt/sugar intake, and log your daily readings."`);
+    alert(`Nudge dispatched! Simulated WhatsApp alert sent to ${patientName}: \n"Good day, this is your clinical care team. We noticed your ${issue}. Please stay hydrated, limit salt/sugar, and log your daily values."`);
   };
 
   const handleToggleMed = (medName: string) => {
@@ -70,6 +89,59 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   return (
     <div className="space-y-6 animate-fade-in" style={{ paddingBottom: '30px' }}>
       
+      {/* Tenant Switcher Simulation Panel */}
+      <div className="glass-panel" style={{ padding: '16px', background: 'rgba(20, 20, 20, 0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <h4 style={{ margin: 0, fontSize: '0.8rem', color: 'var(--accent-primary)', fontWeight: 800, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <ArrowRight className="w-4 h-4 text-blue-400" /> Multi-Tenant Role Switcher (Audit Simulator)
+            </h4>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+              Select a clinical facility or pharmacy to inspect routed data. Only assigned providers can view records.
+            </p>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <button
+                onClick={() => setActiveRole('clinic')}
+                style={{ padding: '8px 12px', fontSize: '0.7rem', border: 'none', background: activeRole === 'clinic' ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: activeRole === 'clinic' ? 'white' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                Clinic / Doctor
+              </button>
+              <button
+                onClick={() => setActiveRole('pharmacy')}
+                style={{ padding: '8px 12px', fontSize: '0.7rem', border: 'none', background: activeRole === 'pharmacy' ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: activeRole === 'pharmacy' ? 'white' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                Pharmacy
+              </button>
+            </div>
+
+            {activeRole === 'clinic' ? (
+              <select
+                value={activeClinicId || ''}
+                onChange={(e) => setActiveClinicId(e.target.value)}
+                style={{ background: '#1c1c1e', color: 'white', border: '1px solid rgba(255,255,255,0.1)', padding: '8px', borderRadius: '8px', fontSize: '0.7rem' }}
+              >
+                {clinics.map(c => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.city})</option>
+                ))}
+              </select>
+            ) : (
+              <select
+                value={activePharmacyId || ''}
+                onChange={(e) => setActivePharmacyId(e.target.value)}
+                style={{ background: '#1c1c1e', color: 'white', border: '1px solid rgba(255,255,255,0.1)', padding: '8px', borderRadius: '8px', fontSize: '0.7rem' }}
+              >
+                {pharmacies.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} ({p.city})</option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Grid: Triage Alerts and Auditor */}
       <div className="dashboard-grid">
         
@@ -83,47 +155,61 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
 
           <div className="alerts-card-list">
             
-            {/* Alert Item 1: Chief Chinedu BP warning */}
-            {latestBp.systolic >= 140 && (
-              <div className="alert-feed-card critical">
-                <div className="alert-card-meta">
-                  <div>
-                    <h4 className="alert-patient-name">{patientProfile.name}</h4>
-                    <p className="alert-urgency-type critical">Elevated Stroke Risk</p>
+            {isPatientAssigned ? (
+              <>
+                {/* Alert Item 1: Chief Chinedu BP warning */}
+                {latestBp.systolic >= 140 && (
+                  <div className="alert-feed-card critical">
+                    <div className="alert-card-meta">
+                      <div>
+                        <h4 className="alert-patient-name">{patientProfile.name}</h4>
+                        <p className="alert-urgency-type critical">Elevated Stroke Risk</p>
+                      </div>
+                      <span className="alert-timestamp">5 mins ago</span>
+                    </div>
+                    <p className="alert-card-body">
+                      Blood pressure logged at <strong>{latestBp.systolic}/{latestBp.diastolic} mmHg</strong> (Stage 2 Hypertension). Heart rate is slightly tachycardic.
+                    </p>
+                    <button
+                      onClick={() => handleNudge(patientProfile.name, `blood pressure is elevated at ${latestBp.systolic}/{latestBp.diastolic} mmHg. Please log values twice daily.`)}
+                      className="btn-nudge"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" /> Send WhatsApp Nudge
+                    </button>
                   </div>
-                  <span className="alert-timestamp">5 mins ago</span>
-                </div>
-                <p className="alert-card-body">
-                  Blood pressure logged at <strong>{latestBp.systolic}/{latestBp.diastolic} mmHg</strong> (Stage 2 Hypertension). Heart rate is slightly tachycardic.
-                </p>
-                <button
-                  onClick={() => handleNudge(patientProfile.name, `blood pressure is elevated at ${latestBp.systolic}/${latestBp.diastolic} mmHg. Please log values twice daily.`)}
-                  className="btn-nudge"
-                >
-                  <MessageSquare className="w-3.5 h-3.5" /> Send WhatsApp Nudge
-                </button>
-              </div>
-            )}
+                )}
 
-            {/* Alert Item 2: Chief Chinedu Glucose warning */}
-            {latestGlucose.level >= 130 && (
-              <div className="alert-feed-card warning">
-                <div className="alert-card-meta">
-                  <div>
-                    <h4 className="alert-patient-name">{patientProfile.name}</h4>
-                    <p className="alert-urgency-type warning">Hyperglycemia Warning</p>
+                {/* Alert Item 2: Chief Chinedu Glucose warning */}
+                {latestGlucose.level >= 130 && (
+                  <div className="alert-feed-card warning">
+                    <div className="alert-card-meta">
+                      <div>
+                        <h4 className="alert-patient-name">{patientProfile.name}</h4>
+                        <p className="alert-urgency-type warning">Hyperglycemia Warning</p>
+                      </div>
+                      <span className="alert-timestamp">10 mins ago</span>
+                    </div>
+                    <p className="alert-card-body">
+                      Fasting glucose logged at <strong>{latestGlucose.level} mg/dL</strong> (Target &lt; 130). Metformin adherence requires verification.
+                    </p>
+                    <button
+                      onClick={() => handleNudge(patientProfile.name, `fasting blood glucose is elevated at ${latestGlucose.level} mg/dL. Ensure Metformin is taken with food.`)}
+                      className="btn-nudge"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" /> Send WhatsApp Nudge
+                    </button>
                   </div>
-                  <span className="alert-timestamp">10 mins ago</span>
-                </div>
-                <p className="alert-card-body">
-                  Fasting glucose logged at <strong>{latestGlucose.level} mg/dL</strong> (Target &lt; 130). Metformin adherence requires verification.
+                )}
+              </>
+            ) : (
+              <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <ShieldAlert className="w-8 h-8 text-gray-500" style={{ margin: '0 auto 12px auto' }} />
+                <p style={{ margin: 0, fontSize: '0.8rem', fontWeight: 'bold', color: 'white' }}>
+                  No Patients Found
                 </p>
-                <button
-                  onClick={() => handleNudge(patientProfile.name, `fasting blood glucose is elevated at ${latestGlucose.level} mg/dL. Ensure Metformin is taken with food.`)}
-                  className="btn-nudge"
-                >
-                  <MessageSquare className="w-3.5 h-3.5" /> Send WhatsApp Nudge
-                </button>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.7rem' }}>
+                  Choose the provider assigned to the patient on the Care Dashboard to simulate active consultation records.
+                </p>
               </div>
             )}
 
@@ -304,76 +390,84 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
               </tr>
             </thead>
             <tbody>
-              {orders.map((order, index) => (
-                <tr key={index}>
-                  <td style={{ fontWeight: 'bold', color: 'white' }}>{order.id}</td>
-                  <td>
-                    {order.id === 'NCD-6088' || order.id === 'NCD-5521' ? patientProfile.name : "Alhaji Ibrahim"}
-                  </td>
-                  <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.items.join(', ')}</td>
-                  <td style={{ textAlign: 'center' }}>
-                    {order.prescriptionRequired ? (
-                      order.prescriptionUploaded ? (
-                        <span className="order-rx-badge-pill valid">
-                          Uploaded (Chief_Eze_Rx.pdf)
-                        </span>
-                      ) : (
-                        <span className="order-rx-badge-pill missing">
-                          Missing Prescription
-                        </span>
-                      )
-                    ) : (
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Not Required</span>
-                    )}
-                  </td>
-                  <td style={{ textAlign: 'right' }} className="order-val-highlight">₦{order.totalNaira.toLocaleString()}</td>
-                  <td style={{ textAlign: 'center' }}>
-                    <span className={`order-status-pill ${
-                      order.status === 'Delivered' ? 'delivered' :
-                      order.status === 'Out for Delivery' ? 'transit' :
-                      order.status === 'Approved' ? 'approved' :
-                      'pending'
-                    }`} style={{ display: 'inline-flex' }}>
-                      {order.status}
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                      {order.status === 'Pending Verification' && (
-                        <button
-                          onClick={() => onUpdateOrderStatus(order.id, 'Approved')}
-                          className="btn-action-table"
-                        >
-                          Verify & Approve
-                        </button>
-                      )}
-                      {order.status === 'Approved' && (
-                        <button
-                          onClick={() => onUpdateOrderStatus(order.id, 'Out for Delivery')}
-                          className="btn-action-table"
-                          style={{ background: 'var(--color-blue)' }}
-                        >
-                          Hand to Rider
-                        </button>
-                      )}
-                      {order.status === 'Out for Delivery' && (
-                        <button
-                          onClick={() => onUpdateOrderStatus(order.id, 'Delivered')}
-                          className="btn-action-table"
-                          style={{ background: 'var(--color-green)' }}
-                        >
-                          Confirm Delivery
-                        </button>
-                      )}
-                      {order.status === 'Delivered' && (
-                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                          ✓ Complete
-                        </span>
-                      )}
-                    </div>
+              {filteredOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    No refill verification requests mapped to this provider.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredOrders.map((order, index) => (
+                  <tr key={index}>
+                    <td style={{ fontWeight: 'bold', color: 'white' }}>{order.id}</td>
+                    <td>
+                      {order.id === 'NCD-6088' || order.id === 'NCD-5521' ? patientProfile.name : "Alhaji Ibrahim"}
+                    </td>
+                    <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.items.join(', ')}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      {order.prescriptionRequired ? (
+                        order.prescriptionUploaded ? (
+                          <span className="order-rx-badge-pill valid">
+                            Uploaded (Chief_Eze_Rx.pdf)
+                          </span>
+                        ) : (
+                          <span className="order-rx-badge-pill missing">
+                            Missing Prescription
+                          </span>
+                        )
+                      ) : (
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Not Required</span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }} className="order-val-highlight">₦{order.totalNaira.toLocaleString()}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <span className={`order-status-pill ${
+                        order.status === 'Delivered' ? 'delivered' :
+                        order.status === 'Out for Delivery' ? 'transit' :
+                        order.status === 'Approved' ? 'approved' :
+                        'pending'
+                      }`} style={{ display: 'inline-flex' }}>
+                        {order.status}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                        {order.status === 'Pending Verification' && (
+                          <button
+                            onClick={() => onUpdateOrderStatus(order.id, 'Approved')}
+                            className="btn-action-table"
+                          >
+                            Verify & Approve
+                          </button>
+                        )}
+                        {order.status === 'Approved' && (
+                          <button
+                            onClick={() => onUpdateOrderStatus(order.id, 'Out for Delivery')}
+                            className="btn-action-table"
+                            style={{ background: 'var(--color-blue)' }}
+                          >
+                            Hand to Rider
+                          </button>
+                        )}
+                        {order.status === 'Out for Delivery' && (
+                          <button
+                            onClick={() => onUpdateOrderStatus(order.id, 'Delivered')}
+                            className="btn-action-table"
+                            style={{ background: 'var(--color-green)' }}
+                          >
+                            Confirm Delivery
+                          </button>
+                        )}
+                        {order.status === 'Delivered' && (
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                            ✓ Complete
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
