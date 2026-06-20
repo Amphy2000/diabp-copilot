@@ -187,6 +187,11 @@ export const NCD_MEDICATIONS = [
 const PROFILE_KEY = "diabp_patient_profile";
 const ORDERS_KEY = "diabp_refill_orders";
 
+function isValidUuid(id: any): boolean {
+  if (typeof id !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
 // LocalStorage fallback helpers
 function saveLocal(key: string, data: any) {
   try {
@@ -356,8 +361,8 @@ export async function savePatientProfile(profile: PatientNcdProfile, userId?: st
         target_glucose_range: profile.targetGlucoseRange,
         streak_days: profile.streakDays,
         active_meds: profile.activeMeds,
-        assigned_clinic_id: profile.assignedClinicId,
-        assigned_pharmacy_id: profile.assignedPharmacyId
+        assigned_clinic_id: isValidUuid(profile.assignedClinicId) ? profile.assignedClinicId : null,
+        assigned_pharmacy_id: isValidUuid(profile.assignedPharmacyId) ? profile.assignedPharmacyId : null
       };
 
       const { data: existing } = await supabase.from('ncd_profiles').select('id').eq('id', targetId).limit(1);
@@ -504,7 +509,7 @@ export async function placeRefillOrder(order: NcdRefillOrder): Promise<void> {
           status: order.status,
           prescription_required: order.prescriptionRequired,
           prescription_uploaded: order.prescriptionUploaded,
-          pharmacy_id: order.pharmacyId
+          pharmacy_id: isValidUuid(order.pharmacyId) ? order.pharmacyId : null
         }]);
       }
     } catch (err) {
@@ -919,6 +924,7 @@ async function getFootScanHistoryForPatient(patientId: string): Promise<FootScan
 export async function getPatientsForClinic(clinicId: string): Promise<PatientNcdProfile[]> {
   if (isSupabaseConfigured) {
     try {
+      if (!isValidUuid(clinicId)) return [];
       const { data: profiles, error } = await supabase
         .from('ncd_profiles')
         .select('*')
@@ -971,6 +977,7 @@ export async function getPatientsForClinic(clinicId: string): Promise<PatientNcd
 export async function getPatientsForPharmacy(pharmacyId: string): Promise<PatientNcdProfile[]> {
   if (isSupabaseConfigured) {
     try {
+      if (!isValidUuid(pharmacyId)) return [];
       const { data: profiles, error } = await supabase
         .from('ncd_profiles')
         .select('*')
