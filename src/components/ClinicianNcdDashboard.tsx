@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 import { 
   auditNcdRegimen,
-  evaluateNcdRisk
+  evaluateNcdRisk,
+  NCD_MEDICATIONS
 } from '../services/ncdService';
 import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy } from '../services/ncdService';
 
@@ -597,7 +598,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                 <th style={{ textAlign: 'center' }}>Prescription</th>
                 <th style={{ textAlign: 'right' }}>Value</th>
                 <th style={{ textAlign: 'center' }}>Status</th>
-                <th style={{ textAlign: 'center' }}>Actions</th>
+                <th style={{ textAlign: 'center' }}>{activeRole === 'clinic' ? 'Compliance Monitor' : 'Actions'}</th>
               </tr>
             </thead>
             <tbody>
@@ -614,7 +615,21 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                     <td>
                       {order.patientName || "Chief Chinedu Eze"}
                     </td>
-                    <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.items.join(', ')}</td>
+                    <td style={{ minWidth: '220px', padding: '12px 8px' }}>
+                      {order.items.map((item, idx) => {
+                        const matched = NCD_MEDICATIONS.find(m => m.name === item || item.startsWith(m.name));
+                        return (
+                          <div key={idx} style={{ marginBottom: idx < order.items.length - 1 ? '6px' : '0' }}>
+                            <div style={{ fontWeight: 'bold', color: 'white', fontSize: '0.8rem' }}>{item}</div>
+                            {matched && (
+                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', whiteSpace: 'normal', lineHeight: '1.3' }}>
+                                {matched.description}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </td>
                     <td style={{ textAlign: 'center' }}>
                       {order.prescriptionRequired ? (
                         order.prescriptionUploaded ? (
@@ -644,21 +659,12 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                     <td style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                         {activeRole === 'clinic' ? (
-                          // CLINIC / DOCTOR ACTIONS: Only clinical verification approval
-                          <>
-                            {order.status === 'Pending Verification' ? (
-                              <button
-                                onClick={() => onUpdateOrderStatus(order.id, 'Approved')}
-                                className="btn-action-table"
-                              >
-                                Verify & Approve
-                              </button>
-                            ) : (
-                              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold' }}>
-                                {order.status === 'Approved' ? '✓ Approved' : `✓ ${order.status}`}
-                              </span>
-                            )}
-                          </>
+                          // CLINIC / DOCTOR ACTIONS: Read-only compliance monitor (No verify & approve buttons)
+                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.04)', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                            {order.status === 'Pending Verification' ? 'Awaiting Pharmacy Audit' :
+                             order.status === 'Approved' ? '✓ Fulfillable / Dispensed' :
+                             order.status === 'Out for Delivery' ? '⚡ In Transit' : '✅ Delivered'}
+                          </span>
                         ) : (
                           // PHARMACIST ACTIONS: Check verification checklists and fulfill delivery
                           <>
