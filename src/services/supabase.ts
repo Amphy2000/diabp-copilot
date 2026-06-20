@@ -33,20 +33,53 @@ const mockAuth = {
     };
   },
   signInWithPassword: async ({ email }: { email: string }) => {
-    const session = {
-      user: {
-        email,
-        user_metadata: {
-          amphy_history: JSON.parse(localStorage.getItem('amphy_ai_history') || '[]')
-        }
+    const mockUsers = JSON.parse(localStorage.getItem('diabp_mock_users') || '{}');
+    const mockUser = mockUsers[email.toLowerCase()] || {
+      id: 'mock-user-default',
+      email,
+      user_metadata: {
+        role: 'patient',
+        display_name: 'Chief Chinedu Eze'
       }
+    };
+
+    const session = {
+      user: mockUser,
+      access_token: 'mock-token',
+      expires_in: 3600
     };
     localStorage.setItem('amphy_mock_session', JSON.stringify(session));
     window.location.reload();
     return { data: { session }, error: null };
   },
-  signUp: async ({ email }: { email: string }) => {
-    return { data: { user: { email } }, error: null };
+  signUp: async ({ email, password, options }: { email: string, password?: string, options?: any }) => {
+    const mockUserId = `mock-user-${Math.random().toString(36).substr(2, 9)}`;
+    const metadata = options?.data || {};
+    
+    const mockUser = {
+      id: mockUserId,
+      email,
+      user_metadata: {
+        role: metadata.role || 'patient',
+        display_name: metadata.display_name || 'Alhaji Ibrahim',
+        ...metadata
+      }
+    };
+
+    // Save to list of mock users
+    const mockUsers = JSON.parse(localStorage.getItem('diabp_mock_users') || '{}');
+    mockUsers[email.toLowerCase()] = mockUser;
+    localStorage.setItem('diabp_mock_users', JSON.stringify(mockUsers));
+
+    // Auto sign-in
+    const session = {
+      user: mockUser,
+      access_token: 'mock-token',
+      expires_in: 3600
+    };
+    localStorage.setItem('amphy_mock_session', JSON.stringify(session));
+
+    return { data: { user: mockUser }, error: null };
   },
   signOut: async () => {
     localStorage.removeItem('amphy_mock_session');
@@ -76,6 +109,75 @@ const mockAuth = {
   }
 };
 
+// Create a mock db query builder that stores facility associations in localStorage
+const mockFrom = (tableName: string) => {
+  return {
+    select: (columns?: string) => {
+      return {
+        eq: (colName: string, val: any) => {
+          return {
+            single: async () => {
+              if (tableName === 'ncd_clinicians') {
+                const associations = JSON.parse(localStorage.getItem('diabp_mock_clinicians') || '[]');
+                const found = associations.find((a: any) => a.user_id === val);
+                return { data: found || null, error: null };
+              }
+              if (tableName === 'ncd_pharmacists') {
+                const associations = JSON.parse(localStorage.getItem('diabp_mock_pharmacists') || '[]');
+                const found = associations.find((a: any) => a.user_id === val);
+                return { data: found || null, error: null };
+              }
+              return { data: null, error: null };
+            },
+            limit: (n: number) => {
+              return {
+                then(resolve: any) {
+                  resolve({ data: [], error: null });
+                }
+              };
+            }
+          };
+        },
+        order: (col: string, options?: any) => {
+          return {
+            then(resolve: any) {
+              resolve({ data: [], error: null });
+            }
+          };
+        }
+      };
+    },
+    insert: (rows: any[]) => {
+      if (tableName === 'ncd_clinicians') {
+        const associations = JSON.parse(localStorage.getItem('diabp_mock_clinicians') || '[]');
+        associations.push(...rows);
+        localStorage.setItem('diabp_mock_clinicians', JSON.stringify(associations));
+      }
+      if (tableName === 'ncd_pharmacists') {
+        const associations = JSON.parse(localStorage.getItem('diabp_mock_pharmacists') || '[]');
+        associations.push(...rows);
+        localStorage.setItem('diabp_mock_pharmacists', JSON.stringify(associations));
+      }
+      return {
+        select: () => ({
+          single: async () => ({ data: rows[0], error: null })
+        })
+      };
+    },
+    update: (payload: any) => {
+      return {
+        eq: (col: string, val: any) => {
+          return {
+            then(resolve: any) {
+              resolve({ data: null, error: null });
+            }
+          };
+        }
+      };
+    }
+  };
+};
+
 let client: any = null;
 let configured = false;
 
@@ -100,6 +202,7 @@ if (
 if (!client) {
   client = {
     auth: mockAuth,
+    from: mockFrom
   };
 }
 

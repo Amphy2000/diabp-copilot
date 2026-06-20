@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Users, 
   Calculator, 
@@ -26,6 +26,8 @@ interface ClinicianNcdDashboardProps {
   patients: PatientNcdProfile[];
   clinics: NcdClinic[];
   pharmacies: NcdPharmacy[];
+  userRole?: 'doctor' | 'pharmacist' | null;
+  facilityId?: string | null;
 }
 
 export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({ 
@@ -33,16 +35,55 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   onUpdateOrderStatus, 
   patients,
   clinics,
-  pharmacies
+  pharmacies,
+  userRole,
+  facilityId
 }) => {
   // Multi-Tenant Simulator State
-  const [activeRole, setActiveRole] = useState<'clinic' | 'pharmacy'>('clinic');
-  const [activeClinicId, setActiveClinicId] = useState<string | null>(clinics[0]?.id || null);
-  const [activePharmacyId, setActivePharmacyId] = useState<string | null>(pharmacies[0]?.id || null);
+  const [activeRole, setActiveRole] = useState<'clinic' | 'pharmacy'>(
+    userRole === 'pharmacist' ? 'pharmacy' : 'clinic'
+  );
+  const [activeClinicId, setActiveClinicId] = useState<string | null>(
+    userRole === 'doctor' && facilityId ? facilityId : (clinics[0]?.id || null)
+  );
+  const [activePharmacyId, setActivePharmacyId] = useState<string | null>(
+    userRole === 'pharmacist' && facilityId ? facilityId : (pharmacies[0]?.id || null)
+  );
+
+  // Sync state if user logs in/changes facility dynamically
+  useEffect(() => {
+    if (userRole === 'doctor' && facilityId) {
+      setActiveRole('clinic');
+      setActiveClinicId(facilityId);
+    } else if (userRole === 'pharmacist' && facilityId) {
+      setActiveRole('pharmacy');
+      setActivePharmacyId(facilityId);
+    }
+  }, [userRole, facilityId]);
 
   // Search and Selected Patient State
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<PatientNcdProfile | null>(null);
+
+  // Pharmacist Checklist State
+  const [checklist, setChecklist] = useState({
+    rxVerified: false,
+    nafdacAudit: false,
+    vitalsAudit: false,
+    identityVerified: false,
+    bundlePackaged: false
+  });
+
+  // Reset checklist when patient changes
+  useEffect(() => {
+    setChecklist({
+      rxVerified: false,
+      nafdacAudit: false,
+      vitalsAudit: false,
+      identityVerified: false,
+      bundlePackaged: false
+    });
+  }, [selectedPatient]);
 
   // Auditor form states (linked to selected patient when opened)
   const [auditAge, setAuditAge] = useState<number>(50);
@@ -127,61 +168,78 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <h4 style={{ margin: 0, fontSize: '0.8rem', color: 'var(--accent-primary)', fontWeight: 800, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <ArrowRight className="w-4 h-4 text-blue-400" /> Multi-Tenant Role Switcher (Audit Simulator)
+              <ArrowRight className="w-4 h-4 text-blue-400" /> {!userRole ? 'Multi-Tenant Role Switcher (Audit Simulator)' : 'Authenticated Care Team Bind'}
             </h4>
             <p style={{ margin: '4px 0 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-              Select a clinical facility or pharmacy to inspect routed data. Only assigned providers can view records.
+              {!userRole 
+                ? 'Select a clinical facility or pharmacy to inspect routed data. Only assigned providers can view records.'
+                : `Secured tenant stream active. Showing database records isolated for your facility.`
+              }
             </p>
           </div>
           
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <button
-                onClick={() => {
-                  setActiveRole('clinic');
-                  setSelectedPatient(null);
-                }}
-                style={{ padding: '8px 12px', fontSize: '0.7rem', border: 'none', background: activeRole === 'clinic' ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: activeRole === 'clinic' ? 'white' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 'bold' }}
-              >
-                Clinic / Doctor
-              </button>
-              <button
-                onClick={() => {
-                  setActiveRole('pharmacy');
-                  setSelectedPatient(null);
-                }}
-                style={{ padding: '8px 12px', fontSize: '0.7rem', border: 'none', background: activeRole === 'pharmacy' ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: activeRole === 'pharmacy' ? 'white' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 'bold' }}
-              >
-                Pharmacy
-              </button>
-            </div>
+            {!userRole ? (
+              <>
+                <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <button
+                    onClick={() => {
+                      setActiveRole('clinic');
+                      setSelectedPatient(null);
+                    }}
+                    style={{ padding: '8px 12px', fontSize: '0.7rem', border: 'none', background: activeRole === 'clinic' ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: activeRole === 'clinic' ? 'white' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    Clinic / Doctor
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveRole('pharmacy');
+                      setSelectedPatient(null);
+                    }}
+                    style={{ padding: '8px 12px', fontSize: '0.7rem', border: 'none', background: activeRole === 'pharmacy' ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: activeRole === 'pharmacy' ? 'white' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    Pharmacy
+                  </button>
+                </div>
 
-            {activeRole === 'clinic' ? (
-              <select
-                value={activeClinicId || ''}
-                onChange={(e) => {
-                  setActiveClinicId(e.target.value);
-                  setSelectedPatient(null);
-                }}
-                style={{ background: '#1c1c1e', color: 'white', border: '1px solid rgba(255,255,255,0.1)', padding: '8px', borderRadius: '8px', fontSize: '0.7rem' }}
-              >
-                {clinics.map(c => (
-                  <option key={c.id} value={c.id}>{c.name} ({c.city})</option>
-                ))}
-              </select>
+                {activeRole === 'clinic' ? (
+                  <select
+                    value={activeClinicId || ''}
+                    onChange={(e) => {
+                      setActiveClinicId(e.target.value);
+                      setSelectedPatient(null);
+                    }}
+                    style={{ background: '#1c1c1e', color: 'white', border: '1px solid rgba(255,255,255,0.1)', padding: '8px', borderRadius: '8px', fontSize: '0.7rem' }}
+                  >
+                    {clinics.map(c => (
+                      <option key={c.id} value={c.id}>{c.name} ({c.city})</option>
+                    ))}
+                  </select>
+                ) : (
+                  <select
+                    value={activePharmacyId || ''}
+                    onChange={(e) => {
+                      setActivePharmacyId(e.target.value);
+                      setSelectedPatient(null);
+                    }}
+                    style={{ background: '#1c1c1e', color: 'white', border: '1px solid rgba(255,255,255,0.1)', padding: '8px', borderRadius: '8px', fontSize: '0.7rem' }}
+                  >
+                    {pharmacies.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.city})</option>
+                    ))}
+                  </select>
+                )}
+              </>
             ) : (
-              <select
-                value={activePharmacyId || ''}
-                onChange={(e) => {
-                  setActivePharmacyId(e.target.value);
-                  setSelectedPatient(null);
-                }}
-                style={{ background: '#1c1c1e', color: 'white', border: '1px solid rgba(255,255,255,0.1)', padding: '8px', borderRadius: '8px', fontSize: '0.7rem' }}
-              >
-                {pharmacies.map(p => (
-                  <option key={p.id} value={p.id}>{p.name} ({p.city})</option>
-                ))}
-              </select>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: 'rgba(20, 184, 166, 0.12)', border: '1px solid rgba(20, 184, 166, 0.25)', borderRadius: '8px', fontSize: '0.75rem', color: 'var(--color-teal-light)', fontWeight: 'bold' }}>
+                <ShieldCheck size={14} />
+                <span>
+                  Facility: {activeRole === 'clinic' 
+                    ? (clinics.find(c => c.id === activeClinicId)?.name || 'Abuja Care Center') 
+                    : (pharmacies.find(p => p.id === activePharmacyId)?.name || 'Net Pharmacy')
+                  }
+                </span>
+              </div>
             )}
           </div>
         </div>
@@ -381,61 +439,139 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                 </div>
               )}
 
-              {/* Dosing Titration Form & Copilot Recommendations */}
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.8rem', color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Calculator size={14} className="text-blue-400" /> AI Regimen Titration Copilot
-                </h4>
-                
-                {/* Active Meds display */}
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                  {selectedPatient.activeMeds.map((med, i) => (
-                    <span key={i} style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '100px', color: 'white' }}>
-                      {med}
-                    </span>
-                  ))}
-                </div>
+              {/* Dosing Titration Form & Copilot Recommendations / Refill Verification Checklist */}
+              {activeRole === 'clinic' ? (
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: '0.8rem', color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Calculator size={14} className="text-blue-400" /> AI Regimen Titration Copilot
+                  </h4>
+                  
+                  {/* Active Meds display */}
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                    {selectedPatient.activeMeds.map((med, i) => (
+                      <span key={i} style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '100px', color: 'white' }}>
+                        {med}
+                      </span>
+                    ))}
+                  </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Systolic / Diastolic</label>
-                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                      <input type="number" value={auditSystolic} onChange={(e) => setAuditSystolic(Number(e.target.value))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px', color: 'white', fontSize: '0.75rem' }} />
-                      <span style={{ color: 'rgba(255,255,255,0.2)' }}>/</span>
-                      <input type="number" value={auditDiastolic} onChange={(e) => setAuditDiastolic(Number(e.target.value))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px', color: 'white', fontSize: '0.75rem' }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Systolic / Diastolic</label>
+                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                        <input type="number" value={auditSystolic} onChange={(e) => setAuditSystolic(Number(e.target.value))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px', color: 'white', fontSize: '0.75rem' }} />
+                        <span style={{ color: 'rgba(255,255,255,0.2)' }}>/</span>
+                        <input type="number" value={auditDiastolic} onChange={(e) => setAuditDiastolic(Number(e.target.value))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px', color: 'white', fontSize: '0.75rem' }} />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Glucose Level (mg/dL)</label>
+                      <input type="number" value={auditGlucose} onChange={(e) => setAuditGlucose(Number(e.target.value))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px', color: 'white', fontSize: '0.75rem' }} />
                     </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Glucose Level (mg/dL)</label>
-                    <input type="number" value={auditGlucose} onChange={(e) => setAuditGlucose(Number(e.target.value))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px', color: 'white', fontSize: '0.75rem' }} />
-                  </div>
-                </div>
 
-                {/* AI Auditing results block */}
-                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '10px', padding: '12px' }}>
-                  {activeAuditResults.warning && (
-                    <div style={{ display: 'flex', gap: '8px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', padding: '10px', borderRadius: '8px', color: '#f87171', fontSize: '0.7rem', marginBottom: '10px' }}>
-                      <ShieldAlert size={14} className="shrink-0" style={{ marginTop: '2px' }} />
-                      <div><strong>Dosing Warning:</strong> {activeAuditResults.warning}</div>
-                    </div>
-                  )}
+                  {/* AI Auditing results block */}
+                  <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '10px', padding: '12px' }}>
+                    {activeAuditResults.warning && (
+                      <div style={{ display: 'flex', gap: '8px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', padding: '10px', borderRadius: '8px', color: '#f87171', fontSize: '0.7rem', marginBottom: '10px' }}>
+                        <ShieldAlert size={14} className="shrink-0" style={{ marginTop: '2px' }} />
+                        <div><strong>Dosing Warning:</strong> {activeAuditResults.warning}</div>
+                      </div>
+                    )}
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.7rem' }}>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)', fontWeight: 'bold' }}>Audit Notes:</span>
-                      <ul style={{ margin: '4px 0 0 0', paddingLeft: '14px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                        {activeAuditResults.notes.map((note, i) => <li key={i}>{note}</li>)}
-                      </ul>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--color-teal-light)', fontWeight: 'bold' }}>AI Recommendations:</span>
-                      <ul style={{ margin: '4px 0 0 0', paddingLeft: '14px', color: 'white', lineHeight: '1.4' }}>
-                        {activeAuditResults.recommendations.map((rec, i) => <li key={i}>{rec}</li>)}
-                      </ul>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.7rem' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', fontWeight: 'bold' }}>Audit Notes:</span>
+                        <ul style={{ margin: '4px 0 0 0', paddingLeft: '14px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                          {activeAuditResults.notes.map((note, i) => <li key={i}>{note}</li>)}
+                        </ul>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--color-teal-light)', fontWeight: 'bold' }}>AI Recommendations:</span>
+                        <ul style={{ margin: '4px 0 0 0', paddingLeft: '14px', color: 'white', lineHeight: '1.4' }}>
+                          {activeAuditResults.recommendations.map((rec, i) => <li key={i}>{rec}</li>)}
+                        </ul>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: '0.8rem', color: 'var(--color-teal-light)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <ShieldCheck size={14} /> SafeMeds Dispensing Audit Checklist
+                  </h4>
+                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                    Perform mandatory safety audits before releasing prescription medications to prevent counterfeit distribution or adverse dosing.
+                  </p>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(0,0,0,0.15)', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.75rem', color: 'white', cursor: 'pointer' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={checklist.rxVerified} 
+                        onChange={(e) => setChecklist({ ...checklist, rxVerified: e.target.checked })} 
+                        style={{ accentColor: '#14b8a6', marginTop: '2px' }} 
+                      />
+                      <div>
+                        <strong>Verify Doctor\'s Prescription Signature</strong>
+                        <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Audit PDF file metadata and doctor credentials.</span>
+                      </div>
+                    </label>
+
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.75rem', color: 'white', cursor: 'pointer' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={checklist.nafdacAudit} 
+                        onChange={(e) => setChecklist({ ...checklist, nafdacAudit: e.target.checked })} 
+                        style={{ accentColor: '#14b8a6', marginTop: '2px' }} 
+                      />
+                      <div>
+                        <strong>NAFDAC Serial Potency Scan</strong>
+                        <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Verify drug packaging anti-counterfeit QR code.</span>
+                      </div>
+                    </label>
+
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.75rem', color: 'white', cursor: 'pointer' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={checklist.vitalsAudit} 
+                        onChange={(e) => setChecklist({ ...checklist, vitalsAudit: e.target.checked })} 
+                        style={{ accentColor: '#14b8a6', marginTop: '2px' }} 
+                      />
+                      <div>
+                        <strong>Log-Vitals Compliance Review</strong>
+                        <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Log review: Patient\'s blood pressure is within stable bounds for refill.</span>
+                      </div>
+                    </label>
+
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.75rem', color: 'white', cursor: 'pointer' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={checklist.identityVerified} 
+                        onChange={(e) => setChecklist({ ...checklist, identityVerified: e.target.checked })} 
+                        style={{ accentColor: '#14b8a6', marginTop: '2px' }} 
+                      />
+                      <div>
+                        <strong>Confirm Patient Identity</strong>
+                        <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Match demographic record and photo.</span>
+                      </div>
+                    </label>
+
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.75rem', color: 'white', cursor: 'pointer' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={checklist.bundlePackaged} 
+                        onChange={(e) => setChecklist({ ...checklist, bundlePackaged: e.target.checked })} 
+                        style={{ accentColor: '#14b8a6', marginTop: '2px' }} 
+                      />
+                      <div>
+                        <strong>Package Chronic Meds Bundle</strong>
+                        <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Ensure exact tablet count (Metformin, Amlodipine, Lisinopril).</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              )}
 
             </div>
           )}
@@ -476,7 +612,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                   <tr key={index}>
                     <td style={{ fontWeight: 'bold', color: 'white' }}>{order.id}</td>
                     <td>
-                      {order.id === 'NCD-6088' || order.id === 'NCD-5521' ? patientProfile.name : "Chief Chinedu Eze"}
+                      {order.patientName || "Chief Chinedu Eze"}
                     </td>
                     <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.items.join(', ')}</td>
                     <td style={{ textAlign: 'center' }}>
@@ -507,36 +643,66 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                        {order.status === 'Pending Verification' && (
-                          <button
-                            onClick={() => onUpdateOrderStatus(order.id, 'Approved')}
-                            className="btn-action-table"
-                          >
-                            Verify & Approve
-                          </button>
-                        )}
-                        {order.status === 'Approved' && (
-                          <button
-                            onClick={() => onUpdateOrderStatus(order.id, 'Out for Delivery')}
-                            className="btn-action-table"
-                            style={{ background: 'var(--color-blue)' }}
-                          >
-                            Hand to Rider
-                          </button>
-                        )}
-                        {order.status === 'Out for Delivery' && (
-                          <button
-                            onClick={() => onUpdateOrderStatus(order.id, 'Delivered')}
-                            className="btn-action-table"
-                            style={{ background: 'var(--color-green)' }}
-                          >
-                            Confirm Delivery
-                          </button>
-                        )}
-                        {order.status === 'Delivered' && (
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                            ✓ Complete
-                          </span>
+                        {activeRole === 'clinic' ? (
+                          // CLINIC / DOCTOR ACTIONS: Only clinical verification approval
+                          <>
+                            {order.status === 'Pending Verification' ? (
+                              <button
+                                onClick={() => onUpdateOrderStatus(order.id, 'Approved')}
+                                className="btn-action-table"
+                              >
+                                Verify & Approve
+                              </button>
+                            ) : (
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold' }}>
+                                {order.status === 'Approved' ? '✓ Approved' : `✓ ${order.status}`}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          // PHARMACIST ACTIONS: Check verification checklists and fulfill delivery
+                          <>
+                            {order.status === 'Pending Verification' && (
+                              <button
+                                onClick={() => onUpdateOrderStatus(order.id, 'Approved')}
+                                className="btn-action-table"
+                                disabled={!checklist.rxVerified || !checklist.nafdacAudit}
+                                style={{ 
+                                  opacity: (!checklist.rxVerified || !checklist.nafdacAudit) ? 0.5 : 1,
+                                  cursor: (!checklist.rxVerified || !checklist.nafdacAudit) ? 'not-allowed' : 'pointer'
+                                }}
+                                title={(!checklist.rxVerified || !checklist.nafdacAudit) 
+                                  ? "Please verify prescription signature and perform NAFDAC serial scan first in patient file" 
+                                  : "Approve medication release"
+                                }
+                              >
+                                Verify & Approve
+                              </button>
+                            )}
+                            {order.status === 'Approved' && (
+                              <button
+                                onClick={() => onUpdateOrderStatus(order.id, 'Out for Delivery')}
+                                className="btn-action-table"
+                                style={{ background: 'var(--color-blue)' }}
+                              >
+                                Hand to Rider
+                              </button>
+                            )}
+                            {order.status === 'Out for Delivery' && (
+                              <button
+                                onClick={() => onUpdateOrderStatus(order.id, 'Delivered')}
+                                className="btn-action-table"
+                                style={{ background: 'var(--color-green)' }}
+                              >
+                                Confirm Delivery
+                              </button>
+                            )}
+                            {order.status === 'Delivered' && (
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                ✓ Complete
+                              </span>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>

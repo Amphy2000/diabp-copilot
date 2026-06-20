@@ -93,7 +93,9 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
       status: 'Pending Verification',
       prescriptionRequired: requiresRx,
       prescriptionUploaded: !!prescriptionFile,
-      pharmacyId: profile.assignedPharmacyId
+      pharmacyId: profile.assignedPharmacyId,
+      patientId: profile.id,
+      patientName: profile.name
     };
 
     onPlaceOrder(newOrder);

@@ -28,6 +28,7 @@ export interface FootScanRecord {
 }
 
 export interface PatientNcdProfile {
+  id?: string; // Links to auth user uuid
   name: string;
   age: number;
   weight: number; // kg
@@ -52,6 +53,8 @@ export interface NcdRefillOrder {
   prescriptionRequired: boolean;
   prescriptionUploaded: boolean;
   pharmacyId: string | null;
+  patientId?: string;
+  patientName?: string;
 }
 
 export interface NcdClinic {
@@ -208,71 +211,91 @@ export async function getPatientProfile(userId?: string): Promise<PatientNcdProf
             console.info("No profile found in Supabase. Initializing default profile...");
             const localProfile = loadLocal(PROFILE_KEY, INITIAL_NCD_PATIENT);
             await savePatientProfile(localProfile, targetId);
-            return localProfile;
+            return { id: targetId, ...localProfile };
           }
         }
         // Table may not exist yet, fallback to LocalStorage
         if (profileErr.code === '42P01') {
           console.warn("Supabase tables not configured. Falling back to LocalStorage.");
-          return loadLocal(PROFILE_KEY, INITIAL_NCD_PATIENT);
+        } else {
+          throw profileErr;
         }
-        throw profileErr;
       }
 
-      // 2. Fetch history logs associated with this profile
-      const { data: vitalsData } = await supabase
-        .from('ncd_vitals')
-        .select('*')
-        .eq('patient_id', targetId)
-        .order('created_at', { ascending: true });
+      if (profileData) {
+        // 2. Fetch history logs associated with this profile
+        const { data: vitalsData } = await supabase
+          .from('ncd_vitals')
+          .select('*')
+          .eq('patient_id', targetId)
+          .order('created_at', { ascending: true });
 
-      const { data: scansData } = await supabase
-        .from('ncd_foot_scans')
-        .select('*')
-        .eq('patient_id', targetId)
-        .order('created_at', { ascending: true });
+        const { data: scansData } = await supabase
+          .from('ncd_foot_scans')
+          .select('*')
+          .eq('patient_id', targetId)
+          .order('created_at', { ascending: true });
 
-      // Convert database logs to history arrays
-      const bpHistory: BpReading[] = (vitalsData || []).map(v => ({
-        date: v.date,
-        systolic: v.systolic,
-        diastolic: v.diastolic
-      }));
+        // Convert database logs to history arrays
+        const bpHistory: BpReading[] = (vitalsData || []).map(v => ({
+          date: v.date,
+          systolic: v.systolic,
+          diastolic: v.diastolic
+        }));
 
-      const glucoseHistory: GlucoseReading[] = (vitalsData || []).map(v => ({
-        date: v.date,
-        level: v.glucose_level,
-        type: v.glucose_type as any
-      }));
+        const glucoseHistory: GlucoseReading[] = (vitalsData || []).map(v => ({
+          date: v.date,
+          level: v.glucose_level,
+          type: v.glucose_type as any
+        }));
 
-      const footScanHistory: FootScanRecord[] = (scansData || []).map(s => ({
-        date: s.date,
-        hasHotspots: s.has_hotspots,
-        hotspots: s.hotspots as any,
-        riskScore: s.risk_score,
-        recommendations: s.recommendations
-      }));
+        const footScanHistory: FootScanRecord[] = (scansData || []).map(s => ({
+          date: s.date,
+          hasHotspots: s.has_hotspots,
+          hotspots: s.hotspots as any,
+          riskScore: s.risk_score,
+          recommendations: s.recommendations
+        }));
 
-      return {
-        name: profileData.name,
-        age: profileData.age,
-        weight: profileData.weight,
-        conditions: profileData.conditions,
-        baselineBp: profileData.baseline_bp,
-        targetGlucoseRange: profileData.target_glucose_range,
-        streakDays: profileData.streak_days,
-        activeMeds: profileData.active_meds,
-        assignedClinicId: profileData.assigned_clinic_id,
-        assignedPharmacyId: profileData.assigned_pharmacy_id,
-        bpHistory: bpHistory.length > 0 ? bpHistory : INITIAL_NCD_PATIENT.bpHistory,
-        glucoseHistory: glucoseHistory.length > 0 ? glucoseHistory : INITIAL_NCD_PATIENT.glucoseHistory,
-        footScanHistory: footScanHistory.length > 0 ? footScanHistory : INITIAL_NCD_PATIENT.footScanHistory
-      };
+        return {
+          id: targetId,
+          name: profileData.name,
+          age: profileData.age,
+          weight: profileData.weight,
+          conditions: profileData.conditions,
+          baselineBp: profileData.baseline_bp,
+          targetGlucoseRange: profileData.target_glucose_range,
+          streakDays: profileData.streak_days,
+          activeMeds: profileData.active_meds,
+          assignedClinicId: profileData.assigned_clinic_id,
+          assignedPharmacyId: profileData.assigned_pharmacy_id,
+          bpHistory: bpHistory.length > 0 ? bpHistory : INITIAL_NCD_PATIENT.bpHistory,
+          glucoseHistory: glucoseHistory.length > 0 ? glucoseHistory : INITIAL_NCD_PATIENT.glucoseHistory,
+          footScanHistory: footScanHistory.length > 0 ? footScanHistory : INITIAL_NCD_PATIENT.footScanHistory
+        };
+      }
     } catch (err) {
       console.error("Supabase load error, falling back to LocalStorage:", err);
     }
   }
-  return loadLocal(PROFILE_KEY, INITIAL_NCD_PATIENT);
+
+  // Fallback local storage dictionary lookup
+  let targetId = userId;
+  if (!targetId) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      targetId = user?.id;
+    } catch {}
+  }
+  if (!targetId) {
+    return loadLocal(PROFILE_KEY, INITIAL_NCD_PATIENT);
+  }
+
+  const allProfiles = loadLocal('diabp_profiles', {});
+  if (allProfiles[targetId]) {
+    return { id: targetId, ...allProfiles[targetId] };
+  }
+  return { id: targetId, ...loadLocal(PROFILE_KEY, INITIAL_NCD_PATIENT) };
 }
 
 /**
@@ -282,16 +305,22 @@ export async function savePatientProfile(profile: PatientNcdProfile, userId?: st
   // Always update LocalStorage first
   saveLocal(PROFILE_KEY, profile);
 
-  if (isSupabaseConfigured) {
+  let targetId = userId;
+  if (!targetId) {
     try {
-      let targetId = userId;
-      if (!targetId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        targetId = user?.id;
-      }
+      const { data: { user } } = await supabase.auth.getUser();
+      targetId = user?.id;
+    } catch {}
+  }
 
-      if (!targetId) return;
+  if (targetId) {
+    const allProfiles = loadLocal('diabp_profiles', {});
+    allProfiles[targetId] = { ...profile, id: targetId };
+    saveLocal('diabp_profiles', allProfiles);
+  }
 
+  if (isSupabaseConfigured && targetId) {
+    try {
       const payload = {
         id: targetId,
         name: profile.name,
@@ -396,7 +425,7 @@ export async function getRefillOrders(): Promise<NcdRefillOrder[]> {
     try {
       const { data, error } = await supabase
         .from('ncd_orders')
-        .select('*')
+        .select('*, ncd_profiles(name)')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -413,7 +442,9 @@ export async function getRefillOrders(): Promise<NcdRefillOrder[]> {
           status: o.status as any,
           prescriptionRequired: o.prescription_required,
           prescriptionUploaded: o.prescription_uploaded,
-          pharmacyId: o.pharmacy_id
+          pharmacyId: o.pharmacy_id,
+          patientId: o.patient_id,
+          patientName: (o.ncd_profiles as any)?.name || "Unknown Patient"
         }));
       }
     } catch (err) {
@@ -759,7 +790,7 @@ export async function getClinics(): Promise<NcdClinic[]> {
     try {
       const { data, error } = await supabase.from('ncd_clinics').select('*');
       if (error) {
-        if (error.code === '42P01') return MOCK_CLINICS;
+        if (error.code === '42P01') return loadLocal("diabp_clinics", MOCK_CLINICS);
         throw error;
       }
       if (data && data.length > 0) {
@@ -778,7 +809,7 @@ export async function getClinics(): Promise<NcdClinic[]> {
       console.error("Supabase clinics load failed, using mock data:", err);
     }
   }
-  return MOCK_CLINICS;
+  return loadLocal("diabp_clinics", MOCK_CLINICS);
 }
 
 export async function getPharmacies(): Promise<NcdPharmacy[]> {
@@ -786,7 +817,7 @@ export async function getPharmacies(): Promise<NcdPharmacy[]> {
     try {
       const { data, error } = await supabase.from('ncd_pharmacies').select('*');
       if (error) {
-        if (error.code === '42P01') return MOCK_PHARMACIES;
+        if (error.code === '42P01') return loadLocal("diabp_pharmacies", MOCK_PHARMACIES);
         throw error;
       }
       if (data && data.length > 0) {
@@ -806,7 +837,7 @@ export async function getPharmacies(): Promise<NcdPharmacy[]> {
       console.error("Supabase pharmacies load failed, using mock data:", err);
     }
   }
-  return MOCK_PHARMACIES;
+  return loadLocal("diabp_pharmacies", MOCK_PHARMACIES);
 }
 
 async function getBpHistoryForPatient(patientId: string): Promise<BpReading[]> {
@@ -863,8 +894,11 @@ export async function getPatientsForClinic(clinicId: string): Promise<PatientNcd
         .eq('assigned_clinic_id', clinicId);
         
       if (error) {
-        if (error.code === '42P01') return [INITIAL_NCD_PATIENT];
-        throw error;
+        if (error.code === '42P01') {
+          // Fallback to local storage
+        } else {
+          throw error;
+        }
       }
       
       if (profiles && profiles.length > 0) {
@@ -874,6 +908,7 @@ export async function getPatientsForClinic(clinicId: string): Promise<PatientNcd
           const glucoseHistory = await getGlucoseHistoryForPatient(p.id);
           const footScanHistory = await getFootScanHistoryForPatient(p.id);
           patients.push({
+            id: p.id,
             name: p.name,
             age: p.age,
             weight: p.weight,
@@ -892,10 +927,14 @@ export async function getPatientsForClinic(clinicId: string): Promise<PatientNcd
         return patients;
       }
     } catch (err) {
-      console.error("Failed to fetch clinic patients:", err);
+      console.error("Failed to fetch clinic patients from Supabase:", err);
     }
   }
-  return [INITIAL_NCD_PATIENT];
+
+  // Local storage fallback filter
+  const allProfiles = loadLocal('diabp_profiles', {});
+  const clinicPatients = Object.values(allProfiles).filter((p: any) => p.assignedClinicId === clinicId) as PatientNcdProfile[];
+  return clinicPatients.length > 0 ? clinicPatients : [{ ...INITIAL_NCD_PATIENT, id: 'mock-patient-default' }];
 }
 
 export async function getPatientsForPharmacy(pharmacyId: string): Promise<PatientNcdProfile[]> {
@@ -907,8 +946,11 @@ export async function getPatientsForPharmacy(pharmacyId: string): Promise<Patien
         .eq('assigned_pharmacy_id', pharmacyId);
         
       if (error) {
-        if (error.code === '42P01') return [INITIAL_NCD_PATIENT];
-        throw error;
+        if (error.code === '42P01') {
+          // Fallback to local storage
+        } else {
+          throw error;
+        }
       }
       
       if (profiles && profiles.length > 0) {
@@ -918,6 +960,7 @@ export async function getPatientsForPharmacy(pharmacyId: string): Promise<Patien
           const glucoseHistory = await getGlucoseHistoryForPatient(p.id);
           const footScanHistory = await getFootScanHistoryForPatient(p.id);
           patients.push({
+            id: p.id,
             name: p.name,
             age: p.age,
             weight: p.weight,
@@ -936,10 +979,14 @@ export async function getPatientsForPharmacy(pharmacyId: string): Promise<Patien
         return patients;
       }
     } catch (err) {
-      console.error("Failed to fetch pharmacy patients:", err);
+      console.error("Failed to fetch pharmacy patients from Supabase:", err);
     }
   }
-  return [INITIAL_NCD_PATIENT];
+
+  // Local storage fallback filter
+  const allProfiles = loadLocal('diabp_profiles', {});
+  const pharmacyPatients = Object.values(allProfiles).filter((p: any) => p.assignedPharmacyId === pharmacyId) as PatientNcdProfile[];
+  return pharmacyPatients.length > 0 ? pharmacyPatients : [{ ...INITIAL_NCD_PATIENT, id: 'mock-patient-default' }];
 }
 
 export async function registerClinic(name: string, address: string, city: string, phone: string): Promise<NcdClinic> {
@@ -963,7 +1010,9 @@ export async function registerClinic(name: string, address: string, city: string
     }
   }
   const newClinic: NcdClinic = { id: `clinic-${Math.random().toString(36).substr(2, 9)}`, name, address, city, contactPhone: phone };
-  MOCK_CLINICS.push(newClinic);
+  const clinics = loadLocal("diabp_clinics", MOCK_CLINICS);
+  const updatedClinics = [...clinics, newClinic];
+  saveLocal("diabp_clinics", updatedClinics);
   return newClinic;
 }
 
@@ -989,7 +1038,9 @@ export async function registerPharmacy(name: string, address: string, city: stri
     }
   }
   const newPharmacy: NcdPharmacy = { id: `pharmacy-${Math.random().toString(36).substr(2, 9)}`, name, address, city, contactPhone: phone, isVerified: true };
-  MOCK_PHARMACIES.push(newPharmacy);
+  const pharmacies = loadLocal("diabp_pharmacies", MOCK_PHARMACIES);
+  const updatedPharmacies = [...pharmacies, newPharmacy];
+  saveLocal("diabp_pharmacies", updatedPharmacies);
   return newPharmacy;
 }
 
@@ -1000,6 +1051,10 @@ export async function associateClinician(userId: string, clinicId: string, role:
     } catch (err) {
       console.error("Clinician association failed:", err);
     }
+  } else {
+    const associations = JSON.parse(localStorage.getItem('diabp_mock_clinicians') || '[]');
+    associations.push({ user_id: userId, clinic_id: clinicId, role });
+    localStorage.setItem('diabp_mock_clinicians', JSON.stringify(associations));
   }
 }
 
@@ -1010,5 +1065,9 @@ export async function associatePharmacist(userId: string, pharmacyId: string): P
     } catch (err) {
       console.error("Pharmacist association failed:", err);
     }
+  } else {
+    const associations = JSON.parse(localStorage.getItem('diabp_mock_pharmacists') || '[]');
+    associations.push({ user_id: userId, pharmacy_id: pharmacyId });
+    localStorage.setItem('diabp_mock_pharmacists', JSON.stringify(associations));
   }
 }

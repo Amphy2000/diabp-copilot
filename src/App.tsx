@@ -31,6 +31,7 @@ function App() {
   const [session, setSession] = useState<any>(null);
   const [userRole, setUserRole] = useState<'patient' | 'doctor' | 'pharmacist' | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
+  const [userFacilityId, setUserFacilityId] = useState<string | null>(null);
 
   // Centralized Application State
   const [patientProfile, setPatientProfile] = useState<PatientNcdProfile | null>(null);
@@ -66,6 +67,7 @@ function App() {
       setPatientProfile(null);
       setPatients([]);
       setOrders([]);
+      setUserFacilityId(null);
       return;
     }
 
@@ -93,6 +95,7 @@ function App() {
               .single();
             if (clinician?.clinic_id) clinicId = clinician.clinic_id;
           } catch {}
+          setUserFacilityId(clinicId);
           const clinicPatients = await getPatientsForClinic(clinicId);
           const refillOrders = await getRefillOrders();
           setPatients(clinicPatients);
@@ -107,6 +110,7 @@ function App() {
               .single();
             if (pharmacist?.pharmacy_id) pharmacyId = pharmacist.pharmacy_id;
           } catch {}
+          setUserFacilityId(pharmacyId);
           const pharmacyPatients = await getPatientsForPharmacy(pharmacyId);
           const refillOrders = await getRefillOrders();
           setPatients(pharmacyPatients);
@@ -154,6 +158,7 @@ function App() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    setUserFacilityId(null);
     window.location.reload();
   };
 
@@ -293,6 +298,8 @@ function App() {
               patients={patients} 
               clinics={clinics}
               pharmacies={pharmacies}
+              userRole={userRole}
+              facilityId={userFacilityId}
             />
           </div>
         )}
