@@ -13,11 +13,11 @@ import {
   Compass
 } from 'lucide-react';
 import { 
-  PatientNcdProfile, 
   evaluateNcdRisk, 
   simulateFootScan, 
-  FootScanRecord 
 } from '../services/ncdService';
+import type { PatientNcdProfile, FootScanRecord } from '../services/ncdService';
+
 
 interface PatientNcdDashboardProps {
   profile: PatientNcdProfile;

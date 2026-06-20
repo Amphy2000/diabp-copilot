@@ -10,10 +10,10 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { 
-  PatientNcdProfile, 
-  NcdRefillOrder, 
   auditNcdRegimen 
 } from '../services/ncdService';
+import type { PatientNcdProfile, NcdRefillOrder } from '../services/ncdService';
+
 
 interface ClinicianNcdDashboardProps {
   orders: NcdRefillOrder[];

@@ -10,9 +10,9 @@ import {
 import { 
   INITIAL_NCD_PATIENT, 
   INITIAL_NCD_ORDERS, 
-  PatientNcdProfile, 
-  NcdRefillOrder 
 } from './services/ncdService';
+import type { PatientNcdProfile, NcdRefillOrder } from './services/ncdService';
+
 import { PatientNcdDashboard } from './components/PatientNcdDashboard';
 import { NcdSafeMeds } from './components/NcdSafeMeds';
 import { ClinicianNcdDashboard } from './components/ClinicianNcdDashboard';

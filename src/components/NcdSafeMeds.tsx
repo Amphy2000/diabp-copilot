@@ -9,7 +9,9 @@ import {
   Clock, 
   MapPin 
 } from 'lucide-react';
-import { NcdRefillOrder, NCD_MEDICATIONS } from '../services/ncdService';
+import { NCD_MEDICATIONS } from '../services/ncdService';
+import type { NcdRefillOrder } from '../services/ncdService';
+
 
 interface NcdSafeMedsProps {
   orders: NcdRefillOrder[];
