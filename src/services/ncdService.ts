@@ -442,23 +442,27 @@ export async function logFootScanRecord(record: FootScanRecord): Promise<void> {
   }
 }
 
-/**
- * Fetches Refill Orders list
- */
 export async function getRefillOrders(): Promise<NcdRefillOrder[]> {
   if (isSupabaseConfigured) {
     try {
-      const { data, error } = await supabase
-        .from('ncd_orders')
-        .select('*, ncd_profiles(name)')
-        .order('created_at', { ascending: false });
+      const { data: { user } } = await supabase.auth.getUser();
+      let query = supabase.from('ncd_orders').select('*, ncd_profiles(name)');
+      
+      if (user) {
+        const role = user.user_metadata?.role;
+        if (role === 'patient') {
+          query = query.eq('patient_id', user.id);
+        }
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
         if (error.code === '42P01') return loadLocal(ORDERS_KEY, INITIAL_NCD_ORDERS);
         throw error;
       }
 
-      if (data && data.length > 0) {
+      if (data) {
         return data.map(o => ({
           id: o.order_number,
           date: o.date,
