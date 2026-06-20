@@ -12,7 +12,6 @@ import {
 import { NCD_MEDICATIONS } from '../services/ncdService';
 import type { NcdRefillOrder } from '../services/ncdService';
 
-
 interface NcdSafeMedsProps {
   orders: NcdRefillOrder[];
   onPlaceOrder: (order: NcdRefillOrder) => void;
@@ -104,19 +103,19 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'Delivered': return <CheckCircle2 className="w-4 h-4 text-green-400" />;
-      case 'Out for Delivery': return <Truck className="w-4 h-4 text-blue-400" />;
-      case 'Approved': return <ShieldCheck className="w-4 h-4 text-teal-400" />;
-      default: return <Clock className="w-4 h-4 text-orange-400" />;
+      case 'Delivered': return <CheckCircle2 className="w-3.5 h-3.5" />;
+      case 'Out for Delivery': return <Truck className="w-3.5 h-3.5" />;
+      case 'Approved': return <ShieldCheck className="w-3.5 h-3.5" />;
+      default: return <Clock className="w-3.5 h-3.5" />;
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusClass = (status: string) => {
     switch (status) {
-      case 'Delivered': return 'text-green-400 bg-green-950/20 border-green-800/30';
-      case 'Out for Delivery': return 'text-blue-400 bg-blue-950/20 border-blue-800/30';
-      case 'Approved': return 'text-teal-400 bg-teal-950/20 border-teal-800/30';
-      default: return 'text-orange-400 bg-orange-950/20 border-orange-800/30';
+      case 'Delivered': return 'delivered';
+      case 'Out for Delivery': return 'transit';
+      case 'Approved': return 'approved';
+      default: return 'pending';
     }
   };
 
@@ -124,95 +123,96 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder }
     <div className="space-y-6 animate-fade-in" style={{ paddingBottom: '30px' }}>
       
       {/* Safety Shield Header */}
-      <div className="glass-panel p-5 bg-gradient-to-r from-teal-950/30 to-blue-950/30 border border-teal-500/10 flex items-center gap-4">
-        <div className="p-3 bg-teal-500/10 rounded-xl border border-teal-500/20 text-teal-400">
+      <div className="glass-panel" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', background: 'linear-gradient(135deg, rgba(15, 118, 110, 0.05) 0%, rgba(2, 132, 199, 0.05) 100%)' }}>
+        <div style={{ padding: '0.6rem', borderRadius: '12px', background: 'rgba(20, 184, 166, 0.1)', color: 'var(--color-teal-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <ShieldCheck className="w-6 h-6" />
         </div>
         <div>
-          <h3 className="font-bold text-white text-base">Verified NCD Safe-Meds Network</h3>
-          <p className="text-xs text-gray-400 leading-normal">
+          <h3 className="card-title" style={{ fontSize: '1rem' }}>Verified NCD Safe-Meds Network</h3>
+          <p className="scan-status-info" style={{ marginTop: '2px' }}>
             Every refill batch of Metformin, Insulin, and Antihypertensives in our network is audited for purity and clinical potency. We combat counterfeit drugs in Nigeria to keep your chronic care plan secure.
           </p>
         </div>
       </div>
 
       {orderNotification && (
-        <div className="p-4 bg-teal-900/20 border border-teal-500/30 text-teal-300 rounded-xl text-sm font-semibold text-center animate-pulse">
+        <div className="p-4 bg-teal-950/20 border border-teal-500/20 text-teal-300 rounded-xl text-sm font-semibold text-center animate-pulse">
           {orderNotification}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="dashboard-grid">
         
         {/* Refill Store Selection */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="glass-panel p-6 space-y-4">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2 border-b border-gray-800 pb-3">
-              <ShoppingBag className="w-5 h-5 text-teal-500" /> Choose Refill Items
-            </h3>
+        <div className="left-column space-y-6">
+          <div className="glass-panel">
+            <div className="card-header-divider">
+              <h3 className="card-title">
+                <ShoppingBag className="card-title-icon text-teal-400" /> Choose Refill Items
+              </h3>
+            </div>
 
-            <div className="space-y-3">
-              {NCD_MEDICATIONS.map(med => (
-                <div 
-                  key={med.id}
-                  onClick={() => handleToggleMed(med.id)}
-                  className={`p-4 rounded-xl border cursor-pointer flex justify-between items-start gap-4 transition-all hover:bg-white/5 ${
-                    selectedMeds.includes(med.id)
-                      ? 'border-teal-500/30 bg-teal-950/15'
-                      : 'border-gray-800 bg-gray-950/20'
-                  }`}
-                >
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-white text-sm">{med.name}</span>
-                      {med.rxRequired && (
-                        <span className="px-2 py-0.5 text-[9px] font-bold bg-orange-950 text-orange-400 border border-orange-800/30 rounded uppercase tracking-wider">
-                          Doctor Prescription Required
-                        </span>
-                      )}
+            <div className="meds-row-layout">
+              {NCD_MEDICATIONS.map(med => {
+                const isSelected = selectedMeds.includes(med.id);
+                return (
+                  <div 
+                    key={med.id}
+                    onClick={() => handleToggleMed(med.id)}
+                    className={`meds-card-item ${isSelected ? 'selected' : ''}`}
+                  >
+                    <div className="meds-info-block">
+                      <div className="meds-name-group">
+                        <span className="meds-name">{med.name}</span>
+                        {med.rxRequired && (
+                          <span className="rx-badge">
+                            Rx Required
+                          </span>
+                        )}
+                      </div>
+                      <p className="meds-description">{med.description}</p>
                     </div>
-                    <p className="text-xs text-gray-500">{med.description}</p>
+                    <div className="meds-price-group">
+                      <div className="meds-price">₦{med.price.toLocaleString()}</div>
+                      <div className="meds-price-period">per month</div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-extrabold text-white text-base">₦{med.price.toLocaleString()}</div>
-                    <div className="text-[10px] text-gray-500">per month</div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
           {/* Active Refill Tracker / Order History */}
-          <div className="glass-panel p-6 space-y-4">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2 border-b border-gray-800 pb-3">
-              <Truck className="w-5 h-5 text-blue-500" /> Refill Dispatch Tracker
-            </h3>
+          <div className="glass-panel">
+            <div className="card-header-divider">
+              <h3 className="card-title">
+                <Truck className="card-title-icon text-blue-400" /> Refill Dispatch Tracker
+              </h3>
+            </div>
 
             {orders.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-6">No order logs found.</p>
+              <p className="scan-status-info" style={{ textAlign: 'center', padding: '2rem 0' }}>No order logs found.</p>
             ) : (
-              <div className="space-y-4">
+              <div className="orders-tracker-grid">
                 {orders.map((order, idx) => (
-                  <div key={idx} className="p-4 border border-gray-800/60 rounded-2xl bg-gray-950/20 space-y-3">
-                    <div className="flex justify-between items-center text-xs">
+                  <div key={idx} className="order-tracker-card-item">
+                    <div className="order-card-meta">
                       <div>
-                        <span className="text-gray-400 font-bold">Refill ID: </span>
-                        <span className="text-white font-bold">{order.id}</span>
+                        Refill ID: <span className="order-id-highlight">{order.id}</span>
                       </div>
-                      <span className="text-gray-500">{order.date}</span>
+                      <span>{order.date}</span>
                     </div>
 
-                    <div className="text-sm font-semibold text-gray-300">
+                    <div className="order-items-summary">
                       {order.items.join(', ')}
                     </div>
 
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-800/40 pt-3">
-                      <div className="text-sm">
-                        <span className="text-gray-500">Total: </span>
-                        <span className="font-extrabold text-teal-400">₦{order.totalNaira.toLocaleString()}</span>
+                    <div className="order-card-footer">
+                      <div className="order-total-price">
+                        Total: <strong>₦{order.totalNaira.toLocaleString()}</strong>
                       </div>
                       
-                      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusColor(order.status)}`}>
+                      <div className={`order-status-pill ${getStatusClass(order.status)}`}>
                         {getStatusIcon(order.status)}
                         {order.status}
                       </div>
@@ -220,15 +220,15 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder }
 
                     {/* Progress visualizer */}
                     {order.status !== 'Delivered' && (
-                      <div className="space-y-2 border-t border-gray-800/30 pt-3">
-                        <div className="flex justify-between text-[10px] text-gray-500 font-semibold uppercase">
+                      <div className="order-progress-stepper">
+                        <div className="stepper-headers">
                           <span>Verified</span>
                           <span>Dispensed</span>
                           <span>In Transit</span>
                         </div>
-                        <div className="progress-bar-container">
+                        <div className="progress-bar-rail">
                           <div 
-                            className="progress-bar-fill" 
+                            className="progress-bar-fill-ncd" 
                             style={{ 
                               width: order.status === 'Pending Verification' 
                                 ? '20%' 
@@ -238,12 +238,12 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder }
                             }}
                           ></div>
                         </div>
-                        <div className="text-[10px] text-gray-400 flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-teal-500" />
+                        <div className="progress-status-desc">
+                          <MapPin className="w-3.5 h-3.5 text-teal-400" />
                           <span>
-                            {order.status === 'Pending Verification' && "Clinician reviewing uploaded prescription and safety logs..."}
-                            {order.status === 'Approved' && "Medications audited & packaged by Pharmacist. Preparing dispatch..."}
-                            {order.status === 'Out for Delivery' && "Refill with dispatch rider. Navigating to delivery address."}
+                            {order.status === 'Pending Verification' && "Clinician reviewing prescription and sensory profiles..."}
+                            {order.status === 'Approved' && "Refill packaged. Dispense verification complete."}
+                            {order.status === 'Out for Delivery' && "Refill out with dispatcher. Delivering to your address."}
                           </span>
                         </div>
                       </div>
@@ -256,18 +256,20 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder }
         </div>
 
         {/* Right Column: Checkout Summary & Prescription Upload */}
-        <div className="space-y-6">
-          <div className="glass-panel p-6 space-y-4">
-            <h3 className="text-lg font-bold text-white border-b border-gray-800 pb-3">Refill Request</h3>
+        <div className="right-column space-y-6">
+          <div className="glass-panel">
+            <div className="card-header-divider">
+              <h3 className="card-title">Refill Request</h3>
+            </div>
             
-            <div className="space-y-2 text-sm text-gray-400">
-              <div className="flex justify-between">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)' }}>
                 <span>Selected Items:</span>
-                <span className="text-white font-bold">{selectedMeds.length}</span>
+                <span style={{ color: 'white', fontWeight: 'bold' }}>{selectedMeds.length}</span>
               </div>
-              <div className="flex justify-between border-t border-gray-800/60 pt-2 text-base font-extrabold text-white">
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.75rem', fontSize: '1.1rem', fontWeight: '800', color: 'white' }}>
                 <span>Total Refill Cost:</span>
-                <span className="text-teal-400">₦{calculateTotal().toLocaleString()}</span>
+                <span style={{ color: 'var(--color-teal-light)' }}>₦{calculateTotal().toLocaleString()}</span>
               </div>
             </div>
 
@@ -276,39 +278,37 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder }
               const med = NCD_MEDICATIONS.find(m => m.id === medId);
               return med?.rxRequired;
             }) && (
-              <div className="border border-dashed border-gray-800 rounded-xl p-4 text-center bg-gray-950/20 space-y-3">
-                <div className="flex justify-center text-teal-400">
-                  <FileText className="w-8 h-8" />
-                </div>
+              <div className="prescription-dropzone">
+                <FileText className="prescription-icon-box w-8 h-8" />
                 
                 {prescriptionFile ? (
-                  <div className="space-y-1.5">
-                    <p className="text-xs text-white font-bold truncate max-w-[200px] mx-auto">{prescriptionFile.name}</p>
-                    <p className="text-[10px] text-teal-400">✓ Uploaded & Checked for Purity</p>
+                  <div style={{ width: '100%' }}>
+                    <p className="prescription-meta-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px', margin: '0 auto' }}>{prescriptionFile.name}</p>
+                    <p className="upload-success-label" style={{ marginTop: '2px' }}>✓ Uploaded & Checked for Purity</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <p className="text-xs text-gray-300 font-medium">Doctor's Prescription Required</p>
-                    <p className="text-[10px] text-gray-500">Upload prescription to verify Metformin / Blood Pressure dosing</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', alignItems: 'center' }}>
+                    <p className="prescription-meta-title">Doctor's Prescription Required</p>
+                    <p className="prescription-meta-desc">Upload prescription to verify drug dosing safety</p>
                     
-                    <label className="cursor-pointer py-2 px-3 rounded-lg bg-gray-900 border border-gray-800 text-xs font-bold text-white hover:border-teal-500 transition-colors inline-flex items-center gap-1.5">
+                    <label className="btn-upload-file-label">
                       <Upload className="w-3.5 h-3.5" />
                       Browse Files
                       <input 
                         type="file" 
                         accept="image/*,.pdf" 
                         onChange={handleFileChange} 
-                        className="hidden" 
+                        style={{ display: 'none' }} 
                       />
                     </label>
                   </div>
                 )}
 
                 {isUploading && (
-                  <div className="space-y-1">
-                    <div className="text-[9px] text-teal-400">Uploading {uploadProgress}%</div>
-                    <div className="w-full bg-gray-800 h-1 rounded-full overflow-hidden">
-                      <div className="bg-teal-500 h-full transition-all" style={{ width: `${uploadProgress}%` }}></div>
+                  <div className="upload-progress-container">
+                    <div className="upload-progress-percent">Uploading {uploadProgress}%</div>
+                    <div className="progress-bar-mini">
+                      <div className="progress-bar-mini-fill" style={{ width: `${uploadProgress}%` }}></div>
                     </div>
                   </div>
                 )}
@@ -318,12 +318,13 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder }
             <button
               onClick={handleCheckout}
               disabled={selectedMeds.length === 0}
-              className="w-full py-3.5 rounded-xl bg-teal-700 hover:bg-teal-600 text-white font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-teal-950/40"
+              className="btn-blue"
+              style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', padding: '12px' }}
             >
               <ShieldCheck className="w-4.5 h-4.5" /> Request SafeRefill
             </button>
             
-            <p className="text-[10px] text-gray-500 leading-normal text-center">
+            <p className="prescription-meta-desc" style={{ marginTop: '0.75rem', lineHeight: '1.4', textAlign: 'center' }}>
               We verify all prescriptions against local physician registries in Nigeria to prevent medication abuse or toxic dosing.
             </p>
           </div>
