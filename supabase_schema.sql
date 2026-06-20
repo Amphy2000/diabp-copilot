@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS ncd_pharmacies (
   city TEXT NOT NULL,
   contact_phone TEXT NOT NULL,
   is_verified BOOLEAN DEFAULT false,
+  prices JSONB DEFAULT NULL, -- Custom medication pricing dictionary per pharmacy
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

@@ -72,6 +72,7 @@ export interface NcdPharmacy {
   city: string;
   contactPhone: string;
   isVerified: boolean;
+  prices?: { [medId: string]: number };
 }
 
 // Initial fallback mock datasets representing Chief Chinedu Eze
@@ -142,9 +143,33 @@ export const MOCK_CLINICS: NcdClinic[] = [
 ];
 
 export const MOCK_PHARMACIES: NcdPharmacy[] = [
-  { id: "pharmacy-1", name: "H-Medix Pharmacy Wuse II", address: "Adetokunbo Ademola Crescent", city: "Abuja", contactPhone: "+234 805 777 8888", isVerified: true },
-  { id: "pharmacy-2", name: "Net Pharmacy Kaduna", address: "Yakubu Gowon Way", city: "Kaduna", contactPhone: "+234 802 999 0000", isVerified: true },
-  { id: "pharmacy-3", name: "Garki Community Chemist", address: "Garki Area 11", city: "Abuja", contactPhone: "+234 803 444 5555", isVerified: false }
+  { 
+    id: "pharmacy-1", 
+    name: "H-Medix Pharmacy Wuse II", 
+    address: "Adetokunbo Ademola Crescent", 
+    city: "Abuja", 
+    contactPhone: "+234 805 777 8888", 
+    isVerified: true,
+    prices: { bundle: 32000, metformin: 6500, amlodipine: 5500, lisinopril: 7000, lantus: 19000 }
+  },
+  { 
+    id: "pharmacy-2", 
+    name: "Net Pharmacy Kaduna", 
+    address: "Yakubu Gowon Way", 
+    city: "Kaduna", 
+    contactPhone: "+234 802 999 0000", 
+    isVerified: true,
+    prices: { bundle: 29000, metformin: 5800, amlodipine: 4800, lisinopril: 6200, lantus: 17500 }
+  },
+  { 
+    id: "pharmacy-3", 
+    name: "Garki Community Chemist", 
+    address: "Garki Area 11", 
+    city: "Abuja", 
+    contactPhone: "+234 803 444 5555", 
+    isVerified: false,
+    prices: { bundle: 27500, metformin: 5500, amlodipine: 4500, lisinopril: 5800, lantus: 16500 }
+  }
 ];
 
 export const NCD_MEDICATIONS = [
@@ -778,7 +803,8 @@ async function seedPharmacies() {
       address: p.address,
       city: p.city,
       contact_phone: p.contactPhone,
-      is_verified: p.isVerified
+      is_verified: p.isVerified,
+      prices: p.prices
     })));
   } catch (err) {
     console.error("Failed to seed pharmacies:", err);
@@ -827,7 +853,8 @@ export async function getPharmacies(): Promise<NcdPharmacy[]> {
           address: p.address,
           city: p.city,
           contactPhone: p.contact_phone,
-          isVerified: p.is_verified
+          isVerified: p.is_verified,
+          prices: p.prices
         }));
       } else {
         await seedPharmacies();
@@ -1017,11 +1044,12 @@ export async function registerClinic(name: string, address: string, city: string
 }
 
 export async function registerPharmacy(name: string, address: string, city: string, phone: string): Promise<NcdPharmacy> {
+  const defaultPrices = { bundle: 30000, metformin: 6000, amlodipine: 5000, lisinopril: 6500, lantus: 18000 };
   if (isSupabaseConfigured) {
     try {
       const { data, error } = await supabase
         .from('ncd_pharmacies')
-        .insert([{ name, address, city, contact_phone: phone, is_verified: true }])
+        .insert([{ name, address, city, contact_phone: phone, is_verified: true, prices: defaultPrices }])
         .select()
         .single();
       if (error) throw error;
@@ -1031,13 +1059,22 @@ export async function registerPharmacy(name: string, address: string, city: stri
         address: data.address,
         city: data.city,
         contactPhone: data.contact_phone,
-        isVerified: data.is_verified
+        isVerified: data.is_verified,
+        prices: data.prices || defaultPrices
       };
     } catch (err) {
       console.error("Pharmacy registration failed:", err);
     }
   }
-  const newPharmacy: NcdPharmacy = { id: `pharmacy-${Math.random().toString(36).substr(2, 9)}`, name, address, city, contactPhone: phone, isVerified: true };
+  const newPharmacy: NcdPharmacy = { 
+    id: `pharmacy-${Math.random().toString(36).substr(2, 9)}`, 
+    name, 
+    address, 
+    city, 
+    contactPhone: phone, 
+    isVerified: true,
+    prices: defaultPrices
+  };
   const pharmacies = loadLocal("diabp_pharmacies", MOCK_PHARMACIES);
   const updatedPharmacies = [...pharmacies, newPharmacy];
   saveLocal("diabp_pharmacies", updatedPharmacies);

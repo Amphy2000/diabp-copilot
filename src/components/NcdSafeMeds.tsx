@@ -55,10 +55,20 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
     }
   };
 
+  // Find the selected pharmacy to read its pricing
+  const assignedPharmacy = pharmacies.find(p => p.id === profile.assignedPharmacyId);
+  const getMedPrice = (medId: string, basePrice: number) => {
+    if (assignedPharmacy && assignedPharmacy.prices && assignedPharmacy.prices[medId] !== undefined) {
+      return assignedPharmacy.prices[medId];
+    }
+    return basePrice;
+  };
+
   const calculateTotal = () => {
     return selectedMeds.reduce((sum, medId) => {
       const med = NCD_MEDICATIONS.find(m => m.id === medId);
-      return sum + (med ? med.price : 0);
+      const price = med ? getMedPrice(med.id, med.price) : 0;
+      return sum + price;
     }, 0);
   };
 
@@ -183,7 +193,7 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
                       <p className="meds-description">{med.description}</p>
                     </div>
                     <div className="meds-price-group">
-                      <div className="meds-price">₦{med.price.toLocaleString()}</div>
+                      <div className="meds-price">₦{getMedPrice(med.id, med.price).toLocaleString()}</div>
                       <div className="meds-price-period">per month</div>
                     </div>
                   </div>
@@ -306,7 +316,7 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
                       Browse Files
                       <input 
                         type="file" 
-                        accept="image/*,.pdf" 
+                        accept=".pdf,.jpg,.jpeg,.png" 
                         onChange={handleFileChange} 
                         style={{ display: 'none' }} 
                       />
