@@ -157,6 +157,13 @@ export async function getPatientProfile(): Promise<PatientNcdProfile> {
         .single();
         
       if (profileErr) {
+        // Table exists but is completely empty (PGRST116: no rows returned)
+        if (profileErr.code === 'PGRST116') {
+          console.info("No profile found in Supabase. Initializing default profile...");
+          const localProfile = loadLocal(PROFILE_KEY, INITIAL_NCD_PATIENT);
+          await savePatientProfile(localProfile);
+          return localProfile;
+        }
         // Table may not exist yet, fallback to LocalStorage
         if (profileErr.code === '42P01') {
           console.warn("Supabase tables not configured. Falling back to LocalStorage.");
