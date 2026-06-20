@@ -1,15 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
-  Heart, 
   ShieldCheck, 
   Users, 
   User, 
   Activity, 
-  ShoppingBag
+  ShoppingBag,
+  Compass
 } from 'lucide-react';
 import { 
-  INITIAL_NCD_PATIENT, 
-  INITIAL_NCD_ORDERS, 
+  getPatientProfile,
+  getRefillOrders,
+  placeRefillOrder as servicePlaceOrder,
+  updateOrderStatus as serviceUpdateStatus,
+  logVitalsEntry as serviceLogVitals,
+  savePatientProfile
 } from './services/ncdService';
 import type { PatientNcdProfile, NcdRefillOrder } from './services/ncdService';
 import { PatientNcdDashboard } from './components/PatientNcdDashboard';
@@ -17,22 +21,98 @@ import { NcdSafeMeds } from './components/NcdSafeMeds';
 import { ClinicianNcdDashboard } from './components/ClinicianNcdDashboard';
 
 function App() {
+  // Application Loading state
+  const [loading, setLoading] = useState(true);
+  
   // Centralized Application State
-  const [patientProfile, setPatientProfile] = useState<PatientNcdProfile>(INITIAL_NCD_PATIENT);
-  const [orders, setOrders] = useState<NcdRefillOrder[]>(INITIAL_NCD_ORDERS);
+  const [patientProfile, setPatientProfile] = useState<PatientNcdProfile | null>(null);
+  const [orders, setOrders] = useState<NcdRefillOrder[]>([]);
   
   // Navigation State
   const [currentRole, setCurrentRole] = useState<'patient' | 'pharmacist'>('patient');
   const [patientTab, setPatientTab] = useState<'dashboard' | 'refills'>('dashboard');
 
-  // Order status updater (passed to ClinicianNcdDashboard to update patient state)
-  const handleUpdateOrderStatus = (orderId: string, status: NcdRefillOrder['status']) => {
+  // Load patient data asynchronously on mount
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const profile = await getPatientProfile();
+        const refillOrders = await getRefillOrders();
+        setPatientProfile(profile);
+        setOrders(refillOrders);
+      } catch (err) {
+        console.error("Failed to load initial NCD data:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  // Update profile wrapper that persists updates
+  const handleUpdateProfile = async (updated: PatientNcdProfile) => {
+    // Optimistic local update
+    setPatientProfile(updated);
+    
+    // Check if the update is just a state change or needs direct vitals call
+    // (If the array length is different, the logger component has already triggered the logVitalsEntry call).
+    // Here we save the general profile metrics (streak, age, meds, etc.)
+    try {
+      await savePatientProfile(updated);
+    } catch (err) {
+      console.error("Failed to save patient profile:", err);
+    }
+  };
+
+  // Wrapper for vitals logger that handles persistence and re-query
+  const handleLogVitalsAndRefresh = async (systolic: number, diastolic: number, glucose: number, glucoseType: 'Fasting' | 'Post-Meal') => {
+    setLoading(true);
+    try {
+      await serviceLogVitals(systolic, diastolic, glucose, glucoseType);
+      const updatedProfile = await getPatientProfile();
+      setPatientProfile(updatedProfile);
+    } catch (err) {
+      console.error("Failed to log vitals:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Order status updater (passed to ClinicianNcdDashboard to update database state)
+  const handleUpdateOrderStatus = async (orderId: string, status: NcdRefillOrder['status']) => {
     setOrders(prevOrders => 
       prevOrders.map(order => 
         order.id === orderId ? { ...order, status } : order
       )
     );
+    try {
+      await serviceUpdateStatus(orderId, status);
+    } catch (err) {
+      console.error("Failed to update order status:", err);
+    }
   };
+
+  const handlePlaceOrder = async (newOrder: NcdRefillOrder) => {
+    setOrders(prev => [newOrder, ...prev]);
+    try {
+      await servicePlaceOrder(newOrder);
+    } catch (err) {
+      console.error("Failed to place refill order:", err);
+    }
+  };
+
+  if (loading || !patientProfile) {
+    return (
+      <div className="app-wrapper" style={{ justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', items: 'center', gap: '8px', textAlign: 'center' }}>
+          <Compass className="spinner-icon w-8 h-8 text-blue-500 animate-spin" />
+          <p style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>
+            Synchronizing with DiaBP Safe-Meds Database...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-wrapper">
@@ -106,14 +186,14 @@ function App() {
             {patientTab === 'dashboard' && (
               <PatientNcdDashboard 
                 profile={patientProfile} 
-                onUpdateProfile={setPatientProfile} 
+                onUpdateProfile={handleUpdateProfile} 
               />
             )}
             
             {patientTab === 'refills' && (
               <NcdSafeMeds 
                 orders={orders} 
-                onPlaceOrder={(newOrder) => setOrders(prev => [newOrder, ...prev])} 
+                onPlaceOrder={handlePlaceOrder} 
               />
             )}
 

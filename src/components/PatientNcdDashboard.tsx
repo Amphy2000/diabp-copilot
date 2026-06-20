@@ -12,7 +12,9 @@ import {
 } from 'lucide-react';
 import { 
   evaluateNcdRisk, 
-  simulateFootScan 
+  analyzeFootImage,
+  logVitalsEntry,
+  logFootScanRecord
 } from '../services/ncdService';
 import type { PatientNcdProfile, FootScanRecord } from '../services/ncdService';
 
@@ -47,8 +49,11 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
   );
 
   // Handle logging a new BP / Glucose reading
-  const handleLogVitals = (e: React.FormEvent) => {
+  const handleLogVitals = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Persist to DB / LocalStorage
+    await logVitalsEntry(systolic, diastolic, glucose, glucoseType);
     
     const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     
@@ -73,10 +78,13 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
       setScanning(true);
       
       // Simulate scanner animation delay
-      setTimeout(() => {
-        const result = simulateFootScan(file.name);
+      setTimeout(async () => {
+        const result = await analyzeFootImage(file);
         setScanRecord(result);
         setScanning(false);
+        
+        // Persist to DB / LocalStorage
+        await logFootScanRecord(result);
         
         // Append to profile history
         onUpdateProfile({
