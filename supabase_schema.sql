@@ -19,9 +19,9 @@ CREATE TABLE IF NOT EXISTS ncd_pharmacies (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 3. Create Patient Profiles Table
+-- 3. Create Patient Profiles Table (Linked to Supabase Auth)
 CREATE TABLE IF NOT EXISTS ncd_profiles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   age INT NOT NULL,
   weight DECIMAL NOT NULL,
@@ -35,7 +35,24 @@ CREATE TABLE IF NOT EXISTS ncd_profiles (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 4. Create Vitals Logs Table (BP + Glucose)
+-- 4. Create Clinicians Table (Linked to Supabase Auth & Clinics)
+CREATE TABLE IF NOT EXISTS ncd_clinicians (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  clinic_id UUID REFERENCES ncd_clinics(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('Doctor', 'Nurse', 'Admin')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 5. Create Pharmacists Table (Linked to Supabase Auth & Pharmacies)
+CREATE TABLE IF NOT EXISTS ncd_pharmacists (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  pharmacy_id UUID REFERENCES ncd_pharmacies(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 6. Create Vitals Logs Table (BP + Glucose)
 CREATE TABLE IF NOT EXISTS ncd_vitals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   patient_id UUID REFERENCES ncd_profiles(id) ON DELETE CASCADE,
@@ -47,7 +64,7 @@ CREATE TABLE IF NOT EXISTS ncd_vitals (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 5. Create Foot Scans Table
+-- 7. Create Foot Scans Table
 CREATE TABLE IF NOT EXISTS ncd_foot_scans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   patient_id UUID REFERENCES ncd_profiles(id) ON DELETE CASCADE,
@@ -59,7 +76,7 @@ CREATE TABLE IF NOT EXISTS ncd_foot_scans (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 6. Create Refill Orders Table
+-- 8. Create Refill Orders Table
 CREATE TABLE IF NOT EXISTS ncd_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   patient_id UUID REFERENCES ncd_profiles(id) ON DELETE CASCADE,

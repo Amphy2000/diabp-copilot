@@ -5,67 +5,124 @@ import {
   User, 
   Activity, 
   ShoppingBag,
-  Compass
+  Compass,
+  LogOut
 } from 'lucide-react';
 import { 
   getPatientProfile,
   getRefillOrders,
   placeRefillOrder as servicePlaceOrder,
   updateOrderStatus as serviceUpdateStatus,
-  logVitalsEntry as serviceLogVitals,
   savePatientProfile,
   getClinics,
-  getPharmacies
+  getPharmacies,
+  getPatientsForClinic,
+  getPatientsForPharmacy
 } from './services/ncdService';
 import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy } from './services/ncdService';
 import { PatientNcdDashboard } from './components/PatientNcdDashboard';
 import { NcdSafeMeds } from './components/NcdSafeMeds';
 import { ClinicianNcdDashboard } from './components/ClinicianNcdDashboard';
+import { Auth } from './components/Auth';
+import { supabase } from './services/supabase';
 
 function App() {
-  // Application Loading state
-  const [loading, setLoading] = useState(true);
-  
+  // Authentication State
+  const [session, setSession] = useState<any>(null);
+  const [userRole, setUserRole] = useState<'patient' | 'doctor' | 'pharmacist' | null>(null);
+  const [authChecking, setAuthChecking] = useState(true);
+
   // Centralized Application State
   const [patientProfile, setPatientProfile] = useState<PatientNcdProfile | null>(null);
+  const [patients, setPatients] = useState<PatientNcdProfile[]>([]);
   const [orders, setOrders] = useState<NcdRefillOrder[]>([]);
   const [clinics, setClinics] = useState<NcdClinic[]>([]);
   const [pharmacies, setPharmacies] = useState<NcdPharmacy[]>([]);
   
   // Navigation State
-  const [currentRole, setCurrentRole] = useState<'patient' | 'pharmacist'>('patient');
   const [patientTab, setPatientTab] = useState<'dashboard' | 'refills'>('dashboard');
+  const [loading, setLoading] = useState(false);
 
-  // Load patient data asynchronously on mount
+  // 1. Initial Auth Check and Listener
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUserRole(session?.user?.user_metadata?.role || null);
+      setAuthChecking(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUserRole(session?.user?.user_metadata?.role || null);
+      setAuthChecking(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // 2. Fetch authenticated data matching roles when session changes
+  useEffect(() => {
+    if (!session) {
+      setPatientProfile(null);
+      setPatients([]);
+      setOrders([]);
+      return;
+    }
+
     async function loadData() {
+      setLoading(true);
       try {
-        const profile = await getPatientProfile();
-        const refillOrders = await getRefillOrders();
+        const role = session.user.user_metadata.role;
         const clinicsList = await getClinics();
         const pharmaciesList = await getPharmacies();
-        
-        setPatientProfile(profile);
-        setOrders(refillOrders);
         setClinics(clinicsList);
         setPharmacies(pharmaciesList);
+
+        if (role === 'patient') {
+          const profile = await getPatientProfile();
+          const refillOrders = await getRefillOrders();
+          setPatientProfile(profile);
+          setOrders(refillOrders);
+        } else if (role === 'doctor') {
+          let clinicId = clinicsList[0]?.id || 'clinic-1';
+          try {
+            const { data: clinician } = await supabase
+              .from('ncd_clinicians')
+              .select('clinic_id')
+              .eq('user_id', session.user.id)
+              .single();
+            if (clinician?.clinic_id) clinicId = clinician.clinic_id;
+          } catch {}
+          const clinicPatients = await getPatientsForClinic(clinicId);
+          const refillOrders = await getRefillOrders();
+          setPatients(clinicPatients);
+          setOrders(refillOrders);
+        } else if (role === 'pharmacist') {
+          let pharmacyId = pharmaciesList[0]?.id || 'pharmacy-1';
+          try {
+            const { data: pharmacist } = await supabase
+              .from('ncd_pharmacists')
+              .select('pharmacy_id')
+              .eq('user_id', session.user.id)
+              .single();
+            if (pharmacist?.pharmacy_id) pharmacyId = pharmacist.pharmacy_id;
+          } catch {}
+          const pharmacyPatients = await getPatientsForPharmacy(pharmacyId);
+          const refillOrders = await getRefillOrders();
+          setPatients(pharmacyPatients);
+          setOrders(refillOrders);
+        }
       } catch (err) {
-        console.error("Failed to load initial NCD data:", err);
+        console.error("Failed to load authenticated context data:", err);
       } finally {
         setLoading(false);
       }
     }
     loadData();
-  }, []);
+  }, [session]);
 
-  // Update profile wrapper that persists updates
   const handleUpdateProfile = async (updated: PatientNcdProfile) => {
-    // Optimistic local update
     setPatientProfile(updated);
-    
-    // Check if the update is just a state change or needs direct vitals call
-    // (If the array length is different, the logger component has already triggered the logVitalsEntry call).
-    // Here we save the general profile metrics (streak, age, meds, etc.)
     try {
       await savePatientProfile(updated);
     } catch (err) {
@@ -73,21 +130,6 @@ function App() {
     }
   };
 
-  // Wrapper for vitals logger that handles persistence and re-query
-  const handleLogVitalsAndRefresh = async (systolic: number, diastolic: number, glucose: number, glucoseType: 'Fasting' | 'Post-Meal') => {
-    setLoading(true);
-    try {
-      await serviceLogVitals(systolic, diastolic, glucose, glucoseType);
-      const updatedProfile = await getPatientProfile();
-      setPatientProfile(updatedProfile);
-    } catch (err) {
-      console.error("Failed to log vitals:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Order status updater (passed to ClinicianNcdDashboard to update database state)
   const handleUpdateOrderStatus = async (orderId: string, status: NcdRefillOrder['status']) => {
     setOrders(prevOrders => 
       prevOrders.map(order => 
@@ -110,10 +152,30 @@ function App() {
     }
   };
 
-  if (loading || !patientProfile) {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.reload();
+  };
+
+  // Auth Checking Loading Spinner
+  if (authChecking) {
     return (
-      <div className="app-wrapper" style={{ justifyContent: 'center', alignItems: 'center' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', items: 'center', gap: '8px', textAlign: 'center' }}>
+      <div className="app-wrapper" style={{ justifyContent: 'center', alignItems: 'center', background: '#0d1117' }}>
+        <Compass className="spinner-icon w-8 h-8 text-blue-500 animate-spin" />
+      </div>
+    );
+  }
+
+  // Redirect to self-onboarding portal if not logged in
+  if (!session) {
+    return <Auth />;
+  }
+
+  // Role context loading indicator
+  if (loading || (userRole === 'patient' && !patientProfile)) {
+    return (
+      <div className="app-wrapper" style={{ justifyContent: 'center', alignItems: 'center', background: '#0d1117' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', textAlign: 'center' }}>
           <Compass className="spinner-icon w-8 h-8 text-blue-500 animate-spin" />
           <p style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>
             Synchronizing with DiaBP Safe-Meds Database...
@@ -143,25 +205,29 @@ function App() {
             <div className="logo-title-group">
               <h1>
                 DiaBP-Copilot
-                <span className="logo-badge">Nigeria MVP</span>
+                <span className="logo-badge">Nigeria Production</span>
               </h1>
               <p className="logo-subtitle">AI Diabetes & Hypertension Care Hub</p>
             </div>
           </div>
 
-          {/* Interactive Role Switcher for MVP Testing */}
-          <div className="role-switcher">
+          {/* User Sign-In Meta & Logout */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontSize: '11px', color: 'white', fontWeight: 'bold' }}>
+                {session.user.email}
+              </span>
+              <span style={{ fontSize: '9px', color: 'var(--color-teal-light)', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                Role: {userRole}
+              </span>
+            </div>
+            
             <button
-              onClick={() => setCurrentRole('patient')}
-              className={`role-btn ${currentRole === 'patient' ? 'active' : ''}`}
+              onClick={handleLogout}
+              className="role-btn"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.2)', cursor: 'pointer', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold' }}
             >
-              <User className="w-3.5 h-3.5" /> Patient Portal
-            </button>
-            <button
-              onClick={() => setCurrentRole('pharmacist')}
-              className={`role-btn ${currentRole === 'pharmacist' ? 'active' : ''}`}
-            >
-              <Users className="w-3.5 h-3.5" /> Clinician Portal
+              <LogOut className="w-3.5 h-3.5" /> Logout
             </button>
           </div>
 
@@ -171,7 +237,7 @@ function App() {
       {/* Main Page Content */}
       <main className="main-content">
         
-        {currentRole === 'patient' ? (
+        {userRole === 'patient' ? (
           // ================= PATIENT VIEW =================
           <div className="space-y-6">
             
@@ -192,7 +258,7 @@ function App() {
             </div>
 
             {/* Tab Views */}
-            {patientTab === 'dashboard' && (
+            {patientTab === 'dashboard' && patientProfile && (
               <PatientNcdDashboard 
                 profile={patientProfile} 
                 onUpdateProfile={handleUpdateProfile} 
@@ -201,7 +267,7 @@ function App() {
               />
             )}
             
-            {patientTab === 'refills' && (
+            {patientTab === 'refills' && patientProfile && (
               <NcdSafeMeds 
                 orders={orders} 
                 onPlaceOrder={handlePlaceOrder} 
@@ -217,14 +283,14 @@ function App() {
             <div className="card-header-divider">
               <h2 className="card-title">
                 <Users className="card-title-icon text-teal-400" />
-                Clinical Pharmacist & MD Workspace
+                {userRole === 'doctor' ? 'Clinical Doctor Workspace' : 'Community Pharmacist Workspace'}
               </h2>
             </div>
 
             <ClinicianNcdDashboard 
               orders={orders} 
               onUpdateOrderStatus={handleUpdateOrderStatus} 
-              patientProfile={patientProfile} 
+              patients={patients} 
               clinics={clinics}
               pharmacies={pharmacies}
             />

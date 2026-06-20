@@ -181,23 +181,35 @@ function loadLocal(key: string, fallback: any) {
 /**
  * Loads patient profile from Supabase with LocalStorage fallback
  */
-export async function getPatientProfile(): Promise<PatientNcdProfile> {
+export async function getPatientProfile(userId?: string): Promise<PatientNcdProfile> {
   if (isSupabaseConfigured) {
     try {
+      let targetId = userId;
+      if (!targetId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        targetId = user?.id;
+      }
+
+      if (!targetId) {
+        return loadLocal(PROFILE_KEY, INITIAL_NCD_PATIENT);
+      }
+
       // 1. Fetch main profile
       const { data: profileData, error: profileErr } = await supabase
         .from('ncd_profiles')
         .select('*')
-        .limit(1)
+        .eq('id', targetId)
         .single();
         
       if (profileErr) {
         // Table exists but is completely empty (PGRST116: no rows returned)
         if (profileErr.code === 'PGRST116') {
-          console.info("No profile found in Supabase. Initializing default profile...");
-          const localProfile = loadLocal(PROFILE_KEY, INITIAL_NCD_PATIENT);
-          await savePatientProfile(localProfile);
-          return localProfile;
+          if (!userId) {
+            console.info("No profile found in Supabase. Initializing default profile...");
+            const localProfile = loadLocal(PROFILE_KEY, INITIAL_NCD_PATIENT);
+            await savePatientProfile(localProfile, targetId);
+            return localProfile;
+          }
         }
         // Table may not exist yet, fallback to LocalStorage
         if (profileErr.code === '42P01') {
@@ -211,13 +223,13 @@ export async function getPatientProfile(): Promise<PatientNcdProfile> {
       const { data: vitalsData } = await supabase
         .from('ncd_vitals')
         .select('*')
-        .eq('patient_id', profileData.id)
+        .eq('patient_id', targetId)
         .order('created_at', { ascending: true });
 
       const { data: scansData } = await supabase
         .from('ncd_foot_scans')
         .select('*')
-        .eq('patient_id', profileData.id)
+        .eq('patient_id', targetId)
         .order('created_at', { ascending: true });
 
       // Convert database logs to history arrays
@@ -266,16 +278,22 @@ export async function getPatientProfile(): Promise<PatientNcdProfile> {
 /**
  * Saves patient profile to Supabase with LocalStorage fallback
  */
-export async function savePatientProfile(profile: PatientNcdProfile): Promise<void> {
+export async function savePatientProfile(profile: PatientNcdProfile, userId?: string): Promise<void> {
   // Always update LocalStorage first
   saveLocal(PROFILE_KEY, profile);
 
   if (isSupabaseConfigured) {
     try {
-      // 1. Get or create profile row
-      const { data: existing } = await supabase.from('ncd_profiles').select('id').limit(1);
-      
+      let targetId = userId;
+      if (!targetId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        targetId = user?.id;
+      }
+
+      if (!targetId) return;
+
       const payload = {
+        id: targetId,
         name: profile.name,
         age: profile.age,
         weight: profile.weight,
@@ -288,11 +306,13 @@ export async function savePatientProfile(profile: PatientNcdProfile): Promise<vo
         assigned_pharmacy_id: profile.assignedPharmacyId
       };
 
+      const { data: existing } = await supabase.from('ncd_profiles').select('id').eq('id', targetId).limit(1);
+
       if (existing && existing.length > 0) {
         await supabase
           .from('ncd_profiles')
           .update(payload)
-          .eq('id', existing[0].id);
+          .eq('id', targetId);
       } else {
         await supabase
           .from('ncd_profiles')
@@ -324,10 +344,10 @@ export async function logVitalsEntry(
 
   if (isSupabaseConfigured) {
     try {
-      const { data: profileRow } = await supabase.from('ncd_profiles').select('id').limit(1).single();
-      if (profileRow) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
         await supabase.from('ncd_vitals').insert([{
-          patient_id: profileRow.id,
+          patient_id: user.id,
           date: dateStr,
           systolic,
           diastolic,
@@ -351,10 +371,10 @@ export async function logFootScanRecord(record: FootScanRecord): Promise<void> {
 
   if (isSupabaseConfigured) {
     try {
-      const { data: profileRow } = await supabase.from('ncd_profiles').select('id').limit(1).single();
-      if (profileRow) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
         await supabase.from('ncd_foot_scans').insert([{
-          patient_id: profileRow.id,
+          patient_id: user.id,
           date: record.date,
           has_hotspots: record.hasHotspots,
           hotspots: record.hotspots,
@@ -413,10 +433,10 @@ export async function placeRefillOrder(order: NcdRefillOrder): Promise<void> {
 
   if (isSupabaseConfigured) {
     try {
-      const { data: profileRow } = await supabase.from('ncd_profiles').select('id').limit(1).single();
-      if (profileRow) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
         await supabase.from('ncd_orders').insert([{
-          patient_id: profileRow.id,
+          patient_id: user.id,
           order_number: order.id,
           date: order.date,
           items: order.items,
@@ -787,4 +807,208 @@ export async function getPharmacies(): Promise<NcdPharmacy[]> {
     }
   }
   return MOCK_PHARMACIES;
+}
+
+async function getBpHistoryForPatient(patientId: string): Promise<BpReading[]> {
+  try {
+    const { data } = await supabase
+      .from('ncd_vitals')
+      .select('date, systolic, diastolic')
+      .eq('patient_id', patientId)
+      .order('created_at', { ascending: true });
+    return (data || []).map(v => ({ date: v.date, systolic: v.systolic, diastolic: v.diastolic }));
+  } catch {
+    return [];
+  }
+}
+
+async function getGlucoseHistoryForPatient(patientId: string): Promise<GlucoseReading[]> {
+  try {
+    const { data } = await supabase
+      .from('ncd_vitals')
+      .select('date, glucose_level, glucose_type')
+      .eq('patient_id', patientId)
+      .order('created_at', { ascending: true });
+    return (data || []).map(v => ({ date: v.date, level: v.glucose_level, type: v.glucose_type as any }));
+  } catch {
+    return [];
+  }
+}
+
+async function getFootScanHistoryForPatient(patientId: string): Promise<FootScanRecord[]> {
+  try {
+    const { data } = await supabase
+      .from('ncd_foot_scans')
+      .select('date, has_hotspots, hotspots, risk_score, recommendations')
+      .eq('patient_id', patientId)
+      .order('created_at', { ascending: true });
+    return (data || []).map(s => ({
+      date: s.date,
+      hasHotspots: s.has_hotspots,
+      hotspots: s.hotspots as any,
+      riskScore: s.risk_score,
+      recommendations: s.recommendations
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function getPatientsForClinic(clinicId: string): Promise<PatientNcdProfile[]> {
+  if (isSupabaseConfigured) {
+    try {
+      const { data: profiles, error } = await supabase
+        .from('ncd_profiles')
+        .select('*')
+        .eq('assigned_clinic_id', clinicId);
+        
+      if (error) {
+        if (error.code === '42P01') return [INITIAL_NCD_PATIENT];
+        throw error;
+      }
+      
+      if (profiles && profiles.length > 0) {
+        const patients: PatientNcdProfile[] = [];
+        for (const p of profiles) {
+          const bpHistory = await getBpHistoryForPatient(p.id);
+          const glucoseHistory = await getGlucoseHistoryForPatient(p.id);
+          const footScanHistory = await getFootScanHistoryForPatient(p.id);
+          patients.push({
+            name: p.name,
+            age: p.age,
+            weight: p.weight,
+            conditions: p.conditions,
+            baselineBp: p.baseline_bp,
+            targetGlucoseRange: p.target_glucose_range,
+            streakDays: p.streak_days,
+            activeMeds: p.active_meds,
+            assignedClinicId: p.assigned_clinic_id,
+            assignedPharmacyId: p.assigned_pharmacy_id,
+            bpHistory: bpHistory.length > 0 ? bpHistory : INITIAL_NCD_PATIENT.bpHistory,
+            glucoseHistory: glucoseHistory.length > 0 ? glucoseHistory : INITIAL_NCD_PATIENT.glucoseHistory,
+            footScanHistory: footScanHistory.length > 0 ? footScanHistory : INITIAL_NCD_PATIENT.footScanHistory
+          });
+        }
+        return patients;
+      }
+    } catch (err) {
+      console.error("Failed to fetch clinic patients:", err);
+    }
+  }
+  return [INITIAL_NCD_PATIENT];
+}
+
+export async function getPatientsForPharmacy(pharmacyId: string): Promise<PatientNcdProfile[]> {
+  if (isSupabaseConfigured) {
+    try {
+      const { data: profiles, error } = await supabase
+        .from('ncd_profiles')
+        .select('*')
+        .eq('assigned_pharmacy_id', pharmacyId);
+        
+      if (error) {
+        if (error.code === '42P01') return [INITIAL_NCD_PATIENT];
+        throw error;
+      }
+      
+      if (profiles && profiles.length > 0) {
+        const patients: PatientNcdProfile[] = [];
+        for (const p of profiles) {
+          const bpHistory = await getBpHistoryForPatient(p.id);
+          const glucoseHistory = await getGlucoseHistoryForPatient(p.id);
+          const footScanHistory = await getFootScanHistoryForPatient(p.id);
+          patients.push({
+            name: p.name,
+            age: p.age,
+            weight: p.weight,
+            conditions: p.conditions,
+            baselineBp: p.baseline_bp,
+            targetGlucoseRange: p.target_glucose_range,
+            streakDays: p.streak_days,
+            activeMeds: p.active_meds,
+            assignedClinicId: p.assigned_clinic_id,
+            assignedPharmacyId: p.assigned_pharmacy_id,
+            bpHistory: bpHistory.length > 0 ? bpHistory : INITIAL_NCD_PATIENT.bpHistory,
+            glucoseHistory: glucoseHistory.length > 0 ? glucoseHistory : INITIAL_NCD_PATIENT.glucoseHistory,
+            footScanHistory: footScanHistory.length > 0 ? footScanHistory : INITIAL_NCD_PATIENT.footScanHistory
+          });
+        }
+        return patients;
+      }
+    } catch (err) {
+      console.error("Failed to fetch pharmacy patients:", err);
+    }
+  }
+  return [INITIAL_NCD_PATIENT];
+}
+
+export async function registerClinic(name: string, address: string, city: string, phone: string): Promise<NcdClinic> {
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from('ncd_clinics')
+        .insert([{ name, address, city, contact_phone: phone }])
+        .select()
+        .single();
+      if (error) throw error;
+      return {
+        id: data.id,
+        name: data.name,
+        address: data.address,
+        city: data.city,
+        contactPhone: data.contact_phone
+      };
+    } catch (err) {
+      console.error("Clinic registration failed:", err);
+    }
+  }
+  const newClinic: NcdClinic = { id: `clinic-${Math.random().toString(36).substr(2, 9)}`, name, address, city, contactPhone: phone };
+  MOCK_CLINICS.push(newClinic);
+  return newClinic;
+}
+
+export async function registerPharmacy(name: string, address: string, city: string, phone: string): Promise<NcdPharmacy> {
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from('ncd_pharmacies')
+        .insert([{ name, address, city, contact_phone: phone, is_verified: true }])
+        .select()
+        .single();
+      if (error) throw error;
+      return {
+        id: data.id,
+        name: data.name,
+        address: data.address,
+        city: data.city,
+        contactPhone: data.contact_phone,
+        isVerified: data.is_verified
+      };
+    } catch (err) {
+      console.error("Pharmacy registration failed:", err);
+    }
+  }
+  const newPharmacy: NcdPharmacy = { id: `pharmacy-${Math.random().toString(36).substr(2, 9)}`, name, address, city, contactPhone: phone, isVerified: true };
+  MOCK_PHARMACIES.push(newPharmacy);
+  return newPharmacy;
+}
+
+export async function associateClinician(userId: string, clinicId: string, role: 'Doctor' | 'Nurse'): Promise<void> {
+  if (isSupabaseConfigured) {
+    try {
+      await supabase.from('ncd_clinicians').insert([{ user_id: userId, clinic_id: clinicId, role }]);
+    } catch (err) {
+      console.error("Clinician association failed:", err);
+    }
+  }
+}
+
+export async function associatePharmacist(userId: string, pharmacyId: string): Promise<void> {
+  if (isSupabaseConfigured) {
+    try {
+      await supabase.from('ncd_pharmacists').insert([{ user_id: userId, pharmacy_id: pharmacyId }]);
+    } catch (err) {
+      console.error("Pharmacist association failed:", err);
+    }
+  }
 }
