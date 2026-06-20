@@ -147,7 +147,11 @@ export const Auth: React.FC = () => {
         window.location.reload();
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred during onboarding.');
+      let msg = err.message || 'An error occurred during onboarding.';
+      if (msg.toLowerCase().includes('email rate limit')) {
+        msg = "Supabase Email Rate Limit Exceeded: The free tier of Supabase limits signup confirmation emails to 3 per hour. To bypass this, go to your Supabase Dashboard -> Authentication -> Providers -> Email, and toggle OFF the 'Confirm email' switch. This will allow instant registrations without sending emails.";
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
