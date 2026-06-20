@@ -132,19 +132,19 @@ export const INITIAL_NCD_ORDERS: NcdRefillOrder[] = [
     status: "Pending Verification",
     prescriptionRequired: true,
     prescriptionUploaded: true,
-    pharmacyId: "pharmacy-1"
+    pharmacyId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
   }
 ];
 
 export const MOCK_CLINICS: NcdClinic[] = [
-  { id: "clinic-1", name: "Abuja Heart & Vascular Clinic", address: "Plot 1042, Constitution Ave, Wuse II", city: "Abuja", contactPhone: "+234 803 111 2222" },
-  { id: "clinic-2", name: "National Hospital NCD Center", address: "Central Business District", city: "Abuja", contactPhone: "+234 809 333 4444" },
-  { id: "clinic-3", name: "Kaduna Specialist Hospital", address: "Waff Road", city: "Kaduna", contactPhone: "+234 812 555 6666" }
+  { id: "11111111-1111-1111-1111-111111111111", name: "Abuja Heart & Vascular Clinic", address: "Plot 1042, Constitution Ave, Wuse II", city: "Abuja", contactPhone: "+234 803 111 2222" },
+  { id: "22222222-2222-2222-2222-222222222222", name: "National Hospital NCD Center", address: "Central Business District", city: "Abuja", contactPhone: "+234 809 333 4444" },
+  { id: "33333333-3333-3333-3333-333333333333", name: "Kaduna Specialist Hospital", address: "Waff Road", city: "Kaduna", contactPhone: "+234 812 555 6666" }
 ];
 
 export const MOCK_PHARMACIES: NcdPharmacy[] = [
   { 
-    id: "pharmacy-1", 
+    id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", 
     name: "H-Medix Pharmacy Wuse II", 
     address: "Adetokunbo Ademola Crescent", 
     city: "Abuja", 
@@ -153,7 +153,7 @@ export const MOCK_PHARMACIES: NcdPharmacy[] = [
     prices: { bundle: 32000, metformin: 6500, amlodipine: 5500, lisinopril: 7000, lantus: 19000 }
   },
   { 
-    id: "pharmacy-2", 
+    id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", 
     name: "Net Pharmacy Kaduna", 
     address: "Yakubu Gowon Way", 
     city: "Kaduna", 
@@ -162,7 +162,7 @@ export const MOCK_PHARMACIES: NcdPharmacy[] = [
     prices: { bundle: 29000, metformin: 5800, amlodipine: 4800, lisinopril: 6200, lantus: 17500 }
   },
   { 
-    id: "pharmacy-3", 
+    id: "cccccccc-cccc-cccc-cccc-cccccccccccc", 
     name: "Garki Community Chemist", 
     address: "Garki Area 11", 
     city: "Abuja", 

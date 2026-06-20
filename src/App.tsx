@@ -86,7 +86,7 @@ function App() {
           setPatientProfile(profile);
           setOrders(refillOrders);
         } else if (role === 'doctor') {
-          let clinicId = clinicsList[0]?.id || 'clinic-1';
+          let clinicId = clinicsList[0]?.id || '11111111-1111-1111-1111-111111111111';
           try {
             const { data: clinician } = await supabase
               .from('ncd_clinicians')
@@ -101,7 +101,7 @@ function App() {
           setPatients(clinicPatients);
           setOrders(refillOrders);
         } else if (role === 'pharmacist') {
-          let pharmacyId = pharmaciesList[0]?.id || 'pharmacy-1';
+          let pharmacyId = pharmaciesList[0]?.id || 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
           try {
             const { data: pharmacist } = await supabase
               .from('ncd_pharmacists')
