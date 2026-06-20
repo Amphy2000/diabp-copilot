@@ -1,0 +1,17 @@
+-- Migration script to add missing columns to existing tables
+-- Run this in your Supabase SQL Editor (https://supabase.com/dashboard/project/vvxwqxwcnorzmklylmkx/sql/new)
+
+-- 1. Add 'prices' column to 'ncd_pharmacies' if it doesn't exist
+ALTER TABLE ncd_pharmacies 
+ADD COLUMN IF NOT EXISTS prices JSONB DEFAULT NULL;
+
+-- 2. Add 'assigned_clinic_id' and 'assigned_pharmacy_id' columns to 'ncd_profiles' if they don't exist
+ALTER TABLE ncd_profiles 
+ADD COLUMN IF NOT EXISTS assigned_clinic_id UUID REFERENCES ncd_clinics(id) ON DELETE SET NULL;
+
+ALTER TABLE ncd_profiles 
+ADD COLUMN IF NOT EXISTS assigned_pharmacy_id UUID REFERENCES ncd_pharmacies(id) ON DELETE SET NULL;
+
+-- 3. Add 'pharmacy_id' column to 'ncd_orders' if it doesn't exist
+ALTER TABLE ncd_orders 
+ADD COLUMN IF NOT EXISTS pharmacy_id UUID REFERENCES ncd_pharmacies(id) ON DELETE SET NULL;

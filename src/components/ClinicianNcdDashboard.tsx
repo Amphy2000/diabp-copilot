@@ -114,7 +114,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
     ? orders.filter(o => o.pharmacyId === activePharmacyId)
     : orders.filter(o => {
         // Clinics see orders of patients assigned to them
-        const orderPatient = patients.find(p => p.bpHistory.some(h => true)); // Simplification for MVP check
+        const orderPatient = patients.find(p => p.id === o.patientId);
         return orderPatient?.assignedClinicId === activeClinicId;
       });
 
