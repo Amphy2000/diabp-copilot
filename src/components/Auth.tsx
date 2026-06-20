@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { 
   getClinics, 
   getPharmacies, 
@@ -196,6 +196,11 @@ export const Auth: React.FC = () => {
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '6px', fontWeight: 500 }}>
             {isLogin ? 'Sign in to access your Chronic Care Portal' : 'Self-Onboarding Registration Portal'}
           </p>
+          {!isSupabaseConfigured && (
+            <div style={{ marginTop: '12px', padding: '8px 12px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: '10px', color: '#f59e0b', fontSize: '0.75rem', fontWeight: 'bold', lineHeight: '1.3' }}>
+              ⚠ Running in Offline Sandbox (LocalStorage). Data will not sync across devices. Please configure your environment variables.
+            </div>
+          )}
         </div>
 
         {error && (
