@@ -365,20 +365,24 @@ export async function savePatientProfile(profile: PatientNcdProfile, userId?: st
         assigned_pharmacy_id: isValidUuid(profile.assignedPharmacyId) ? profile.assignedPharmacyId : null
       };
 
-      const { data: existing } = await supabase.from('ncd_profiles').select('id').eq('id', targetId).limit(1);
+      const { data: existing, error: selectErr } = await supabase.from('ncd_profiles').select('id').eq('id', targetId).limit(1);
+      if (selectErr) throw selectErr;
 
       if (existing && existing.length > 0) {
-        await supabase
+        const { error: updateErr } = await supabase
           .from('ncd_profiles')
           .update(payload)
           .eq('id', targetId);
+        if (updateErr) throw updateErr;
       } else {
-        await supabase
+        const { error: insertErr } = await supabase
           .from('ncd_profiles')
           .insert([payload]);
+        if (insertErr) throw insertErr;
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Supabase write error, using LocalStorage backup:", err);
+      alert("Supabase profile save failed: " + (err.message || JSON.stringify(err)));
     }
   }
 }
@@ -500,7 +504,7 @@ export async function placeRefillOrder(order: NcdRefillOrder): Promise<void> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        await supabase.from('ncd_orders').insert([{
+        const { error } = await supabase.from('ncd_orders').insert([{
           patient_id: user.id,
           order_number: order.id,
           date: order.date,
@@ -511,9 +515,11 @@ export async function placeRefillOrder(order: NcdRefillOrder): Promise<void> {
           prescription_uploaded: order.prescriptionUploaded,
           pharmacy_id: isValidUuid(order.pharmacyId) ? order.pharmacyId : null
         }]);
+        if (error) throw error;
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Supabase place order failed:", err);
+      alert("Supabase place order failed: " + (err.message || JSON.stringify(err)));
     }
   }
 }
@@ -528,12 +534,14 @@ export async function updateOrderStatus(orderId: string, status: NcdRefillOrder[
 
   if (isSupabaseConfigured) {
     try {
-      await supabase
+      const { error } = await supabase
         .from('ncd_orders')
         .update({ status })
         .eq('order_number', orderId);
-    } catch (err) {
-      console.error("Supabase update status failed:", err);
+      if (error) throw error;
+    } catch (err: any) {
+      console.error("Supabase order status update failed:", err);
+      alert("Supabase status update failed: " + (err.message || JSON.stringify(err)));
     }
   }
 }
