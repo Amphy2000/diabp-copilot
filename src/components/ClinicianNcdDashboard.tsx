@@ -92,62 +92,99 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   const [facilityUpgradeModalOpen, setFacilityUpgradeModalOpen] = useState(false);
   const [upgradeTarget, setUpgradeTarget] = useState<'clinic' | 'pharmacy'>('clinic');
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual'>('monthly');
-  const [cardHolder, setCardHolder] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
+  const [billingName, setBillingName] = useState('');
+  const [billingEmail, setBillingEmail] = useState('');
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
   const [paymentError, setPaymentError] = useState('');
 
-  const handleUpgradeFacility = async (e: React.FormEvent) => {
+  const handleUpgradeFacility = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cardHolder || !cardNumber || !cardExpiry || !cardCvv) {
-      setPaymentError("Please fill in all credit card details.");
+    if (!billingName || !billingEmail) {
+      setPaymentError("Please enter your billing name and email.");
       return;
     }
     setPaymentError("");
     setPaymentStep('processing');
 
-    // Simulate API Flutterwave transaction loading delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    const amount = upgradeTarget === 'clinic' 
+      ? (selectedPlan === 'monthly' ? 25000 : 250000) 
+      : (selectedPlan === 'monthly' ? 15000 : 150000);
 
-    setPaymentStep('success');
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const activeFacilityId = upgradeTarget === 'clinic' ? activeClinicId : activePharmacyId;
+    const txRef = `flw-facility-${upgradeTarget}-${activeFacilityId}-${Date.now()}`;
 
-    const expiryDate = new Date();
-    if (selectedPlan === 'monthly') {
-      expiryDate.setMonth(expiryDate.getMonth() + 1);
-    } else {
-      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+    if (!(window as any).FlutterwaveCheckout) {
+      setPaymentError("Payment gateway is loading. Please try again in a few seconds.");
+      setPaymentStep('form');
+      return;
     }
 
-    if (upgradeTarget === 'clinic') {
-      const activeClinic = clinics.find(c => c.id === activeClinicId);
-      if (activeClinic && onUpdateClinic) {
-        await onUpdateClinic({
-          ...activeClinic,
-          isPremium: true,
-          premiumExpiry: expiryDate.toLocaleDateString()
-        });
-      }
-    } else {
-      const activePharmacy = pharmacies.find(p => p.id === activePharmacyId);
-      if (activePharmacy && onUpdatePharmacy) {
-        await onUpdatePharmacy({
-          ...activePharmacy,
-          isPremium: true,
-          premiumExpiry: expiryDate.toLocaleDateString()
-        });
-      }
-    }
+    (window as any).FlutterwaveCheckout({
+      public_key: "FLWPUBK-e2deff3114e81d12bb4f07dbad8b9558-X",
+      tx_ref: txRef,
+      amount: amount,
+      currency: "NGN",
+      payment_options: "card, banktransfer, ussd, account",
+      customer: {
+        email: billingEmail,
+        name: billingName,
+      },
+      customizations: {
+        title: "DiaBP Pay",
+        description: `Upgrade to Premium ${upgradeTarget === 'clinic' ? 'Clinic' : 'Pharmacy'} Plan`,
+      },
+      meta: {
+        facility_type: upgradeTarget,
+        facility_id: activeFacilityId,
+        plan: selectedPlan
+      },
+      callback: async function (response: any) {
+        console.log("Flutterwave Response:", response);
+        if (response.status === "successful" || response.status === "completed") {
+          setPaymentStep('success');
 
-    // Reset checkout states
-    setFacilityUpgradeModalOpen(false);
-    setPaymentStep('form');
-    setCardHolder('');
-    setCardNumber('');
-    setCardExpiry('');
-    setCardCvv('');
+          const expiryDate = new Date();
+          if (selectedPlan === 'monthly') {
+            expiryDate.setMonth(expiryDate.getMonth() + 1);
+          } else {
+            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+          }
+
+          if (upgradeTarget === 'clinic') {
+            const activeClinic = clinics.find(c => c.id === activeClinicId);
+            if (activeClinic && onUpdateClinic) {
+              await onUpdateClinic({
+                ...activeClinic,
+                isPremium: true,
+                premiumExpiry: expiryDate.toLocaleDateString()
+              });
+            }
+          } else {
+            const activePharmacy = pharmacies.find(p => p.id === activePharmacyId);
+            if (activePharmacy && onUpdatePharmacy) {
+              await onUpdatePharmacy({
+                ...activePharmacy,
+                isPremium: true,
+                premiumExpiry: expiryDate.toLocaleDateString()
+              });
+            }
+          }
+
+          setTimeout(() => {
+            setFacilityUpgradeModalOpen(false);
+            setPaymentStep('form');
+            setBillingName('');
+            setBillingEmail('');
+          }, 2000);
+        } else {
+          setPaymentError("Payment was not successful. Please try again.");
+          setPaymentStep('form');
+        }
+      },
+      onclose: function () {
+        setPaymentStep('form');
+      }
+    });
   };
 
   // Collapsible cards state
@@ -2598,8 +2635,8 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                     lineHeight: '1.3',
                     textAlign: 'left'
                   }}>
-                    ⚡ Powered by <strong>Flutterwave V4 Gateway</strong><br/>
-                    Client ID: <code style={{ color: 'white' }}>41a6a298-2ede...9475</code>
+                    ⚡ Powered by <strong>Flutterwave Secure Checkout</strong><br/>
+                    Public Key: <code style={{ color: 'white' }}>FLWPUBK-e2deff...9558-X</code>
                   </div>
 
                   {paymentError && (
@@ -2618,8 +2655,9 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                       <input 
                         type="text" 
                         placeholder={upgradeTarget === 'clinic' ? 'Medical Director / Clinician' : 'Head Pharmacist / Manager'}
-                        value={cardHolder}
-                        onChange={(e) => setCardHolder(e.target.value)}
+                        value={billingName}
+                        onChange={(e) => setBillingName(e.target.value)}
+                        required
                         style={{
                           background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
                           borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '0.8rem'
@@ -2628,47 +2666,18 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Card Number</label>
+                      <label style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Billing Email Address</label>
                       <input 
-                        type="text" 
-                        placeholder="4000 1234 5678 9010"
-                        value={cardNumber}
-                        onChange={(e) => setCardNumber(e.target.value)}
+                        type="email" 
+                        placeholder="billing@facility.com"
+                        value={billingEmail}
+                        onChange={(e) => setBillingEmail(e.target.value)}
+                        required
                         style={{
                           background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
                           borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '0.8rem'
                         }}
                       />
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Expiry Date</label>
-                        <input 
-                          type="text" 
-                          placeholder="MM/YY"
-                          value={cardExpiry}
-                          onChange={(e) => setCardExpiry(e.target.value)}
-                          style={{
-                            background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
-                            borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '0.8rem'
-                          }}
-                        />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>CVV</label>
-                        <input 
-                          type="password" 
-                          placeholder="•••"
-                          maxLength={4}
-                          value={cardCvv}
-                          onChange={(e) => setCardCvv(e.target.value)}
-                          style={{
-                            background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
-                            borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '0.8rem'
-                          }}
-                        />
-                      </div>
                     </div>
                   </div>
                 </div>
