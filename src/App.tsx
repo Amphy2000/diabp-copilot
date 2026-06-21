@@ -21,7 +21,11 @@ import {
   updatePharmacyPrices,
   saveClinic,
   savePharmacy,
-  getAllPatients
+  getAllPatients,
+  deleteClinic,
+  deletePharmacy,
+  deletePatientProfile,
+  deleteRefillOrder
 } from './services/ncdService';
 import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy } from './services/ncdService';
 import { PatientNcdDashboard } from './components/PatientNcdDashboard';
@@ -253,6 +257,42 @@ function App() {
     }
   };
 
+  const handleDeleteClinic = async (clinicId: string) => {
+    try {
+      await deleteClinic(clinicId);
+      setClinics(prev => prev.filter(c => c.id !== clinicId));
+    } catch (err) {
+      console.error("Failed to delete clinic:", err);
+    }
+  };
+
+  const handleDeletePharmacy = async (pharmacyId: string) => {
+    try {
+      await deletePharmacy(pharmacyId);
+      setPharmacies(prev => prev.filter(p => p.id !== pharmacyId));
+    } catch (err) {
+      console.error("Failed to delete pharmacy:", err);
+    }
+  };
+
+  const handleDeletePatient = async (patientId: string) => {
+    try {
+      await deletePatientProfile(patientId);
+      setPatients(prev => prev.filter(p => p.id !== patientId));
+    } catch (err) {
+      console.error("Failed to delete patient profile:", err);
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    try {
+      await deleteRefillOrder(orderId);
+      setOrders(prev => prev.filter(o => o.id !== orderId));
+    } catch (err) {
+      console.error("Failed to delete refill order:", err);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUserFacilityId(null);
@@ -392,6 +432,10 @@ function App() {
               onUpdateClinic={handleUpdateClinic}
               onUpdatePharmacy={handleUpdatePharmacy}
               onUpdatePatientProfile={handleUpdatePatientProfile}
+              onDeleteClinic={handleDeleteClinic}
+              onDeletePharmacy={handleDeletePharmacy}
+              onDeletePatient={handleDeletePatient}
+              onDeleteOrder={handleDeleteOrder}
             />
           </div>
         ) : (

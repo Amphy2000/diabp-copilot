@@ -1772,3 +1772,47 @@ async function getSystemAlertsOnly(): Promise<NcdAlert[]> {
   }
   return loadLocal(ALERTS_KEY, INITIAL_NCD_ALERTS);
 }
+
+export async function deleteClinic(clinicId: string): Promise<void> {
+  if (isSupabaseConfigured) {
+    const { error } = await supabase.from('ncd_clinics').delete().eq('id', clinicId);
+    if (error) throw error;
+  } else {
+    const clinics = loadLocal("diabp_clinics", MOCK_CLINICS);
+    const updated = clinics.filter((c: any) => c.id !== clinicId);
+    saveLocal("diabp_clinics", updated);
+  }
+}
+
+export async function deletePharmacy(pharmacyId: string): Promise<void> {
+  if (isSupabaseConfigured) {
+    const { error } = await supabase.from('ncd_pharmacies').delete().eq('id', pharmacyId);
+    if (error) throw error;
+  } else {
+    const pharmacies = loadLocal("diabp_pharmacies", MOCK_PHARMACIES);
+    const updated = pharmacies.filter((p: any) => p.id !== pharmacyId);
+    saveLocal("diabp_pharmacies", updated);
+  }
+}
+
+export async function deletePatientProfile(patientId: string): Promise<void> {
+  if (isSupabaseConfigured) {
+    const { error } = await supabase.from('ncd_profiles').delete().eq('id', patientId);
+    if (error) throw error;
+  } else {
+    const profiles = loadLocal("diabp_profiles", {});
+    delete profiles[patientId];
+    saveLocal("diabp_profiles", profiles);
+  }
+}
+
+export async function deleteRefillOrder(orderId: string): Promise<void> {
+  if (isSupabaseConfigured) {
+    const { error } = await supabase.from('ncd_orders').delete().eq('order_number', orderId);
+    if (error) throw error;
+  } else {
+    const orders = loadLocal(ORDERS_KEY, INITIAL_NCD_ORDERS);
+    const updated = orders.filter((o: any) => o.id !== orderId);
+    saveLocal(ORDERS_KEY, updated);
+  }
+}

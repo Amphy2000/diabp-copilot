@@ -24,6 +24,10 @@ interface SuperAdminDashboardProps {
   onUpdateClinic: (clinic: NcdClinic) => Promise<void>;
   onUpdatePharmacy: (pharmacy: NcdPharmacy) => Promise<void>;
   onUpdatePatientProfile: (patient: PatientNcdProfile) => Promise<void>;
+  onDeleteClinic?: (clinicId: string) => Promise<void>;
+  onDeletePharmacy?: (pharmacyId: string) => Promise<void>;
+  onDeletePatient?: (patientId: string) => Promise<void>;
+  onDeleteOrder?: (orderId: string) => Promise<void>;
 }
 
 export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
@@ -33,7 +37,11 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   orders,
   onUpdateClinic,
   onUpdatePharmacy,
-  onUpdatePatientProfile
+  onUpdatePatientProfile,
+  onDeleteClinic,
+  onDeletePharmacy,
+  onDeletePatient,
+  onDeleteOrder
 }) => {
   const [activeTab, setActiveTab] = useState<'facilities' | 'patients' | 'audits'>('facilities');
   const [searchTerm, setSearchTerm] = useState('');
@@ -441,29 +449,59 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                           {getPlanBadge(clinic.isPremium, clinic.premiumExpiry)}
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right' }}>
-                          <select
-                            disabled={updatingId === clinic.id}
-                            value={getPlanOption(clinic.isPremium, clinic.premiumExpiry)}
-                            onChange={(e) => handlePlanChange('clinic', clinic, e.target.value)}
-                            style={{
-                              background: 'rgba(255, 255, 255, 0.05)',
-                              border: '1px solid rgba(255, 255, 255, 0.1)',
-                              color: 'white',
-                              borderRadius: '8px',
-                              padding: '6px 12px',
-                              fontSize: '0.75rem',
-                              fontWeight: 'bold',
-                              outline: 'none',
-                              cursor: 'pointer',
-                              minWidth: '130px'
-                            }}
-                          >
-                            <option value="basic" style={{ background: '#111827', color: 'var(--text-muted)' }}>Basic Plan</option>
-                            <option value="trial_7" style={{ background: '#111827', color: '#60a5fa' }}>Free Trial (7d)</option>
-                            <option value="trial_30" style={{ background: '#111827', color: '#3b82f6' }}>Free Trial (30d)</option>
-                            <option value="premium_1y" style={{ background: '#111827', color: '#facc15' }}>Standard (1y)</option>
-                            <option value="lifetime" style={{ background: '#111827', color: '#34d399' }}>Lifetime Premium</option>
-                          </select>
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                            <select
+                              disabled={updatingId === clinic.id}
+                              value={getPlanOption(clinic.isPremium, clinic.premiumExpiry)}
+                              onChange={(e) => handlePlanChange('clinic', clinic, e.target.value)}
+                              style={{
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                color: 'white',
+                                borderRadius: '8px',
+                                padding: '6px 12px',
+                                fontSize: '0.75rem',
+                                fontWeight: 'bold',
+                                outline: 'none',
+                                cursor: 'pointer',
+                                minWidth: '130px'
+                              }}
+                            >
+                              <option value="basic" style={{ background: '#111827', color: 'var(--text-muted)' }}>Basic Plan</option>
+                              <option value="trial_7" style={{ background: '#111827', color: '#60a5fa' }}>Free Trial (7d)</option>
+                              <option value="trial_30" style={{ background: '#111827', color: '#3b82f6' }}>Free Trial (30d)</option>
+                              <option value="premium_1y" style={{ background: '#111827', color: '#facc15' }}>Standard (1y)</option>
+                              <option value="lifetime" style={{ background: '#111827', color: '#34d399' }}>Lifetime Premium</option>
+                            </select>
+                            {onDeleteClinic && (
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Are you sure you want to delete clinic "${clinic.name}"? This action cannot be undone.`)) {
+                                    onDeleteClinic(clinic.id);
+                                  }
+                                }}
+                                style={{
+                                  background: 'rgba(239, 68, 68, 0.15)',
+                                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                                  color: '#f87171',
+                                  borderRadius: '8px',
+                                  padding: '6px 12px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 'bold',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                                }}
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -512,29 +550,59 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                           {getPlanBadge(pharmacy.isPremium, pharmacy.premiumExpiry)}
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right' }}>
-                          <select
-                            disabled={updatingId === pharmacy.id}
-                            value={getPlanOption(pharmacy.isPremium, pharmacy.premiumExpiry)}
-                            onChange={(e) => handlePlanChange('pharmacy', pharmacy, e.target.value)}
-                            style={{
-                              background: 'rgba(255, 255, 255, 0.05)',
-                              border: '1px solid rgba(255, 255, 255, 0.1)',
-                              color: 'white',
-                              borderRadius: '8px',
-                              padding: '6px 12px',
-                              fontSize: '0.75rem',
-                              fontWeight: 'bold',
-                              outline: 'none',
-                              cursor: 'pointer',
-                              minWidth: '130px'
-                            }}
-                          >
-                            <option value="basic" style={{ background: '#111827', color: 'var(--text-muted)' }}>Basic Plan</option>
-                            <option value="trial_7" style={{ background: '#111827', color: '#60a5fa' }}>Free Trial (7d)</option>
-                            <option value="trial_30" style={{ background: '#111827', color: '#3b82f6' }}>Free Trial (30d)</option>
-                            <option value="premium_1y" style={{ background: '#111827', color: '#facc15' }}>Standard (1y)</option>
-                            <option value="lifetime" style={{ background: '#111827', color: '#34d399' }}>Lifetime Premium</option>
-                          </select>
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                            <select
+                              disabled={updatingId === pharmacy.id}
+                              value={getPlanOption(pharmacy.isPremium, pharmacy.premiumExpiry)}
+                              onChange={(e) => handlePlanChange('pharmacy', pharmacy, e.target.value)}
+                              style={{
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                color: 'white',
+                                borderRadius: '8px',
+                                padding: '6px 12px',
+                                fontSize: '0.75rem',
+                                fontWeight: 'bold',
+                                outline: 'none',
+                                cursor: 'pointer',
+                                minWidth: '130px'
+                              }}
+                            >
+                              <option value="basic" style={{ background: '#111827', color: 'var(--text-muted)' }}>Basic Plan</option>
+                              <option value="trial_7" style={{ background: '#111827', color: '#60a5fa' }}>Free Trial (7d)</option>
+                              <option value="trial_30" style={{ background: '#111827', color: '#3b82f6' }}>Free Trial (30d)</option>
+                              <option value="premium_1y" style={{ background: '#111827', color: '#facc15' }}>Standard (1y)</option>
+                              <option value="lifetime" style={{ background: '#111827', color: '#34d399' }}>Lifetime Premium</option>
+                            </select>
+                            {onDeletePharmacy && (
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Are you sure you want to delete pharmacy "${pharmacy.name}"? This action cannot be undone.`)) {
+                                    onDeletePharmacy(pharmacy.id);
+                                  }
+                                }}
+                                style={{
+                                  background: 'rgba(239, 68, 68, 0.15)',
+                                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                                  color: '#f87171',
+                                  borderRadius: '8px',
+                                  padding: '6px 12px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 'bold',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                                }}
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -575,29 +643,59 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                       {getPlanBadge(patient.isPremium, patient.premiumExpiry)}
                     </td>
                     <td style={{ padding: '12px', textAlign: 'right' }}>
-                      <select
-                        disabled={updatingId === patient.id}
-                        value={getPlanOption(patient.isPremium, patient.premiumExpiry)}
-                        onChange={(e) => handlePlanChange('patient', patient, e.target.value)}
-                        style={{
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
-                          color: 'white',
-                          borderRadius: '8px',
-                          padding: '6px 12px',
-                          fontSize: '0.75rem',
-                          fontWeight: 'bold',
-                          outline: 'none',
-                          cursor: 'pointer',
-                          minWidth: '130px'
-                        }}
-                      >
-                        <option value="basic" style={{ background: '#111827', color: 'var(--text-muted)' }}>Basic Plan</option>
-                        <option value="trial_7" style={{ background: '#111827', color: '#60a5fa' }}>Free Trial (7d)</option>
-                        <option value="trial_30" style={{ background: '#111827', color: '#3b82f6' }}>Free Trial (30d)</option>
-                        <option value="premium_1y" style={{ background: '#111827', color: '#facc15' }}>Standard (1y)</option>
-                        <option value="lifetime" style={{ background: '#111827', color: '#34d399' }}>Lifetime Premium</option>
-                      </select>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <select
+                          disabled={updatingId === patient.id}
+                          value={getPlanOption(patient.isPremium, patient.premiumExpiry)}
+                          onChange={(e) => handlePlanChange('patient', patient, e.target.value)}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            color: 'white',
+                            borderRadius: '8px',
+                            padding: '6px 12px',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                            outline: 'none',
+                            cursor: 'pointer',
+                            minWidth: '130px'
+                          }}
+                        >
+                          <option value="basic" style={{ background: '#111827', color: 'var(--text-muted)' }}>Basic Plan</option>
+                          <option value="trial_7" style={{ background: '#111827', color: '#60a5fa' }}>Free Trial (7d)</option>
+                          <option value="trial_30" style={{ background: '#111827', color: '#3b82f6' }}>Free Trial (30d)</option>
+                          <option value="premium_1y" style={{ background: '#111827', color: '#facc15' }}>Standard (1y)</option>
+                          <option value="lifetime" style={{ background: '#111827', color: '#34d399' }}>Lifetime Premium</option>
+                        </select>
+                        {onDeletePatient && (
+                          <button
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to delete patient "${patient.name}"? This action cannot be undone.`)) {
+                                onDeletePatient(patient.id);
+                              }
+                            }}
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              color: '#f87171',
+                              borderRadius: '8px',
+                              padding: '6px 12px',
+                              fontSize: '0.75rem',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                            }}
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -623,6 +721,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   <th style={{ padding: '12px' }}>Subaccount Payout ({((1 - commissionRate) * 100).toFixed(0)}%)</th>
                   <th style={{ padding: '12px' }}>Platform Fee ({(commissionRate * 100).toFixed(0)}%)</th>
                   <th style={{ padding: '12px' }}>Status</th>
+                  <th style={{ padding: '12px', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -651,6 +750,36 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                         }}>
                           {order.status}
                         </span>
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'right' }}>
+                        {onDeleteOrder && (
+                          <button
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to delete refill order "${order.id}"? This action cannot be undone.`)) {
+                                onDeleteOrder(order.id);
+                              }
+                            }}
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              color: '#f87171',
+                              borderRadius: '8px',
+                              padding: '6px 12px',
+                              fontSize: '0.75rem',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                            }}
+                          >
+                            Delete
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
