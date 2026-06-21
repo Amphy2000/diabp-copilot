@@ -24,6 +24,10 @@ import {
 } from '../services/ncdService';
 import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy, NcdAlert } from '../services/ncdService';
 
+const getRiskClass = (risk: 'Low' | 'Medium' | 'High' | 'Emergency') => {
+  return risk.toLowerCase();
+};
+
 interface ClinicianNcdDashboardProps {
   orders: NcdRefillOrder[];
   onUpdateOrderStatus: (orderId: string, status: NcdRefillOrder['status']) => void;
