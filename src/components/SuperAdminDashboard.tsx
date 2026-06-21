@@ -39,6 +39,20 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
+  const [commissionRate, setCommissionRate] = useState<number>(() => {
+    const stored = localStorage.getItem('diabp_system_commission_rate');
+    if (stored !== null) {
+      const parsed = parseFloat(stored);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 0.05; // 5% default
+  });
+
+  const handleSaveCommission = (rate: number) => {
+    localStorage.setItem('diabp_system_commission_rate', rate.toString());
+    setCommissionRate(rate);
+  };
+
   // --- REVENUE ANALYTICS CALCULATIONS ---
   
   // 1. Refills Transaction Volume (Only orders that are Approved, Out for Delivery, or Delivered)
@@ -47,8 +61,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   );
   const totalRefillVolume = successfulOrders.reduce((sum, o) => sum + o.totalNaira, 0);
 
-  // 2. Admin Split Commission (5% of refills volume)
-  const adminCommissions = totalRefillVolume * 0.05;
+  // 2. Admin Split Commission
+  const adminCommissions = totalRefillVolume * commissionRate;
 
   // 3. B2B SaaS Subscriptions Revenue (Clinic: N25,000/mo, Pharmacy: N15,000/mo)
   const premiumClinicsCount = clinics.filter(c => c.isPremium).length;
@@ -67,59 +81,98 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
   // --- OVERRIDE TOGGLE HANDLERS ---
 
-  const handleToggleClinicPremium = async (clinic: NcdClinic) => {
-    setUpdatingId(clinic.id);
-    try {
-      const nextPremium = !clinic.isPremium;
-      const expiry = nextPremium 
-        ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString() 
-        : undefined;
+  const getPlanOption = (isPremium?: boolean, premiumExpiry?: string): string => {
+    if (!isPremium) return 'basic';
+    if (premiumExpiry === 'Lifetime') return 'lifetime';
+    if (!premiumExpiry) return 'premium_1y'; // fallback
+    
+    // parse expiry to calculate remaining time
+    const expiryDate = new Date(premiumExpiry);
+    const diffTime = expiryDate.getTime() - Date.now();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays > 0 && diffDays <= 7) return 'trial_7';
+    if (diffDays > 7 && diffDays <= 30) return 'trial_30';
+    if (diffDays > 30 && diffDays <= 365) return 'premium_1y';
+    return 'lifetime';
+  };
 
-      await onUpdateClinic({
-        ...clinic,
-        isPremium: nextPremium,
-        premiumExpiry: expiry
-      });
+  const handlePlanChange = async (
+    type: 'clinic' | 'pharmacy' | 'patient',
+    item: any,
+    planKey: string
+  ) => {
+    setUpdatingId(item.id);
+    try {
+      let isPremium = false;
+      let premiumExpiry: string | undefined = undefined;
+
+      if (planKey === 'trial_7') {
+        isPremium = true;
+        premiumExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString();
+      } else if (planKey === 'trial_30') {
+        isPremium = true;
+        premiumExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString();
+      } else if (planKey === 'premium_1y') {
+        isPremium = true;
+        premiumExpiry = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString();
+      } else if (planKey === 'lifetime') {
+        isPremium = true;
+        premiumExpiry = 'Lifetime';
+      }
+
+      if (type === 'clinic') {
+        await onUpdateClinic({
+          ...item,
+          isPremium,
+          premiumExpiry
+        });
+      } else if (type === 'pharmacy') {
+        await onUpdatePharmacy({
+          ...item,
+          isPremium,
+          premiumExpiry
+        });
+      } else if (type === 'patient') {
+        await onUpdatePatientProfile({
+          ...item,
+          isPremium,
+          premiumExpiry
+        });
+      }
     } finally {
       setUpdatingId(null);
     }
   };
 
-  const handleTogglePharmacyPremium = async (pharmacy: NcdPharmacy) => {
-    setUpdatingId(pharmacy.id);
-    try {
-      const nextPremium = !pharmacy.isPremium;
-      const expiry = nextPremium 
-        ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString() 
-        : undefined;
-
-      await onUpdatePharmacy({
-        ...pharmacy,
-        isPremium: nextPremium,
-        premiumExpiry: expiry
-      });
-    } finally {
-      setUpdatingId(null);
+  const getPlanBadge = (isPremium?: boolean, premiumExpiry?: string) => {
+    if (!isPremium) {
+      return (
+        <span style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem' }}>
+          Basic Plan
+        </span>
+      );
     }
-  };
-
-  const handleTogglePatientPremium = async (patient: PatientNcdProfile) => {
-    if (!patient.id) return;
-    setUpdatingId(patient.id);
-    try {
-      const nextPremium = !patient.isPremium;
-      const expiry = nextPremium 
-        ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString() 
-        : undefined;
-
-      await onUpdatePatientProfile({
-        ...patient,
-        isPremium: nextPremium,
-        premiumExpiry: expiry
-      });
-    } finally {
-      setUpdatingId(null);
+    if (premiumExpiry === 'Lifetime') {
+      return (
+        <span style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 'bold' }}>
+          ♾️ Lifetime
+        </span>
+      );
     }
+    const planKey = getPlanOption(isPremium, premiumExpiry);
+    if (planKey === 'trial_7' || planKey === 'trial_30') {
+      return (
+        <span style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.2)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 'bold' }}>
+          ⏳ Trial ({premiumExpiry})
+        </span>
+      );
+    }
+    return (
+      <span style={{ background: 'rgba(234, 179, 8, 0.1)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 'bold' }}>
+        👑 Premium ({premiumExpiry})
+      </span>
+    );
   };
 
   const handleUpdateSubaccountId = async (type: 'clinic' | 'pharmacy', facility: any, subId: string) => {
@@ -181,6 +234,34 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         </div>
       </div>
 
+      {/* System Settings & Commission Control */}
+      <div className="glass-panel" style={{ padding: '20px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <h4 style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Sliders className="text-teal-400 w-4 h-4" />
+          System Platform Split Configuration
+        </h4>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '250px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              <span>Platform Commission Rate</span>
+              <span style={{ color: 'var(--color-teal-light)', fontWeight: 'bold' }}>{(commissionRate * 100).toFixed(1)}%</span>
+            </div>
+            <input 
+              type="range"
+              min="0.01"
+              max="0.20"
+              step="0.005"
+              value={commissionRate}
+              onChange={(e) => handleSaveCommission(parseFloat(e.target.value))}
+              style={{ width: '100%', accentColor: '#14b8a6', cursor: 'pointer' }}
+            />
+          </div>
+          <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)', flex: 2, minWidth: '200px', lineHeight: '1.4' }}>
+            Adjusting this commission percentage dynamically updates the payout calculation across all clinics and pharmacies. Custom split parameters are routed to Flutterwave checkout payloads in real-time.
+          </p>
+        </div>
+      </div>
+
       {/* 2. Global Revenue Analytics Section */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
         
@@ -204,7 +285,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px', borderLeft: '3px solid #3b82f6' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold', textTransform: 'uppercase' }}>
-              Refills Split Comm. (5%)
+              Refills Split Comm. ({(commissionRate * 100).toFixed(0)}%)
             </span>
             <TrendingUp className="text-blue-400 w-4 h-4" />
           </div>
@@ -332,29 +413,32 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                           />
                         </td>
                         <td style={{ padding: '12px' }}>
-                          {clinic.isPremium ? (
-                            <span style={{ background: 'rgba(234, 179, 8, 0.1)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 'bold' }}>
-                              👑 Premium
-                            </span>
-                          ) : (
-                            <span style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem' }}>
-                              Basic Plan
-                            </span>
-                          )}
+                          {getPlanBadge(clinic.isPremium, clinic.premiumExpiry)}
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right' }}>
-                          <button
+                          <select
                             disabled={updatingId === clinic.id}
-                            onClick={() => handleToggleClinicPremium(clinic)}
+                            value={getPlanOption(clinic.isPremium, clinic.premiumExpiry)}
+                            onChange={(e) => handlePlanChange('clinic', clinic, e.target.value)}
                             style={{
-                              background: clinic.isPremium ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                              border: clinic.isPremium ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
-                              color: clinic.isPremium ? '#ef4444' : '#10b981',
-                              borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.65rem'
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              color: 'white',
+                              borderRadius: '8px',
+                              padding: '6px 12px',
+                              fontSize: '0.75rem',
+                              fontWeight: 'bold',
+                              outline: 'none',
+                              cursor: 'pointer',
+                              minWidth: '130px'
                             }}
                           >
-                            {clinic.isPremium ? 'Downgrade' : 'Grant Premium'}
-                          </button>
+                            <option value="basic" style={{ background: '#111827', color: 'var(--text-muted)' }}>Basic Plan</option>
+                            <option value="trial_7" style={{ background: '#111827', color: '#60a5fa' }}>Free Trial (7d)</option>
+                            <option value="trial_30" style={{ background: '#111827', color: '#3b82f6' }}>Free Trial (30d)</option>
+                            <option value="premium_1y" style={{ background: '#111827', color: '#facc15' }}>Standard (1y)</option>
+                            <option value="lifetime" style={{ background: '#111827', color: '#34d399' }}>Lifetime Premium</option>
+                          </select>
                         </td>
                       </tr>
                     );
@@ -400,29 +484,32 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                           />
                         </td>
                         <td style={{ padding: '12px' }}>
-                          {pharmacy.isPremium ? (
-                            <span style={{ background: 'rgba(234, 179, 8, 0.1)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 'bold' }}>
-                              👑 Premium
-                            </span>
-                          ) : (
-                            <span style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem' }}>
-                              Basic Plan
-                            </span>
-                          )}
+                          {getPlanBadge(pharmacy.isPremium, pharmacy.premiumExpiry)}
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right' }}>
-                          <button
+                          <select
                             disabled={updatingId === pharmacy.id}
-                            onClick={() => handleTogglePharmacyPremium(pharmacy)}
+                            value={getPlanOption(pharmacy.isPremium, pharmacy.premiumExpiry)}
+                            onChange={(e) => handlePlanChange('pharmacy', pharmacy, e.target.value)}
                             style={{
-                              background: pharmacy.isPremium ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                              border: pharmacy.isPremium ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
-                              color: pharmacy.isPremium ? '#ef4444' : '#10b981',
-                              borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.65rem'
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              color: 'white',
+                              borderRadius: '8px',
+                              padding: '6px 12px',
+                              fontSize: '0.75rem',
+                              fontWeight: 'bold',
+                              outline: 'none',
+                              cursor: 'pointer',
+                              minWidth: '130px'
                             }}
                           >
-                            {pharmacy.isPremium ? 'Downgrade' : 'Grant Premium'}
-                          </button>
+                            <option value="basic" style={{ background: '#111827', color: 'var(--text-muted)' }}>Basic Plan</option>
+                            <option value="trial_7" style={{ background: '#111827', color: '#60a5fa' }}>Free Trial (7d)</option>
+                            <option value="trial_30" style={{ background: '#111827', color: '#3b82f6' }}>Free Trial (30d)</option>
+                            <option value="premium_1y" style={{ background: '#111827', color: '#facc15' }}>Standard (1y)</option>
+                            <option value="lifetime" style={{ background: '#111827', color: '#34d399' }}>Lifetime Premium</option>
+                          </select>
                         </td>
                       </tr>
                     );
@@ -460,29 +547,32 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     </td>
                     <td style={{ padding: '12px', color: 'var(--text-secondary)' }}>{patient.phone || 'N/A'}</td>
                     <td style={{ padding: '12px' }}>
-                      {patient.isPremium ? (
-                        <span style={{ background: 'rgba(234, 179, 8, 0.1)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 'bold' }}>
-                          👑 Premium
-                        </span>
-                      ) : (
-                        <span style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem' }}>
-                          Basic Tier
-                        </span>
-                      )}
+                      {getPlanBadge(patient.isPremium, patient.premiumExpiry)}
                     </td>
                     <td style={{ padding: '12px', textAlign: 'right' }}>
-                      <button
+                      <select
                         disabled={updatingId === patient.id}
-                        onClick={() => handleTogglePatientPremium(patient)}
+                        value={getPlanOption(patient.isPremium, patient.premiumExpiry)}
+                        onChange={(e) => handlePlanChange('patient', patient, e.target.value)}
                         style={{
-                          background: patient.isPremium ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                          border: patient.isPremium ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
-                          color: patient.isPremium ? '#ef4444' : '#10b981',
-                          borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.65rem'
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          color: 'white',
+                          borderRadius: '8px',
+                          padding: '6px 12px',
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold',
+                          outline: 'none',
+                          cursor: 'pointer',
+                          minWidth: '130px'
                         }}
                       >
-                        {patient.isPremium ? 'Downgrade' : 'Make Premium'}
-                      </button>
+                        <option value="basic" style={{ background: '#111827', color: 'var(--text-muted)' }}>Basic Plan</option>
+                        <option value="trial_7" style={{ background: '#111827', color: '#60a5fa' }}>Free Trial (7d)</option>
+                        <option value="trial_30" style={{ background: '#111827', color: '#3b82f6' }}>Free Trial (30d)</option>
+                        <option value="premium_1y" style={{ background: '#111827', color: '#facc15' }}>Standard (1y)</option>
+                        <option value="lifetime" style={{ background: '#111827', color: '#34d399' }}>Lifetime Premium</option>
+                      </select>
                     </td>
                   </tr>
                 ))}
@@ -505,8 +595,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   <th style={{ padding: '12px' }}>Patient</th>
                   <th style={{ padding: '12px' }}>Medications</th>
                   <th style={{ padding: '12px' }}>Total Amount</th>
-                  <th style={{ padding: '12px' }}>Subaccount Payout (95%)</th>
-                  <th style={{ padding: '12px' }}>Platform Fee (5%)</th>
+                  <th style={{ padding: '12px' }}>Subaccount Payout ({((1 - commissionRate) * 100).toFixed(0)}%)</th>
+                  <th style={{ padding: '12px' }}>Platform Fee ({(commissionRate * 100).toFixed(0)}%)</th>
                   <th style={{ padding: '12px' }}>Status</th>
                 </tr>
               </thead>
@@ -522,10 +612,10 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                       <td style={{ padding: '12px', color: 'var(--text-muted)' }}>{order.items.join(', ')}</td>
                       <td style={{ padding: '12px', fontWeight: 'bold' }}>₦{order.totalNaira.toLocaleString()}</td>
                       <td style={{ padding: '12px', color: isSuccess ? '#34d399' : 'var(--text-muted)' }}>
-                        ₦{(order.totalNaira * 0.95).toLocaleString()}
+                        ₦{(order.totalNaira * (1 - commissionRate)).toLocaleString()}
                       </td>
                       <td style={{ padding: '12px', color: isSuccess ? '#60a5fa' : 'var(--text-muted)' }}>
-                        ₦{(order.totalNaira * 0.05).toLocaleString()}
+                        ₦{(order.totalNaira * commissionRate).toLocaleString()}
                       </td>
                       <td style={{ padding: '12px' }}>
                         <span style={{

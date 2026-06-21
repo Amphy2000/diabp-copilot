@@ -119,6 +119,13 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
     }
   }, [userRole, facilityId]);
 
+  // Sync workspace role when facilityUserRole changes from App session
+  useEffect(() => {
+    if (userRole) {
+      setWorkspaceRole(facilityUserRole === 'staff' ? 'staff' : 'admin');
+    }
+  }, [facilityUserRole, userRole]);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<PatientNcdProfile | null>(null);
   const [viewingPrescriptionOrder, setViewingPrescriptionOrder] = useState<NcdRefillOrder | null>(null);
@@ -706,6 +713,14 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   const completedOrdersList = filteredOrders.filter(o => o.status === 'Delivered' || o.status === 'Out for Delivery');
   const totalRevenue = completedOrdersList.reduce((acc, curr) => acc + (curr.totalNaira || 0), 0);
   const activePatientsCount = filteredPatients.length;
+  const commissionRate = (() => {
+    const stored = localStorage.getItem('diabp_system_commission_rate');
+    if (stored !== null) {
+      const parsed = parseFloat(stored);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 0.05;
+  })();
 
   return (
     <div className="space-y-6 animate-fade-in" style={{ paddingBottom: '30px' }}>
@@ -941,6 +956,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
       )}
 
       {/* Facility Revenue Analytics Card */}
+      {workspaceRole === 'admin' && (
       <div className="glass-panel" style={{ padding: '20px', marginBottom: '16px', background: 'rgba(13, 17, 23, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
         <h3 style={{ margin: '0 0 16px 0', fontSize: '0.85rem', color: 'white', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <CreditCard className="w-4 h-4 text-teal-400" />
@@ -960,7 +976,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
             <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '12px', textAlign: 'left' }}>
               <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Net Payout</div>
               <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#38bdf8', marginTop: '4px' }}>
-                ₦{(totalRevenue * 0.95).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₦{(totalRevenue * (1 - commissionRate)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '2px' }}>Settled to bank account</div>
             </div>
@@ -996,6 +1012,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
           </div>
         )}
       </div>
+      )}
 
       {/* Triage & Automation Control Center */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', marginBottom: '8px' }}>
@@ -2735,6 +2752,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
       )}
 
       {/* Master Clinical Logs Directory Audit Panel */}
+      {workspaceRole === 'admin' && (
       <div className="glass-panel" style={{ marginTop: '24px', background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.3) 0%, rgba(15, 23, 42, 0.3) 100%)', border: '1px solid rgba(255,255,255,0.05)', padding: '20px', borderRadius: '16px', position: 'relative', overflow: 'hidden' }}>
         <div style={{ filter: (activeRole === 'clinic' && !isFacilityPremium) ? 'blur(5px)' : 'none', transition: 'filter 0.3s ease' }}>
         <div 
@@ -2958,6 +2976,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
           </div>
         )}
       </div>
+      )}
 
       {/* Interactive Selected Patient Export Modal */}
       {exportPatient && (

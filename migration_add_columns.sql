@@ -73,4 +73,17 @@ ADD COLUMN IF NOT EXISTS email TEXT DEFAULT NULL;
 ALTER TABLE ncd_clinicians 
 ADD COLUMN IF NOT EXISTS email TEXT DEFAULT NULL;
 
+-- 10. Update historical creator records to Owner/Admin roles
+UPDATE ncd_pharmacists
+SET role = 'Owner', email = 'amphy2000@gmail.com'
+WHERE email = 'amphy2000@gmail.com' OR user_id IN (
+  SELECT id FROM auth.users WHERE email = 'amphy2000@gmail.com'
+);
+
+UPDATE ncd_clinicians
+SET role = 'Admin', email = 'amphyfx@gmail.com'
+WHERE email = 'amphyfx@gmail.com' OR user_id IN (
+  SELECT id FROM auth.users WHERE email = 'amphyfx@gmail.com'
+);
+
 

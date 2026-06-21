@@ -172,9 +172,18 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
       if (pharmacy?.subaccountId) {
         const cleanSubaccountId = pharmacy.subaccountId.split('|||')[0].trim();
         if (cleanSubaccountId) {
+          const commissionRate = (() => {
+            const stored = localStorage.getItem('diabp_system_commission_rate');
+            if (stored !== null) {
+              const parsed = parseFloat(stored);
+              if (!isNaN(parsed)) return parsed;
+            }
+            return 0.05;
+          })();
+          const splitRatio = Math.round((1 - commissionRate) * 100);
           subaccountsList.push({
             id: cleanSubaccountId,
-            transaction_split_ratio: 95 // 95% to pharmacy, 5% stays as platform fee
+            transaction_split_ratio: splitRatio
           });
         }
       }
