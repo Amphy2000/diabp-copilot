@@ -55,6 +55,7 @@ export interface NcdRefillOrder {
   pharmacyId: string | null;
   patientId?: string;
   patientName?: string;
+  prescriptionDetails?: string;
 }
 
 export interface NcdClinic {
@@ -482,7 +483,8 @@ export async function getRefillOrders(): Promise<NcdRefillOrder[]> {
           prescriptionUploaded: o.prescription_uploaded,
           pharmacyId: o.pharmacy_id,
           patientId: o.patient_id,
-          patientName: (o.ncd_profiles as any)?.name || "Unknown Patient"
+          patientName: (o.ncd_profiles as any)?.name || "Unknown Patient",
+          prescriptionDetails: o.prescription_details
         }));
       }
     } catch (err) {
@@ -513,7 +515,8 @@ export async function placeRefillOrder(order: NcdRefillOrder): Promise<void> {
           status: order.status,
           prescription_required: order.prescriptionRequired,
           prescription_uploaded: order.prescriptionUploaded,
-          pharmacy_id: isValidUuid(order.pharmacyId) ? order.pharmacyId : null
+          pharmacy_id: isValidUuid(order.pharmacyId) ? order.pharmacyId : null,
+          prescription_details: order.prescriptionDetails || null
         }]);
         if (error) throw error;
       }

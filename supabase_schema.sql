@@ -89,5 +89,6 @@ CREATE TABLE IF NOT EXISTS ncd_orders (
   prescription_required BOOLEAN NOT NULL,
   prescription_uploaded BOOLEAN NOT NULL,
   pharmacy_id UUID REFERENCES ncd_pharmacies(id) ON DELETE SET NULL,
+  prescription_details TEXT DEFAULT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );

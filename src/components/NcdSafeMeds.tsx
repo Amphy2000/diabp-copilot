@@ -22,6 +22,8 @@ interface NcdSafeMedsProps {
 export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, profile, pharmacies }) => {
   const [selectedMeds, setSelectedMeds] = useState<string[]>(['bundle']);
   const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
+  const [useManualRx, setUseManualRx] = useState(false);
+  const [prescriptionDetails, setPrescriptionDetails] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [orderNotification, setOrderNotification] = useState<string | null>(null);
@@ -85,9 +87,18 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
       return med?.rxRequired;
     });
 
-    if (requiresRx && !prescriptionFile) {
-      alert("A valid doctor's prescription must be uploaded for Metformin / Blood Pressure refills.");
-      return;
+    if (requiresRx) {
+      if (useManualRx) {
+        if (!prescriptionDetails.trim()) {
+          alert("Please enter your prescription details (e.g. Doctor's name, prescription number or date) to verify drug dosing safety.");
+          return;
+        }
+      } else {
+        if (!prescriptionFile) {
+          alert("A valid doctor's prescription must be uploaded for Metformin / Blood Pressure refills. If upload reloads your browser, please select 'Enter details manually' below.");
+          return;
+        }
+      }
     }
 
     const itemNames = selectedMeds.map(medId => {
@@ -102,7 +113,8 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
       totalNaira: calculateTotal(),
       status: 'Pending Verification',
       prescriptionRequired: requiresRx,
-      prescriptionUploaded: !!prescriptionFile,
+      prescriptionUploaded: useManualRx ? !!prescriptionDetails.trim() : !!prescriptionFile,
+      prescriptionDetails: useManualRx ? prescriptionDetails : undefined,
       pharmacyId: profile.assignedPharmacyId,
       patientId: profile.id,
       patientName: profile.name
@@ -113,6 +125,8 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
     
     // Clear form
     setPrescriptionFile(null);
+    setPrescriptionDetails('');
+    setUseManualRx(false);
     setUploadProgress(0);
     setSelectedMeds(['bundle']);
 
@@ -293,43 +307,121 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
               </div>
             </div>
 
-            {/* Prescription Upload Widget */}
+            {/* Prescription Verification Widget */}
             {selectedMeds.some(medId => {
               const med = NCD_MEDICATIONS.find(m => m.id === medId);
               return med?.rxRequired;
             }) && (
-              <div className="prescription-dropzone">
-                <FileText className="prescription-icon-box w-8 h-8" />
-                
-                {prescriptionFile ? (
-                  <div style={{ width: '100%' }}>
-                    <p className="prescription-meta-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px', margin: '0 auto' }}>{prescriptionFile.name}</p>
-                    <p className="upload-success-label" style={{ marginTop: '2px' }}>✓ Uploaded & Checked for Purity</p>
+              <div className="prescription-dropzone" style={{ minHeight: 'auto', padding: '15px' }}>
+                <div style={{ display: 'flex', gap: '8px', width: '100%', marginBottom: '12px', justifyContent: 'center' }}>
+                  <button 
+                    type="button"
+                    onClick={() => setUseManualRx(false)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      border: '1px solid',
+                      borderColor: !useManualRx ? 'var(--color-teal-light)' : 'rgba(255, 255, 255, 0.1)',
+                      background: !useManualRx ? 'rgba(20, 184, 166, 0.15)' : 'transparent',
+                      color: !useManualRx ? 'white' : 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    Upload File
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setUseManualRx(true)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      border: '1px solid',
+                      borderColor: useManualRx ? 'var(--color-teal-light)' : 'rgba(255, 255, 255, 0.1)',
+                      background: useManualRx ? 'rgba(20, 184, 166, 0.15)' : 'transparent',
+                      color: useManualRx ? 'white' : 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    Enter Details Manually
+                  </button>
+                </div>
+
+                {useManualRx ? (
+                  <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <p className="prescription-meta-title" style={{ fontSize: '12px', color: 'white', textAlign: 'left', fontWeight: 'bold' }}>
+                      Enter Prescription Details
+                    </p>
+                    <textarea
+                      value={prescriptionDetails}
+                      onChange={(e) => setPrescriptionDetails(e.target.value)}
+                      placeholder="e.g. Prescribed by Dr. Emeka, Abuja Heart Clinic on June 15. Metformin 500mg, Refill Code: RX-904"
+                      style={{
+                        width: '100%',
+                        minHeight: '80px',
+                        background: 'rgba(0, 0, 0, 0.3)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        borderRadius: '8px',
+                        padding: '8px',
+                        fontSize: '11px',
+                        color: 'white',
+                        fontFamily: 'inherit',
+                        resize: 'none'
+                      }}
+                    />
+                    <p style={{ fontSize: '9px', color: 'var(--text-muted)', textAlign: 'left', lineHeight: '1.25' }}>
+                      Type the prescription details here. Ideal if file uploads refresh your browser due to mobile memory constraints.
+                    </p>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', alignItems: 'center' }}>
-                    <p className="prescription-meta-title">Doctor's Prescription Required</p>
-                    <p className="prescription-meta-desc">Upload prescription to verify drug dosing safety</p>
-                    
-                    <label className="btn-upload-file-label">
-                      <Upload className="w-3.5 h-3.5" />
-                      Browse Files
-                      <input 
-                        type="file" 
-                        accept=".pdf,.jpg,.jpeg,.png" 
-                        onChange={handleFileChange} 
-                        style={{ display: 'none' }} 
-                      />
-                    </label>
-                  </div>
-                )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', alignItems: 'center', width: '100%' }}>
+                    <FileText className="prescription-icon-box w-7 h-7" style={{ marginBottom: '4px' }} />
+                    {!prescriptionFile ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', alignItems: 'center' }}>
+                        <p className="prescription-meta-title">Doctor's Prescription Required</p>
+                        <p className="prescription-meta-desc">Upload prescription to verify drug dosing safety</p>
+                        
+                        <label htmlFor="prescription-upload-input" className="btn-upload-file-label" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Upload className="w-3.5 h-3.5" />
+                          Browse Files
+                        </label>
+                        <input 
+                          id="prescription-upload-input"
+                          type="file" 
+                          accept="application/pdf,image/png,image/jpeg" 
+                          onChange={handleFileChange} 
+                          style={{ display: 'none' }} 
+                        />
+                      </div>
+                    ) : (
+                      <div style={{ width: '100%', textAlign: 'center' }}>
+                        <p className="prescription-meta-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px', margin: '0 auto' }}>{prescriptionFile.name}</p>
+                        <p className="upload-success-label" style={{ marginTop: '2px' }}>✓ Uploaded & Checked for Purity</p>
+                        <button 
+                          type="button" 
+                          onClick={() => setPrescriptionFile(null)}
+                          style={{ fontSize: '10px', color: '#f87171', background: 'none', border: 'none', textDecoration: 'underline', marginTop: '6px', cursor: 'pointer' }}
+                        >
+                          Clear File
+                        </button>
+                      </div>
+                    )}
 
-                {isUploading && (
-                  <div className="upload-progress-container">
-                    <div className="upload-progress-percent">Uploading {uploadProgress}%</div>
-                    <div className="progress-bar-mini">
-                      <div className="progress-bar-mini-fill" style={{ width: `${uploadProgress}%` }}></div>
-                    </div>
+                    {isUploading && (
+                      <div className="upload-progress-container" style={{ width: '100%', marginTop: '8px' }}>
+                        <div className="upload-progress-percent">Uploading {uploadProgress}%</div>
+                        <div className="progress-bar-mini">
+                          <div className="progress-bar-mini-fill" style={{ width: `${uploadProgress}%` }}></div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

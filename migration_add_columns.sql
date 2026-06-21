@@ -12,6 +12,9 @@ ADD COLUMN IF NOT EXISTS assigned_clinic_id UUID REFERENCES ncd_clinics(id) ON D
 ALTER TABLE ncd_profiles 
 ADD COLUMN IF NOT EXISTS assigned_pharmacy_id UUID REFERENCES ncd_pharmacies(id) ON DELETE SET NULL;
 
--- 3. Add 'pharmacy_id' column to 'ncd_orders' if it doesn't exist
+-- 3. Add 'pharmacy_id' and 'prescription_details' columns to 'ncd_orders' if they don't exist
 ALTER TABLE ncd_orders 
 ADD COLUMN IF NOT EXISTS pharmacy_id UUID REFERENCES ncd_pharmacies(id) ON DELETE SET NULL;
+
+ALTER TABLE ncd_orders 
+ADD COLUMN IF NOT EXISTS prescription_details TEXT DEFAULT NULL;

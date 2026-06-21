@@ -633,9 +633,20 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                     <td style={{ textAlign: 'center' }}>
                       {order.prescriptionRequired ? (
                         order.prescriptionUploaded ? (
-                          <span className="order-rx-badge-pill valid">
-                            Uploaded (Eze_Rx.pdf)
-                          </span>
+                          order.prescriptionDetails ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                              <span className="order-rx-badge-pill valid" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.3)' }}>
+                                Details Provided
+                              </span>
+                              <div style={{ fontSize: '9px', color: 'var(--text-muted)', maxWidth: '140px', whiteSpace: 'normal', fontStyle: 'italic', lineHeight: '1.2' }}>
+                                "{order.prescriptionDetails}"
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="order-rx-badge-pill valid">
+                              Uploaded (Eze_Rx.pdf)
+                            </span>
+                          )
                         ) : (
                           <span className="order-rx-badge-pill missing">
                             Missing Prescription
