@@ -68,6 +68,8 @@ export interface NcdClinic {
   address: string;
   city: string;
   contactPhone: string;
+  isPremium?: boolean;
+  premiumExpiry?: string;
 }
 
 export interface NcdPharmacy {
@@ -78,6 +80,8 @@ export interface NcdPharmacy {
   contactPhone: string;
   isVerified: boolean;
   prices?: { [medId: string]: number };
+  isPremium?: boolean;
+  premiumExpiry?: string;
 }
 
 export interface NcdAlert {
@@ -1078,7 +1082,9 @@ export async function getClinics(): Promise<NcdClinic[]> {
           name: c.name,
           address: c.address,
           city: c.city,
-          contactPhone: c.contact_phone
+          contactPhone: c.contact_phone,
+          isPremium: c.is_premium || false,
+          premiumExpiry: c.premium_expiry || undefined
         }));
       } else {
         await seedClinics();
@@ -1089,6 +1095,31 @@ export async function getClinics(): Promise<NcdClinic[]> {
     }
   }
   return loadLocal("diabp_clinics", MOCK_CLINICS);
+}
+
+export async function saveClinic(clinic: NcdClinic): Promise<void> {
+  const current = await getClinics();
+  const updated = current.map(c => c.id === clinic.id ? clinic : c);
+  saveLocal("diabp_clinics", updated);
+
+  if (isSupabaseConfigured) {
+    try {
+      const { error } = await supabase
+        .from('ncd_clinics')
+        .update({
+          name: clinic.name,
+          address: clinic.address,
+          city: clinic.city,
+          contact_phone: clinic.contactPhone,
+          is_premium: clinic.isPremium || false,
+          premium_expiry: clinic.premiumExpiry || null
+        })
+        .eq('id', clinic.id);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Supabase clinic save failed:", err);
+    }
+  }
 }
 
 export async function getPharmacies(): Promise<NcdPharmacy[]> {
@@ -1107,7 +1138,9 @@ export async function getPharmacies(): Promise<NcdPharmacy[]> {
           city: p.city,
           contactPhone: p.contact_phone,
           isVerified: p.is_verified,
-          prices: p.prices
+          prices: p.prices,
+          isPremium: p.is_premium || false,
+          premiumExpiry: p.premium_expiry || undefined
         }));
       } else {
         await seedPharmacies();
@@ -1118,6 +1151,33 @@ export async function getPharmacies(): Promise<NcdPharmacy[]> {
     }
   }
   return loadLocal("diabp_pharmacies", MOCK_PHARMACIES);
+}
+
+export async function savePharmacy(pharmacy: NcdPharmacy): Promise<void> {
+  const current = await getPharmacies();
+  const updated = current.map(p => p.id === pharmacy.id ? pharmacy : p);
+  saveLocal("diabp_pharmacies", updated);
+
+  if (isSupabaseConfigured) {
+    try {
+      const { error } = await supabase
+        .from('ncd_pharmacies')
+        .update({
+          name: pharmacy.name,
+          address: pharmacy.address,
+          city: pharmacy.city,
+          contact_phone: pharmacy.contactPhone,
+          is_verified: pharmacy.isVerified,
+          prices: pharmacy.prices,
+          is_premium: pharmacy.isPremium || false,
+          premium_expiry: pharmacy.premiumExpiry || null
+        })
+        .eq('id', pharmacy.id);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Supabase pharmacy save failed:", err);
+    }
+  }
 }
 
 async function getBpHistoryForPatient(patientId: string): Promise<BpReading[]> {

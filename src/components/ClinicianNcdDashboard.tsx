@@ -16,7 +16,8 @@ import {
   Phone,
   MapPin,
   Eye,
-  ShoppingBag
+  ShoppingBag,
+  Lock
 } from 'lucide-react';
 import { 
   auditNcdRegimen,
@@ -42,6 +43,8 @@ interface ClinicianNcdDashboardProps {
   userRole?: 'doctor' | 'pharmacist' | null;
   facilityId?: string | null;
   onUpdatePharmacyPrices?: (pharmacyId: string, prices: { [medId: string]: number }) => void;
+  onUpdateClinic?: (updated: NcdClinic) => void;
+  onUpdatePharmacy?: (updated: NcdPharmacy) => void;
 }
 
 export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({ 
@@ -52,7 +55,9 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   pharmacies,
   userRole,
   facilityId,
-  onUpdatePharmacyPrices
+  onUpdatePharmacyPrices,
+  onUpdateClinic,
+  onUpdatePharmacy
 }) => {
   // Multi-Tenant Simulator State
   const [activeRole, setActiveRole] = useState<'clinic' | 'pharmacy'>(
@@ -81,6 +86,68 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   const [viewingPrescriptionOrder, setViewingPrescriptionOrder] = useState<NcdRefillOrder | null>(null);
   const [editingPrices, setEditingPrices] = useState(false);
   const [tempPrices, setTempPrices] = useState<{ [medId: string]: number }>({});
+
+  // B2B Facility Upgrade states
+  const [facilityUpgradeModalOpen, setFacilityUpgradeModalOpen] = useState(false);
+  const [upgradeTarget, setUpgradeTarget] = useState<'clinic' | 'pharmacy'>('clinic');
+  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual'>('monthly');
+  const [cardHolder, setCardHolder] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+  const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
+  const [paymentError, setPaymentError] = useState('');
+
+  const handleUpgradeFacility = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cardHolder || !cardNumber || !cardExpiry || !cardCvv) {
+      setPaymentError("Please fill in all credit card details.");
+      return;
+    }
+    setPaymentError("");
+    setPaymentStep('processing');
+
+    // Simulate API Flutterwave transaction loading delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    setPaymentStep('success');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    const expiryDate = new Date();
+    if (selectedPlan === 'monthly') {
+      expiryDate.setMonth(expiryDate.getMonth() + 1);
+    } else {
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+    }
+
+    if (upgradeTarget === 'clinic') {
+      const activeClinic = clinics.find(c => c.id === activeClinicId);
+      if (activeClinic && onUpdateClinic) {
+        await onUpdateClinic({
+          ...activeClinic,
+          isPremium: true,
+          premiumExpiry: expiryDate.toLocaleDateString()
+        });
+      }
+    } else {
+      const activePharmacy = pharmacies.find(p => p.id === activePharmacyId);
+      if (activePharmacy && onUpdatePharmacy) {
+        await onUpdatePharmacy({
+          ...activePharmacy,
+          isPremium: true,
+          premiumExpiry: expiryDate.toLocaleDateString()
+        });
+      }
+    }
+
+    // Reset checkout states
+    setFacilityUpgradeModalOpen(false);
+    setPaymentStep('form');
+    setCardHolder('');
+    setCardNumber('');
+    setCardExpiry('');
+    setCardCvv('');
+  };
 
   // Collapsible cards state
   const [collapsedAlertsLog, setCollapsedAlertsLog] = useState(false);
@@ -285,6 +352,12 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
     return hasCriticalAlert || strokeRisk === 'High' || strokeRisk === 'Emergency' || diabeticRisk === 'High' || diabeticRisk === 'Emergency';
   });
 
+  const activeClinic = clinics.find(c => c.id === activeClinicId);
+  
+  const isFacilityPremium = activeRole === 'clinic' 
+    ? (activeClinic?.isPremium || false) 
+    : (activePharmacy?.isPremium || false);
+
   return (
     <div className="space-y-6 animate-fade-in" style={{ paddingBottom: '30px' }}>
       
@@ -366,14 +439,22 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                 </span>
               </div>
             )}
+            
             {activeRole === 'pharmacy' && (
               <button
                 type="button"
-                onClick={() => setEditingPrices(true)}
+                onClick={() => {
+                  if (!isFacilityPremium) {
+                    setUpgradeTarget('pharmacy');
+                    setFacilityUpgradeModalOpen(true);
+                  } else {
+                    setEditingPrices(true);
+                  }
+                }}
                 style={{
-                  background: 'rgba(20, 184, 166, 0.15)',
-                  border: '1px solid var(--color-teal-light)',
-                  color: 'white',
+                  background: isFacilityPremium ? 'rgba(20, 184, 166, 0.15)' : 'rgba(255,255,255,0.05)',
+                  border: isFacilityPremium ? '1px solid var(--color-teal-light)' : '1px solid rgba(255,255,255,0.1)',
+                  color: isFacilityPremium ? 'white' : 'var(--text-muted)',
                   borderRadius: '8px',
                   padding: '8px 12px',
                   fontSize: '0.7rem',
@@ -385,12 +466,88 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                   transition: 'all 0.2s ease'
                 }}
               >
-                ⚙️ Manage Pricing
+                {isFacilityPremium ? '⚙️ Manage Pricing' : '🔒 Manage Pricing (Premium)'}
+              </button>
+            )}
+
+            {!isFacilityPremium && (
+              <button
+                type="button"
+                onClick={() => {
+                  setUpgradeTarget(activeRole);
+                  setFacilityUpgradeModalOpen(true);
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                  border: 'none',
+                  color: 'black',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  fontSize: '0.7rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: '0 0 10px rgba(234, 179, 8, 0.2)'
+                }}
+              >
+                👑 Upgrade Facility Plan
               </button>
             )}
           </div>
         </div>
       </div>
+
+      {/* Facility Warning Banner */}
+      {!isFacilityPremium && (
+        <div style={{
+          background: 'linear-gradient(90deg, rgba(234, 179, 8, 0.15) 0%, rgba(202, 138, 4, 0.05) 100%)',
+          border: '1px solid rgba(234, 179, 8, 0.3)',
+          borderRadius: '12px',
+          padding: '12px 16px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '12px',
+          flexWrap: 'wrap',
+          marginBottom: '8px',
+          textAlign: 'left'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '1.2rem' }}>👑</span>
+            <div style={{ textAlign: 'left' }}>
+              <h5 style={{ margin: 0, fontSize: '0.8rem', color: '#eab308', fontWeight: 'bold' }}>
+                Basic Facility Plan Active: {activeRole === 'clinic' ? (activeClinic?.name || 'this Clinic') : (activePharmacy?.name || 'this Pharmacy')}
+              </h5>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                {activeRole === 'clinic' 
+                  ? 'Advanced diagnostics audit features (Global Master Logs auditing directories and CSV data exports) are locked.'
+                  : 'Custom pricing catalog configurations and price adjustment overrides on customer orders are locked.'
+                }
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setUpgradeTarget(activeRole);
+              setFacilityUpgradeModalOpen(true);
+            }}
+            style={{
+              background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+              border: 'none',
+              color: 'black',
+              padding: '6px 14px',
+              borderRadius: '6px',
+              fontSize: '0.7rem',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+          >
+            Upgrade Plan
+          </button>
+        </div>
+      )}
 
       {/* Triage & Automation Control Center */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', marginBottom: '8px' }}>
@@ -1450,23 +1607,26 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                                     type="number"
                                     defaultValue={order.totalNaira}
                                     id={`price-adjust-${order.id}`}
+                                    disabled={!isFacilityPremium}
                                     style={{
                                       width: '65px',
                                       background: 'transparent',
                                       border: 'none',
-                                      color: 'white',
+                                      color: isFacilityPremium ? 'white' : 'var(--text-muted)',
                                       fontSize: '11px',
                                       fontFamily: 'monospace',
                                       textAlign: 'right',
-                                      outline: 'none'
+                                      outline: 'none',
+                                      cursor: isFacilityPremium ? 'text' : 'not-allowed'
                                     }}
-                                    placeholder="Adjust"
+                                    placeholder={isFacilityPremium ? "Adjust" : "Locked"}
+                                    title={!isFacilityPremium ? "Price adjustment locked. Upgrade to Premium Pharmacy plan." : ""}
                                   />
                                 </div>
                                 <button
                                   onClick={() => {
                                     const inputEl = document.getElementById(`price-adjust-${order.id}`) as HTMLInputElement;
-                                    const adjustedPrice = inputEl ? Number(inputEl.value) : order.totalNaira;
+                                    const adjustedPrice = (inputEl && isFacilityPremium) ? Number(inputEl.value) : order.totalNaira;
                                     handleUpdateStatusAndClearAlert(order.id, 'Approved', adjustedPrice);
                                   }}
                                   className="btn-action-table"
@@ -1906,7 +2066,8 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
         )}
 
       {/* Master Clinical Logs Directory Audit Panel */}
-      <div className="glass-panel" style={{ marginTop: '24px', background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.3) 0%, rgba(15, 23, 42, 0.3) 100%)', border: '1px solid rgba(255,255,255,0.05)', padding: '20px', borderRadius: '16px' }}>
+      <div className="glass-panel" style={{ marginTop: '24px', background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.3) 0%, rgba(15, 23, 42, 0.3) 100%)', border: '1px solid rgba(255,255,255,0.05)', padding: '20px', borderRadius: '16px', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ filter: (activeRole === 'clinic' && !isFacilityPremium) ? 'blur(5px)' : 'none', transition: 'filter 0.3s ease' }}>
         <div 
           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', borderBottom: collapsedMasterDirectory ? 'none' : '1px solid rgba(255,255,255,0.06)', paddingBottom: collapsedMasterDirectory ? '0' : '12px' }}
           onClick={() => setCollapsedMasterDirectory(!collapsedMasterDirectory)}
@@ -2096,6 +2257,35 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+        </div>
+        {activeRole === 'clinic' && !isFacilityPremium && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(3px)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '20px', zIndex: 10, textAlign: 'center'
+          }}>
+            <Lock size={24} className="text-teal-400" style={{ marginBottom: '8px' }} />
+            <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', color: 'white', fontWeight: 'bold' }}>Global Master Logs Directory Locked</h4>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 16px 0', lineHeight: '1.4', maxWidth: '80%' }}>
+              Upgrade to a Premium Clinic Account to unlock consolidated historic vitals entries, foot sole scans, and refill audits across all patients.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setUpgradeTarget('clinic');
+                setFacilityUpgradeModalOpen(true);
+              }}
+              style={{
+                background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)', border: 'none', color: 'black',
+                padding: '8px 16px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer',
+                boxShadow: '0 0 10px rgba(234, 179, 8, 0.2)'
+              }}
+            >
+              👑 Unlock Premium Clinic Workspace
+            </button>
           </div>
         )}
       </div>
@@ -2299,6 +2489,238 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                 </button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* B2B Facility Premium Upgrade Flutterwave Modal */}
+      {facilityUpgradeModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          zIndex: 9999, padding: '20px'
+        }}>
+          <div style={{
+            background: '#111827', border: '2px solid #eab308', borderRadius: '16px',
+            width: '100%', maxWidth: '500px', boxShadow: '0 25px 50px -12px rgba(234, 179, 8, 0.15)',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '20px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              background: 'linear-gradient(180deg, rgba(234, 179, 8, 0.05) 0%, rgba(0,0,0,0) 100%)'
+            }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem', color: '#eab308', fontWeight: 'bold' }}>
+                👑 Upgrade to Premium {upgradeTarget === 'clinic' ? 'Clinic' : 'Pharmacy'} Plan
+              </h3>
+              <button 
+                onClick={() => {
+                  setFacilityUpgradeModalOpen(false);
+                  setPaymentStep('form');
+                  setPaymentError('');
+                }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.06)', border: 'none', borderRadius: '50%',
+                  width: '28px', height: '28px', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', color: 'white', cursor: 'pointer'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {paymentStep === 'form' && (
+              <form onSubmit={handleUpgradeFacility} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Select Subscription Plan */}
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
+                    Choose Your Subscription Plan
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div 
+                      onClick={() => setSelectedPlan('monthly')}
+                      style={{
+                        padding: '12px', borderRadius: '10px',
+                        border: selectedPlan === 'monthly' ? '2px solid #eab308' : '1px solid rgba(255, 255, 255, 0.1)',
+                        background: selectedPlan === 'monthly' ? 'rgba(234, 179, 8, 0.05)' : 'rgba(255, 255, 255, 0.02)',
+                        cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>Monthly License</div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#eab308', margin: '4px 0' }}>
+                        {upgradeTarget === 'clinic' ? '₦25,000' : '₦15,000'}
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Billed Monthly</div>
+                    </div>
+                    <div 
+                      onClick={() => setSelectedPlan('annual')}
+                      style={{
+                        padding: '12px', borderRadius: '10px',
+                        border: selectedPlan === 'annual' ? '2px solid #eab308' : '1px solid rgba(255, 255, 255, 0.1)',
+                        background: selectedPlan === 'annual' ? 'rgba(234, 179, 8, 0.05)' : 'rgba(255, 255, 255, 0.02)',
+                        cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s ease', position: 'relative'
+                      }}
+                    >
+                      <span style={{
+                        position: 'absolute', top: '-8px', right: '10px',
+                        background: '#eab308', color: 'black', padding: '1px 6px',
+                        borderRadius: '100px', fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase'
+                      }}>
+                        Save 17%
+                      </span>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>Annual License</div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#eab308', margin: '4px 0' }}>
+                        {upgradeTarget === 'clinic' ? '₦250,000' : '₦150,000'}
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Billed Yearly</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Secure Card Payment Section */}
+                <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                    <CreditCard size={14} className="text-teal-400" />
+                    <span style={{ fontSize: '0.75rem', color: 'white', fontWeight: 'bold' }}>eCraftHub Secure Payment Gateway</span>
+                  </div>
+                  
+                  <div style={{
+                    fontSize: '0.62rem',
+                    color: '#eab308',
+                    background: 'rgba(234, 179, 8, 0.06)',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(234, 179, 8, 0.15)',
+                    marginBottom: '12px',
+                    lineHeight: '1.3',
+                    textAlign: 'left'
+                  }}>
+                    ⚡ Powered by <strong>Flutterwave V4 Gateway</strong><br/>
+                    Client ID: <code style={{ color: 'white' }}>41a6a298-2ede...9475</code>
+                  </div>
+
+                  {paymentError && (
+                    <div style={{
+                      padding: '8px 12px', background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.2)', color: '#f87171',
+                      borderRadius: '6px', fontSize: '0.75rem', marginBottom: '12px'
+                    }}>
+                      {paymentError}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Billing Contact Name</label>
+                      <input 
+                        type="text" 
+                        placeholder={upgradeTarget === 'clinic' ? 'Medical Director / Clinician' : 'Head Pharmacist / Manager'}
+                        value={cardHolder}
+                        onChange={(e) => setCardHolder(e.target.value)}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '0.8rem'
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Card Number</label>
+                      <input 
+                        type="text" 
+                        placeholder="4000 1234 5678 9010"
+                        value={cardNumber}
+                        onChange={(e) => setCardNumber(e.target.value)}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '0.8rem'
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Expiry Date</label>
+                        <input 
+                          type="text" 
+                          placeholder="MM/YY"
+                          value={cardExpiry}
+                          onChange={(e) => setCardExpiry(e.target.value)}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '0.8rem'
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>CVV</label>
+                        <input 
+                          type="password" 
+                          placeholder="•••"
+                          maxLength={4}
+                          value={cardCvv}
+                          onChange={(e) => setCardCvv(e.target.value)}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '0.8rem'
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <ShieldCheck size={12} className="text-teal-400" /> Secure SSL Connection
+                  </span>
+                  <span>Total Due: {selectedPlan === 'monthly' ? (upgradeTarget === 'clinic' ? '₦25,000' : '₦15,000') : (upgradeTarget === 'clinic' ? '₦250,000' : '₦150,000')}</span>
+                </div>
+
+                <button
+                  type="submit"
+                  style={{
+                    background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                    border: 'none', color: 'black', padding: '12px', borderRadius: '8px',
+                    fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', marginTop: '8px',
+                    boxShadow: '0 4px 12px rgba(234, 179, 8, 0.25)', transition: 'transform 0.1s ease'
+                  }}
+                >
+                  Pay & Activate Facility License
+                </button>
+              </form>
+            )}
+
+            {paymentStep === 'processing' && (
+              <div style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', minHeight: '300px' }}>
+                <div style={{
+                  width: '50px', height: '50px', border: '3px solid rgba(234, 179, 8, 0.2)',
+                  borderTop: '3px solid #eab308', borderRadius: '50%'
+                }} className="spinner-icon"></div>
+                <div style={{ textAlign: 'center' }}>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', color: 'white', fontWeight: 'bold' }}>Verifying Transaction</h4>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Communicating securely with Flutterwave. Please do not refresh.</p>
+                </div>
+              </div>
+            )}
+
+            {paymentStep === 'success' && (
+              <div style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', minHeight: '300px' }}>
+                <div style={{
+                  width: '50px', height: '50px', background: 'rgba(16, 185, 129, 0.1)',
+                  borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: '2px solid #10b981'
+                }}>
+                  <ShieldCheck size={28} className="text-emerald-400" />
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', color: '#10b981', fontWeight: 'bold' }}>Upgrade Successful!</h4>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Your premium facility license is active. Full administrative tools unlocked.</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

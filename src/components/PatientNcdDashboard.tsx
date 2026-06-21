@@ -1039,9 +1039,23 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
 
                 {/* Secure Card Payment Section */}
                 <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                     <CreditCard size={14} className="text-teal-400" />
-                    <span style={{ fontSize: '0.75rem', color: 'white', fontWeight: 'bold' }}>Secure Credit / Debit Card Payment</span>
+                    <span style={{ fontSize: '0.75rem', color: 'white', fontWeight: 'bold' }}>eCraftHub Secure Payment Gateway</span>
+                  </div>
+                  <div style={{
+                    fontSize: '0.62rem',
+                    color: '#eab308',
+                    background: 'rgba(234, 179, 8, 0.06)',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(234, 179, 8, 0.15)',
+                    marginBottom: '12px',
+                    lineHeight: '1.3',
+                    textAlign: 'left'
+                  }}>
+                    ⚡ Powered by <strong>Flutterwave V4 Gateway</strong><br/>
+                    Client ID: <code style={{ color: 'white' }}>41a6a298-2ede...9475</code>
                   </div>
 
                   {paymentError && (

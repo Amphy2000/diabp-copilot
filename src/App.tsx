@@ -18,7 +18,9 @@ import {
   getPharmacies,
   getPatientsForClinic,
   getPatientsForPharmacy,
-  updatePharmacyPrices
+  updatePharmacyPrices,
+  saveClinic,
+  savePharmacy
 } from './services/ncdService';
 import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy } from './services/ncdService';
 import { PatientNcdDashboard } from './components/PatientNcdDashboard';
@@ -164,6 +166,24 @@ function App() {
       setPharmacies(pharmaciesList);
     } catch (err) {
       console.error("Failed to update pharmacy prices:", err);
+    }
+  };
+
+  const handleUpdateClinic = async (updatedClinic: NcdClinic) => {
+    setClinics(prev => prev.map(c => c.id === updatedClinic.id ? updatedClinic : c));
+    try {
+      await saveClinic(updatedClinic);
+    } catch (err) {
+      console.error("Failed to update clinic:", err);
+    }
+  };
+
+  const handleUpdatePharmacy = async (updatedPharmacy: NcdPharmacy) => {
+    setPharmacies(prev => prev.map(p => p.id === updatedPharmacy.id ? updatedPharmacy : p));
+    try {
+      await savePharmacy(updatedPharmacy);
+    } catch (err) {
+      console.error("Failed to update pharmacy:", err);
     }
   };
 
@@ -314,6 +334,8 @@ function App() {
               userRole={userRole}
               facilityId={userFacilityId}
               onUpdatePharmacyPrices={handleUpdatePharmacyPrices}
+              onUpdateClinic={handleUpdateClinic}
+              onUpdatePharmacy={handleUpdatePharmacy}
             />
           </div>
         )}

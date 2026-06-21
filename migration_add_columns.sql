@@ -43,4 +43,17 @@ ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT false;
 ALTER TABLE ncd_profiles 
 ADD COLUMN IF NOT EXISTS premium_expiry TEXT DEFAULT NULL;
 
+-- 7. Add 'is_premium' and 'premium_expiry' columns to 'ncd_clinics' and 'ncd_pharmacies' tables if they don't exist
+ALTER TABLE ncd_clinics 
+ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT false;
+
+ALTER TABLE ncd_clinics 
+ADD COLUMN IF NOT EXISTS premium_expiry TEXT DEFAULT NULL;
+
+ALTER TABLE ncd_pharmacies 
+ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT false;
+
+ALTER TABLE ncd_pharmacies 
+ADD COLUMN IF NOT EXISTS premium_expiry TEXT DEFAULT NULL;
+
 
