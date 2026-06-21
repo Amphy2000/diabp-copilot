@@ -130,18 +130,24 @@ export const Auth: React.FC = () => {
             if (!newFacilityName.trim()) throw new Error("Clinic name is required.");
             const newClinic = await registerClinic(newFacilityName, newFacilityAddress, newFacilityCity, newFacilityPhone);
             targetClinicId = newClinic.id;
+            if (!targetClinicId) throw new Error("Please select or create a clinic.");
+            await associateClinician(user.id, targetClinicId, 'Admin', email);
+          } else {
+            if (!targetClinicId) throw new Error("Please select or create a clinic.");
+            await associateClinician(user.id, targetClinicId, 'Doctor', email);
           }
-          if (!targetClinicId) throw new Error("Please select or create a clinic.");
-          await associateClinician(user.id, targetClinicId, 'Doctor');
         } else if (role === 'pharmacist') {
           let targetPharmacyId = selectedFacilityId;
           if (onboardOption === 'create') {
             if (!newFacilityName.trim()) throw new Error("Pharmacy name is required.");
             const newPharmacy = await registerPharmacy(newFacilityName, newFacilityAddress, newFacilityCity, newFacilityPhone);
             targetPharmacyId = newPharmacy.id;
+            if (!targetPharmacyId) throw new Error("Please select or create a pharmacy.");
+            await associatePharmacist(user.id, targetPharmacyId, 'Owner', email);
+          } else {
+            if (!targetPharmacyId) throw new Error("Please select or create a pharmacy.");
+            await associatePharmacist(user.id, targetPharmacyId, 'Staff', email);
           }
-          if (!targetPharmacyId) throw new Error("Please select or create a pharmacy.");
-          await associatePharmacist(user.id, targetPharmacyId);
         }
 
         // Complete authentication and sign-in directly

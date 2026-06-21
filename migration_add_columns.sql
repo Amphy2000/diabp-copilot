@@ -63,4 +63,14 @@ ADD COLUMN IF NOT EXISTS subaccount_id TEXT DEFAULT NULL;
 ALTER TABLE ncd_clinics 
 ADD COLUMN IF NOT EXISTS subaccount_id TEXT DEFAULT NULL;
 
+-- 9. Add 'role' and 'email' columns to ncd_pharmacists and ncd_clinicians
+ALTER TABLE ncd_pharmacists 
+ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'Owner' CHECK (role IN ('Owner', 'Staff'));
+
+ALTER TABLE ncd_pharmacists 
+ADD COLUMN IF NOT EXISTS email TEXT DEFAULT NULL;
+
+ALTER TABLE ncd_clinicians 
+ADD COLUMN IF NOT EXISTS email TEXT DEFAULT NULL;
+
 

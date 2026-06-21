@@ -1427,31 +1427,138 @@ export async function updatePharmacyPrices(pharmacyId: string, prices: { [medId:
   saveLocal("diabp_pharmacies", updated);
 }
 
-export async function associateClinician(userId: string, clinicId: string, role: 'Doctor' | 'Nurse'): Promise<void> {
+export async function associateClinician(userId: string, clinicId: string, role: 'Doctor' | 'Nurse' | 'Admin', email?: string): Promise<void> {
   if (isSupabaseConfigured) {
     try {
-      await supabase.from('ncd_clinicians').insert([{ user_id: userId, clinic_id: clinicId, role }]);
+      await supabase.from('ncd_clinicians').insert([{ user_id: userId, clinic_id: clinicId, role, email }]);
     } catch (err) {
       console.error("Clinician association failed:", err);
     }
   } else {
     const associations = JSON.parse(localStorage.getItem('diabp_mock_clinicians') || '[]');
-    associations.push({ user_id: userId, clinic_id: clinicId, role });
+    associations.push({ user_id: userId, clinic_id: clinicId, role, email });
     localStorage.setItem('diabp_mock_clinicians', JSON.stringify(associations));
   }
 }
 
-export async function associatePharmacist(userId: string, pharmacyId: string): Promise<void> {
+export async function associatePharmacist(userId: string, pharmacyId: string, role: 'Owner' | 'Staff' = 'Owner', email?: string): Promise<void> {
   if (isSupabaseConfigured) {
     try {
-      await supabase.from('ncd_pharmacists').insert([{ user_id: userId, pharmacy_id: pharmacyId }]);
+      await supabase.from('ncd_pharmacists').insert([{ user_id: userId, pharmacy_id: pharmacyId, role, email }]);
     } catch (err) {
       console.error("Pharmacist association failed:", err);
     }
   } else {
     const associations = JSON.parse(localStorage.getItem('diabp_mock_pharmacists') || '[]');
-    associations.push({ user_id: userId, pharmacy_id: pharmacyId });
+    associations.push({ user_id: userId, pharmacy_id: pharmacyId, role, email });
     localStorage.setItem('diabp_mock_pharmacists', JSON.stringify(associations));
+  }
+}
+
+export interface FacilityStaffMember {
+  id: string;
+  userId: string;
+  role: string;
+  email: string | null;
+  createdAt: string;
+}
+
+export async function getFacilityStaff(facilityId: string, facilityType: 'clinic' | 'pharmacy'): Promise<FacilityStaffMember[]> {
+  if (isSupabaseConfigured) {
+    if (facilityType === 'clinic') {
+      const { data, error } = await supabase
+        .from('ncd_clinicians')
+        .select('id, user_id, role, email, created_at')
+        .eq('clinic_id', facilityId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return (data || []).map(d => ({
+        id: d.id,
+        userId: d.user_id,
+        role: d.role,
+        email: d.email,
+        createdAt: d.created_at
+      }));
+    } else {
+      const { data, error } = await supabase
+        .from('ncd_pharmacists')
+        .select('id, user_id, role, email, created_at')
+        .eq('pharmacy_id', facilityId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return (data || []).map(d => ({
+        id: d.id,
+        userId: d.user_id,
+        role: d.role,
+        email: d.email,
+        createdAt: d.created_at
+      }));
+    }
+  } else {
+    if (facilityType === 'clinic') {
+      const list = JSON.parse(localStorage.getItem('diabp_mock_clinicians') || '[]');
+      return list
+        .filter((c: any) => c.clinic_id === facilityId)
+        .map((c: any, index: number) => ({
+          id: `assoc-${index}`,
+          userId: c.user_id,
+          role: c.role || 'Doctor',
+          email: c.email || `${c.user_id.substring(0, 8)}@facility.com`,
+          createdAt: new Date().toISOString()
+        }));
+    } else {
+      const list = JSON.parse(localStorage.getItem('diabp_mock_pharmacists') || '[]');
+      return list
+        .filter((p: any) => p.pharmacy_id === facilityId)
+        .map((p: any, index: number) => ({
+          id: `assoc-${index}`,
+          userId: p.user_id,
+          role: p.role || 'Owner',
+          email: p.email || `${p.user_id.substring(0, 8)}@facility.com`,
+          createdAt: new Date().toISOString()
+        }));
+    }
+  }
+}
+
+export async function addFacilityStaff(
+  email: string,
+  password: string,
+  fullName: string,
+  role: string,
+  facilityId: string,
+  facilityType: 'clinic' | 'pharmacy'
+): Promise<void> {
+  if (isSupabaseConfigured) {
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          role: facilityType === 'clinic' ? 'doctor' : 'pharmacist',
+          full_name: fullName
+        }
+      }
+    });
+    if (authError) throw authError;
+    if (!authData.user) throw new Error("Failed to register staff account.");
+
+    if (facilityType === 'clinic') {
+      await associateClinician(authData.user.id, facilityId, role as any, email);
+    } else {
+      await associatePharmacist(authData.user.id, facilityId, role as any, email);
+    }
+  } else {
+    const mockUserId = `user-staff-${Math.random().toString(36).substr(2, 9)}`;
+    const associations = JSON.parse(localStorage.getItem('diabp_mock_users') || '[]');
+    associations.push({ id: mockUserId, email, role: facilityType === 'clinic' ? 'doctor' : 'pharmacist', full_name: fullName });
+    localStorage.setItem('diabp_mock_users', JSON.stringify(associations));
+
+    if (facilityType === 'clinic') {
+      await associateClinician(mockUserId, facilityId, role as any, email);
+    } else {
+      await associatePharmacist(mockUserId, facilityId, role as any, email);
+    }
   }
 }
 

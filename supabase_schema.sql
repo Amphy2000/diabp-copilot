@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS ncd_clinicians (
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   clinic_id UUID REFERENCES ncd_clinics(id) ON DELETE CASCADE,
   role TEXT NOT NULL CHECK (role IN ('Doctor', 'Nurse', 'Admin')),
+  email TEXT DEFAULT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -60,6 +61,8 @@ CREATE TABLE IF NOT EXISTS ncd_pharmacists (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   pharmacy_id UUID REFERENCES ncd_pharmacies(id) ON DELETE CASCADE,
+  role TEXT NOT NULL DEFAULT 'Owner' CHECK (role IN ('Owner', 'Staff')),
+  email TEXT DEFAULT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

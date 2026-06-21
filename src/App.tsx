@@ -36,6 +36,7 @@ function App() {
   const [userRole, setUserRole] = useState<'patient' | 'doctor' | 'pharmacist' | 'admin' | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
   const [userFacilityId, setUserFacilityId] = useState<string | null>(null);
+  const [facilityUserRole, setFacilityUserRole] = useState<'admin' | 'staff'>('staff');
 
   // Centralized Application State
   const [patientProfile, setPatientProfile] = useState<PatientNcdProfile | null>(null);
@@ -91,14 +92,23 @@ function App() {
           setOrders(refillOrders);
         } else if (role === 'doctor') {
           let clinicId = clinicsList[0]?.id || '11111111-1111-1111-1111-111111111111';
-          try {
-            const { data: clinician } = await supabase
-              .from('ncd_clinicians')
-              .select('clinic_id')
-              .eq('user_id', session.user.id)
-              .single();
-            if (clinician?.clinic_id) clinicId = clinician.clinic_id;
-          } catch {}
+          let userRoleInFacility: 'admin' | 'staff' = 'staff';
+          if (isSupabaseConfigured) {
+            try {
+              const { data: clinician } = await supabase
+                .from('ncd_clinicians')
+                .select('clinic_id, role')
+                .eq('user_id', session.user.id)
+                .single();
+              if (clinician?.clinic_id) clinicId = clinician.clinic_id;
+              if (clinician?.role === 'Admin') userRoleInFacility = 'admin';
+            } catch {}
+          } else {
+            const associations = JSON.parse(localStorage.getItem('diabp_mock_clinicians') || '[]');
+            const assoc = associations.find((a: any) => a.user_id === session.user.id);
+            if (assoc?.role === 'Admin') userRoleInFacility = 'admin';
+          }
+          setFacilityUserRole(userRoleInFacility);
           setUserFacilityId(clinicId);
           const clinicPatients = await getPatientsForClinic(clinicId);
           const refillOrders = await getRefillOrders();
@@ -106,14 +116,23 @@ function App() {
           setOrders(refillOrders);
         } else if (role === 'pharmacist') {
           let pharmacyId = pharmaciesList[0]?.id || 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-          try {
-            const { data: pharmacist } = await supabase
-              .from('ncd_pharmacists')
-              .select('pharmacy_id')
-              .eq('user_id', session.user.id)
-              .single();
-            if (pharmacist?.pharmacy_id) pharmacyId = pharmacist.pharmacy_id;
-          } catch {}
+          let userRoleInFacility: 'admin' | 'staff' = 'staff';
+          if (isSupabaseConfigured) {
+            try {
+              const { data: pharmacist } = await supabase
+                .from('ncd_pharmacists')
+                .select('pharmacy_id, role')
+                .eq('user_id', session.user.id)
+                .single();
+              if (pharmacist?.pharmacy_id) pharmacyId = pharmacist.pharmacy_id;
+              if (pharmacist?.role === 'Owner') userRoleInFacility = 'admin';
+            } catch {}
+          } else {
+            const associations = JSON.parse(localStorage.getItem('diabp_mock_pharmacists') || '[]');
+            const assoc = associations.find((a: any) => a.user_id === session.user.id);
+            if (assoc?.role === 'Owner') userRoleInFacility = 'admin';
+          }
+          setFacilityUserRole(userRoleInFacility);
           setUserFacilityId(pharmacyId);
           const pharmacyPatients = await getPatientsForPharmacy(pharmacyId);
           const refillOrders = await getRefillOrders();
@@ -362,6 +381,7 @@ function App() {
               onUpdatePharmacyPrices={handleUpdatePharmacyPrices}
               onUpdateClinic={handleUpdateClinic}
               onUpdatePharmacy={handleUpdatePharmacy}
+              facilityUserRole={facilityUserRole}
             />
           </div>
         )}

@@ -27,7 +27,9 @@ import {
   getSystemAlerts,
   dismissSystemAlert,
   dismissAlertsForPatient,
-  getRefillTracker
+  getRefillTracker,
+  getFacilityStaff,
+  addFacilityStaff
 } from '../services/ncdService';
 import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy, NcdAlert } from '../services/ncdService';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
@@ -73,6 +75,7 @@ interface ClinicianNcdDashboardProps {
   onUpdatePharmacyPrices?: (pharmacyId: string, prices: { [medId: string]: number }) => void;
   onUpdateClinic?: (updated: NcdClinic) => void;
   onUpdatePharmacy?: (updated: NcdPharmacy) => void;
+  facilityUserRole?: 'admin' | 'staff';
 }
 
 export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({ 
@@ -85,13 +88,16 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   facilityId,
   onUpdatePharmacyPrices,
   onUpdateClinic,
-  onUpdatePharmacy
+  onUpdatePharmacy,
+  facilityUserRole = 'admin'
 }) => {
   // Multi-Tenant Simulator State
   const [activeRole, setActiveRole] = useState<'clinic' | 'pharmacy'>(
     userRole === 'pharmacist' ? 'pharmacy' : 'clinic'
   );
-  const [workspaceRole, setWorkspaceRole] = useState<'admin' | 'staff'>('admin');
+  const [workspaceRole, setWorkspaceRole] = useState<'admin' | 'staff'>(
+    userRole && facilityUserRole === 'staff' ? 'staff' : 'admin'
+  );
   const [activeClinicId, setActiveClinicId] = useState<string | null>(
     userRole === 'doctor' && facilityId ? facilityId : (clinics[0]?.id || null)
   );
@@ -140,6 +146,80 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   const [createSubaccountSuccess, setCreateSubaccountSuccess] = useState('');
   const [resolvedAccountName, setResolvedAccountName] = useState('');
   const [isResolvingAccount, setIsResolvingAccount] = useState(false);
+
+  // Care Team & Staff states
+  const [staffList, setStaffList] = useState<FacilityStaffMember[]>([]);
+  const [isLoadingStaff, setIsLoadingStaff] = useState(false);
+  const [addingStaff, setAddingStaff] = useState(false);
+  const [staffEmail, setStaffEmail] = useState('');
+  const [staffPassword, setStaffPassword] = useState('');
+  const [staffFullName, setStaffFullName] = useState('');
+  const [staffRole, setStaffRole] = useState('Staff');
+  const [staffError, setStaffError] = useState('');
+  const [staffSuccess, setStaffSuccess] = useState('');
+  const [collapsedStaffPanel, setCollapsedStaffPanel] = useState(true);
+
+  // Set default staff role when activeRole changes
+  useEffect(() => {
+    setStaffRole(activeRole === 'clinic' ? 'Doctor' : 'Staff');
+  }, [activeRole]);
+
+  // Load facility staff list
+  const refreshStaffList = async () => {
+    const facilityId = activeRole === 'clinic' ? activeClinicId : activePharmacyId;
+    if (!facilityId) return;
+    setIsLoadingStaff(true);
+    try {
+      const list = await getFacilityStaff(facilityId, activeRole);
+      setStaffList(list);
+    } catch (err) {
+      console.error("Failed to load facility staff list:", err);
+    } finally {
+      setIsLoadingStaff(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshStaffList();
+  }, [activeClinicId, activePharmacyId, activeRole]);
+
+  const handleAddStaffMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!staffEmail.trim() || !staffPassword.trim() || !staffFullName.trim()) {
+      setStaffError("Please fill out all fields.");
+      return;
+    }
+    setStaffError('');
+    setStaffSuccess('');
+    const facilityId = activeRole === 'clinic' ? activeClinicId : activePharmacyId;
+    if (!facilityId) {
+      setStaffError("No active facility selected.");
+      return;
+    }
+    
+    try {
+      await addFacilityStaff(
+        staffEmail.trim(),
+        staffPassword.trim(),
+        staffFullName.trim(),
+        staffRole,
+        facilityId,
+        activeRole
+      );
+      setStaffSuccess(`Staff member registered successfully!`);
+      // Reset form
+      setStaffEmail('');
+      setStaffPassword('');
+      setStaffFullName('');
+      refreshStaffList();
+      setTimeout(() => {
+        setAddingStaff(false);
+        setStaffSuccess('');
+      }, 2000);
+    } catch (err: any) {
+      setStaffError(err.message || "Failed to add staff member.");
+    }
+  };
 
   const handleUpgradeFacility = (e: React.FormEvent) => {
     e.preventDefault();
@@ -710,17 +790,23 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
             )}
 
             {/* Facility Workspace Role Selector */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 10px', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', fontSize: '0.75rem', color: 'white', fontWeight: 'bold' }}>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Workspace Role:</span>
-              <select
-                value={workspaceRole}
-                onChange={(e) => setWorkspaceRole(e.target.value as 'admin' | 'staff')}
-                style={{ background: '#1c1c1e', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer' }}
-              >
-                <option value="admin">Owner/Admin</option>
-                <option value="staff">Staff/Dispenser</option>
-              </select>
-            </div>
+            {(!userRole || facilityUserRole === 'admin') ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 10px', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', fontSize: '0.75rem', color: 'white', fontWeight: 'bold' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Workspace Role:</span>
+                <select
+                  value={workspaceRole}
+                  onChange={(e) => setWorkspaceRole(e.target.value as 'admin' | 'staff')}
+                  style={{ background: '#1c1c1e', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer' }}
+                >
+                  <option value="admin">Owner/Admin</option>
+                  <option value="staff">Staff/Dispenser</option>
+                </select>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                <span>Workspace Role: Staff/Dispenser</span>
+              </div>
+            )}
             
             {workspaceRole === 'admin' && activeRole === 'pharmacy' && (
               <button
@@ -872,19 +958,11 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
             </div>
 
             <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '12px', textAlign: 'left' }}>
-              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Net Payout (95%)</div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Net Payout</div>
               <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#38bdf8', marginTop: '4px' }}>
                 ₦{(totalRevenue * 0.95).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '2px' }}>Settled to bank account</div>
-            </div>
-
-            <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '12px', textAlign: 'left' }}>
-              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Platform Commission (5%)</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#f87171', marginTop: '4px' }}>
-                ₦{(totalRevenue * 0.05).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '2px' }}>DiaBP system split commission</div>
             </div>
 
             <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '12px', textAlign: 'left' }}>
@@ -2434,6 +2512,227 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
           </div>
         </div>
         )}
+
+      {/* Facility Staff Management Directory Panel */}
+      {workspaceRole === 'admin' && (
+        <div className="glass-panel" style={{ marginTop: '24px', background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.3) 0%, rgba(15, 23, 42, 0.3) 100%)', border: '1px solid rgba(255,255,255,0.05)', padding: '20px', borderRadius: '16px' }}>
+          <div 
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', borderBottom: collapsedStaffPanel ? 'none' : '1px solid rgba(255,255,255,0.06)', paddingBottom: collapsedStaffPanel ? '0' : '12px' }}
+            onClick={() => setCollapsedStaffPanel(!collapsedStaffPanel)}
+          >
+            <div>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                👥 Care Team & Staff Directory
+              </h3>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                View and manage registered staff accounts and assign workspace permissions.
+              </p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }} onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => {
+                  setStaffError('');
+                  setStaffSuccess('');
+                  setAddingStaff(true);
+                }}
+                style={{
+                  background: 'rgba(20, 184, 166, 0.15)',
+                  border: '1px solid var(--color-teal-light)',
+                  color: 'var(--color-teal-light)',
+                  borderRadius: '6px',
+                  padding: '4px 10px',
+                  fontSize: '0.65rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                + Add Staff Account
+              </button>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{collapsedStaffPanel ? 'Expand ▾' : 'Collapse ▴'}</span>
+            </div>
+          </div>
+
+          {collapsedStaffPanel && (
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '6px 0 0 0' }}>
+              Total Registered Staff: <strong>{staffList.length}</strong>
+            </div>
+          )}
+
+          {!collapsedStaffPanel && (
+            <div style={{ marginTop: '16px' }}>
+              {isLoadingStaff ? (
+                <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
+                  Loading care team roster...
+                </div>
+              ) : staffList.length === 0 ? (
+                <div style={{ padding: '20px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', borderRadius: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                  No other staff accounts associated yet. Use "+ Add Staff Account" to register your care team.
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                        <th style={{ padding: '8px 12px' }}>Email Address</th>
+                        <th style={{ padding: '8px 12px' }}>Assigned Role</th>
+                        <th style={{ padding: '8px 12px' }}>Created At</th>
+                        <th style={{ padding: '8px 12px' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {staffList.map((member, index) => (
+                        <tr key={member.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', background: index % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent' }}>
+                          <td style={{ padding: '10px 12px', color: 'white', fontWeight: 'bold' }}>{member.email || `Staff Account ${index + 1}`}</td>
+                          <td style={{ padding: '10px 12px' }}>
+                            <span style={{
+                              fontSize: '9px',
+                              background: member.role === 'Admin' || member.role === 'Owner' ? 'rgba(234, 179, 8, 0.15)' : 'rgba(56, 189, 248, 0.15)',
+                              color: member.role === 'Admin' || member.role === 'Owner' ? '#eab308' : '#38bdf8',
+                              padding: '2px 8px',
+                              borderRadius: '100px',
+                              fontWeight: 'bold',
+                              textTransform: 'uppercase'
+                            }}>
+                              {member.role}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 12px', color: 'var(--text-secondary)' }}>
+                            {new Date(member.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                          </td>
+                          <td style={{ padding: '10px 12px', color: 'var(--color-teal-light)' }}>Active</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add Staff Account Modal */}
+      {addingStaff && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          zIndex: 9999, padding: '20px'
+        }}>
+          <div style={{
+            background: '#111827', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '16px', width: '100%', maxWidth: '400px',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '20px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              background: 'rgba(255, 255, 255, 0.02)'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                👥 Add Facility Staff Member
+              </h3>
+              <button 
+                onClick={() => setAddingStaff(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleAddStaffMember} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {staffError && (
+                <div style={{ fontSize: '11px', color: '#f87171', background: 'rgba(239, 68, 68, 0.15)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                  ⚠️ {staffError}
+                </div>
+              )}
+              {staffSuccess && (
+                <div style={{ fontSize: '11px', color: '#34d399', background: 'rgba(16, 185, 129, 0.15)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                  ✓ {staffSuccess}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold', textTransform: 'uppercase' }}>Full Name</label>
+                <input 
+                  type="text" 
+                  value={staffFullName}
+                  onChange={(e) => setStaffFullName(e.target.value)}
+                  placeholder="e.g. John Doe"
+                  required
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', padding: '10px', color: 'white', fontSize: '0.8rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold', textTransform: 'uppercase' }}>Email Address</label>
+                <input 
+                  type="email" 
+                  value={staffEmail}
+                  onChange={(e) => setStaffEmail(e.target.value)}
+                  placeholder="e.g. staff@facility.com"
+                  required
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', padding: '10px', color: 'white', fontSize: '0.8rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold', textTransform: 'uppercase' }}>Password</label>
+                <input 
+                  type="password" 
+                  value={staffPassword}
+                  onChange={(e) => setStaffPassword(e.target.value)}
+                  placeholder="Minimum 6 characters"
+                  required
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', padding: '10px', color: 'white', fontSize: '0.8rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold', textTransform: 'uppercase' }}>Assigned Role</label>
+                <select
+                  value={staffRole}
+                  onChange={(e) => setStaffRole(e.target.value)}
+                  style={{ background: '#1c1c1e', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', padding: '10px', color: 'white', fontSize: '0.8rem', width: '100%' }}
+                >
+                  {activeRole === 'clinic' ? (
+                    <>
+                      <option value="Doctor">Doctor / MD Consultant</option>
+                      <option value="Nurse">Nurse / Care Manager</option>
+                      <option value="Admin">Admin / Director</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="Staff">Staff / Dispenser</option>
+                      <option value="Owner">Owner / Manager</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setAddingStaff(false)}
+                  style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'white', padding: '10px 16px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{ background: 'var(--color-teal-light)', border: 'none', color: 'white', padding: '10px 16px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}
+                >
+                  Register Staff
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Master Clinical Logs Directory Audit Panel */}
       <div className="glass-panel" style={{ marginTop: '24px', background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.3) 0%, rgba(15, 23, 42, 0.3) 100%)', border: '1px solid rgba(255,255,255,0.05)', padding: '20px', borderRadius: '16px', position: 'relative', overflow: 'hidden' }}>
