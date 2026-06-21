@@ -669,7 +669,7 @@ export async function updateOrderStatus(orderId: string, status: NcdRefillOrder[
   }
 }
 
-export async function getSystemAlerts(): Promise<NcdAlert[]> {
+export async function getSystemAlerts(facilityId?: string | null, facilityType?: 'clinic' | 'pharmacy' | null): Promise<NcdAlert[]> {
   // Trigger background check for low refill supplies in a non-blocking way
   setTimeout(() => {
     runRefillTrackerAutomation().catch(err => console.error("Refill automation failed:", err));
@@ -678,11 +678,17 @@ export async function getSystemAlerts(): Promise<NcdAlert[]> {
   if (isSupabaseConfigured) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      let query = supabase.from('ncd_alerts').select('*, ncd_profiles(name)');
+      let query = supabase.from('ncd_alerts').select('*, ncd_profiles!inner(name, assigned_clinic_id, assigned_pharmacy_id)');
       if (user) {
         const role = user.user_metadata?.role;
         if (role === 'patient') {
           query = query.eq('patient_id', user.id);
+        } else if (facilityId && facilityType) {
+          if (facilityType === 'clinic') {
+            query = query.eq('ncd_profiles.assigned_clinic_id', facilityId);
+          } else {
+            query = query.eq('ncd_profiles.assigned_pharmacy_id', facilityId);
+          }
         }
       }
       const { data, error } = await query.order('created_at', { ascending: false });
@@ -705,7 +711,21 @@ export async function getSystemAlerts(): Promise<NcdAlert[]> {
       console.error("Supabase alerts load failed, using local storage:", err);
     }
   }
-  return loadLocal(ALERTS_KEY, INITIAL_NCD_ALERTS);
+  
+  const currentAlerts = loadLocal(ALERTS_KEY, INITIAL_NCD_ALERTS);
+  if (facilityId && facilityType) {
+    const allProfiles = loadLocal('diabp_profiles', {});
+    return currentAlerts.filter((alert: NcdAlert) => {
+      const profile = allProfiles[alert.patientId] || (alert.patientId === '4cf427cf-0ec4-4fde-a623-76b9f148e8d4' ? INITIAL_NCD_PATIENT : null);
+      if (!profile) return false;
+      if (facilityType === 'clinic') {
+        return profile.assignedClinicId === facilityId;
+      } else {
+        return profile.assignedPharmacyId === facilityId;
+      }
+    });
+  }
+  return currentAlerts;
 }
 
 export async function createSystemAlert(
@@ -1339,6 +1359,57 @@ export async function getPatientsForPharmacy(pharmacyId: string): Promise<Patien
   const allProfiles = loadLocal('diabp_profiles', {});
   const pharmacyPatients = Object.values(allProfiles).filter((p: any) => p.assignedPharmacyId === pharmacyId) as PatientNcdProfile[];
   return pharmacyPatients.length > 0 ? pharmacyPatients : [{ ...INITIAL_NCD_PATIENT, id: 'mock-patient-default' }];
+}
+
+export async function getAllPatients(): Promise<PatientNcdProfile[]> {
+  if (isSupabaseConfigured) {
+    try {
+      const { data: profiles, error } = await supabase
+        .from('ncd_profiles')
+        .select('*');
+        
+      if (error) {
+        if (error.code !== '42P01') throw error;
+      }
+      
+      if (profiles && profiles.length > 0) {
+        const patients: PatientNcdProfile[] = [];
+        for (const p of profiles) {
+          const bpHistory = await getBpHistoryForPatient(p.id);
+          const glucoseHistory = await getGlucoseHistoryForPatient(p.id);
+          const footScanHistory = await getFootScanHistoryForPatient(p.id);
+          patients.push({
+            id: p.id,
+            name: p.name,
+            age: p.age,
+            weight: p.weight,
+            conditions: p.conditions,
+            baselineBp: p.baseline_bp,
+            targetGlucoseRange: p.target_glucose_range,
+            streakDays: p.streak_days,
+            activeMeds: p.active_meds,
+            assignedClinicId: p.assigned_clinic_id,
+            assignedPharmacyId: p.assigned_pharmacy_id,
+            phone: p.phone || undefined,
+            address: p.address || undefined,
+            isPremium: p.is_premium,
+            premiumExpiry: p.premium_expiry,
+            bpHistory: bpHistory.length > 0 ? bpHistory : INITIAL_NCD_PATIENT.bpHistory,
+            glucoseHistory: glucoseHistory.length > 0 ? glucoseHistory : INITIAL_NCD_PATIENT.glucoseHistory,
+            footScanHistory: footScanHistory.length > 0 ? footScanHistory : INITIAL_NCD_PATIENT.footScanHistory
+          });
+        }
+        return patients;
+      }
+    } catch (err) {
+      console.error("Failed to fetch all patients from Supabase:", err);
+    }
+  }
+
+  // Local storage fallback
+  const allProfiles = loadLocal('diabp_profiles', {});
+  const patientsList = Object.values(allProfiles) as PatientNcdProfile[];
+  return patientsList.length > 0 ? patientsList : [{ ...INITIAL_NCD_PATIENT, id: 'mock-patient-default' }];
 }
 
 export async function registerClinic(name: string, address: string, city: string, phone: string): Promise<NcdClinic> {

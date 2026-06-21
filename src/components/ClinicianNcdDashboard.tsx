@@ -555,13 +555,19 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   );
   const [refillTab, setRefillTab] = useState<'pending' | 'ready' | 'completed'>('pending');
 
+  const refreshAlerts = async () => {
+    const activeId = activeRole === 'clinic' ? activeClinicId : activePharmacyId;
+    const updated = await getSystemAlerts(activeId, activeRole);
+    setAlerts(updated);
+  };
+
   useEffect(() => {
-    getSystemAlerts().then(setAlerts);
+    refreshAlerts();
     const interval = setInterval(() => {
-      getSystemAlerts().then(setAlerts);
+      refreshAlerts();
     }, 10000);
     return () => clearInterval(interval);
-  }, [patients, orders]);
+  }, [patients, orders, activeClinicId, activePharmacyId, activeRole]);
 
   const handleToggleAutoRefill = (val: boolean) => {
     setAutoRefillEnabled(val);
@@ -637,8 +643,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
       try {
         await dismissAlertsForPatient(patient.id, 'critical');
         await dismissAlertsForPatient(patient.id, 'info');
-        const updated = await getSystemAlerts();
-        setAlerts(updated);
+        await refreshAlerts();
       } catch (err) {
         console.error("Failed to auto-dismiss alerts on nudge:", err);
       }
@@ -654,8 +659,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
       if (order?.patientId) {
         try {
           await dismissAlertsForPatient(order.patientId, 'warning');
-          const updated = await getSystemAlerts();
-          setAlerts(updated);
+          await refreshAlerts();
         } catch (err) {
           console.error("Failed to auto-dismiss alerts on status update:", err);
         }
@@ -666,8 +670,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   const handleDismissAlert = async (alertId: string) => {
     try {
       await dismissSystemAlert(alertId);
-      const updated = await getSystemAlerts();
-      setAlerts(updated);
+      await refreshAlerts();
     } catch (err) {
       console.error("Failed to dismiss alert:", err);
     }

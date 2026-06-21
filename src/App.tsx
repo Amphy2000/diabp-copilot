@@ -20,7 +20,8 @@ import {
   getPatientsForPharmacy,
   updatePharmacyPrices,
   saveClinic,
-  savePharmacy
+  savePharmacy,
+  getAllPatients
 } from './services/ncdService';
 import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy } from './services/ncdService';
 import { PatientNcdDashboard } from './components/PatientNcdDashboard';
@@ -166,6 +167,11 @@ function App() {
           const refillOrders = await getRefillOrders();
           setPatients(pharmacyPatients);
           setOrders(refillOrders);
+        } else if (role === 'admin') {
+          const allPatients = await getAllPatients();
+          const allOrders = await getRefillOrders();
+          setPatients(allPatients);
+          setOrders(allOrders);
         }
       } catch (err) {
         console.error("Failed to load authenticated context data:", err);

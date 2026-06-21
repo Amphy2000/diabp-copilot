@@ -79,6 +79,15 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   // 5. Total Admin Platform Revenue
   const totalAdminRevenue = adminCommissions + totalSaaSRevenue + patientSubRevenue;
 
+  // 6. Active vs Inactive Patients Registry Metrics
+  const totalPatients = patients.length;
+  const activePatientsCount = patients.filter(p => 
+    (p.bpHistory && p.bpHistory.length > 0) || 
+    (p.glucoseHistory && p.glucoseHistory.length > 0) || 
+    (p.streakDays && p.streakDays > 0)
+  ).length;
+  const inactivePatientsCount = totalPatients - activePatientsCount;
+
   // --- OVERRIDE TOGGLE HANDLERS ---
 
   const getPlanOption = (isPremium?: boolean, premiumExpiry?: string): string => {
@@ -326,6 +335,22 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
           </div>
           <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
             From {premiumPatientsCount} premium-tier active users
+          </span>
+        </div>
+
+        {/* App Patients Registry */}
+        <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px', borderLeft: '3px solid #a855f7' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold', textTransform: 'uppercase' }}>
+              Patients Registry
+            </span>
+            <Users className="text-purple-400 w-4 h-4" />
+          </div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#c084fc' }}>
+            {totalPatients} Total Patients
+          </div>
+          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+            🟢 {activePatientsCount} Active | 🔴 {inactivePatientsCount} Inactive
           </span>
         </div>
 
