@@ -24,9 +24,24 @@ serve(async (req) => {
     if (payload.event === "charge.completed" && payload.data.status === "successful") {
       const { meta } = payload.data;
       
-      const targetType = meta?.facility_type; // 'clinic' | 'pharmacy' | 'patient'
-      const targetId = meta?.facility_id;     // Database UUID reference
-      const plan = meta?.plan;                 // 'monthly' | 'annual'
+      const targetTypeVal = meta?.facility_type; // 'clinic' | 'pharmacy' | 'patient'
+      const targetIdVal = meta?.facility_id;     // Database UUID reference
+      const planVal = meta?.plan;                 // 'monthly' | 'annual'
+
+      let targetType = targetTypeVal;
+      let targetId = targetIdVal;
+      let plan = planVal;
+
+      // Parse metadata from V3 format (array of metaname/metavalue objects) if needed
+      if (Array.isArray(meta)) {
+        const typeItem = meta.find((m: any) => m.metaname === "facility_type");
+        const idItem = meta.find((m: any) => m.metaname === "facility_id");
+        const planItem = meta.find((m: any) => m.metaname === "plan");
+
+        if (typeItem) targetType = typeItem.metavalue;
+        if (idItem) targetId = idItem.metavalue;
+        if (planItem) plan = planItem.metavalue;
+      }
 
       if (!targetType || !targetId) {
         return new Response("Missing metadata in webhook data", { status: 400 });
