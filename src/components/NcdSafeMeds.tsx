@@ -7,7 +7,8 @@ import {
   FileText, 
   CheckCircle2, 
   Clock, 
-  MapPin 
+  MapPin,
+  CreditCard
 } from 'lucide-react';
 import { NCD_MEDICATIONS } from '../services/ncdService';
 import type { NcdRefillOrder, PatientNcdProfile, NcdPharmacy } from '../services/ncdService';
@@ -142,11 +143,14 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
     const baseDetails = useManualRx ? manualRxDetails : (uploadedRxDetails || '');
     const finalDetails = brandPreference ? `${brandPreference}|||${baseDetails}` : baseDetails;
 
+    const totalNaira = calculateTotal();
+    const orderId = `NCD-${Math.floor(1000 + Math.random() * 9000)}`;
+
     const newOrder: NcdRefillOrder = {
-      id: `NCD-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: orderId,
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       items: itemNames,
-      totalNaira: calculateTotal(),
+      totalNaira: totalNaira,
       status: 'Pending Verification',
       prescriptionRequired: requiresRx,
       prescriptionUploaded: useManualRx ? !!manualRxDetails.trim() : (!!prescriptionFile || !!uploadedRxDetails),
@@ -156,21 +160,84 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
       patientName: profile.name
     };
 
-    onPlaceOrder(newOrder);
-    setOrderNotification(`Refill ordered! Refill ID: ${newOrder.id}. We are auditing your compliance logs.`);
-    
-    // Clear form
-    setPrescriptionFile(null);
-    setManualRxDetails('');
-    setUploadedRxDetails('');
-    setBrandPreference('');
-    setUseManualRx(false);
-    setUploadProgress(0);
-    setSelectedMeds(['bundle']);
+    // If order has a price > 0, trigger real-time payment gateway checkout
+    if (totalNaira > 0) {
+      if (!(window as any).FlutterwaveCheckout) {
+        alert("Payment gateway is loading. Please try again in a few seconds.");
+        return;
+      }
 
-    setTimeout(() => {
-      setOrderNotification(null);
-    }, 5000);
+      const pharmacy = pharmacies.find(p => p.id === profile.assignedPharmacyId);
+      const subaccountsList: any[] = [];
+      if (pharmacy?.subaccountId) {
+        subaccountsList.push({
+          id: pharmacy.subaccountId,
+          transaction_split_ratio: 95 // 95% to pharmacy, 5% stays as platform fee
+        });
+      }
+
+      const txRef = `flw-refill-${orderId}-${Date.now()}`;
+
+      (window as any).FlutterwaveCheckout({
+        public_key: "FLWPUBK-e2deff3114e81d12bb4f07dbad8b9558-X",
+        tx_ref: txRef,
+        amount: totalNaira,
+        currency: "NGN",
+        payment_options: "card, banktransfer, ussd, account",
+        customer: {
+          email: (profile as any).email || `${profile.name.replace(/\s+/g, '').toLowerCase()}@diabp.com`,
+          name: profile.name,
+          phonenumber: profile.phone || undefined,
+        },
+        customizations: {
+          title: "DiaBP Pay",
+          description: `SafeMeds Medication Refill - Order #${orderId}`,
+        },
+        subaccounts: subaccountsList.length > 0 ? subaccountsList : undefined,
+        callback: function (response: any) {
+          console.log("Flutterwave Refill Response:", response);
+          if (response.status === "successful" || response.status === "completed") {
+            onPlaceOrder({ ...newOrder, status: 'Approved' });
+            setOrderNotification(`Refill order paid & submitted successfully! Order ID: ${orderId}`);
+            
+            // Clear form
+            setPrescriptionFile(null);
+            setManualRxDetails('');
+            setUploadedRxDetails('');
+            setBrandPreference('');
+            setUseManualRx(false);
+            setUploadProgress(0);
+            setSelectedMeds(['bundle']);
+            
+            setTimeout(() => {
+              setOrderNotification(null);
+            }, 5000);
+          } else {
+            alert("Payment was not successful. Order not placed.");
+          }
+        },
+        onclose: function () {
+          console.log("Payment window closed");
+        }
+      });
+    } else {
+      // Free or Quote needed orders go directly through as pending quote
+      onPlaceOrder(newOrder);
+      setOrderNotification(`Refill request submitted! Since this is a custom regimen, your pharmacist will verify & provide a price quote shortly. Order ID: ${newOrder.id}`);
+      
+      // Clear form
+      setPrescriptionFile(null);
+      setManualRxDetails('');
+      setUploadedRxDetails('');
+      setBrandPreference('');
+      setUseManualRx(false);
+      setUploadProgress(0);
+      setSelectedMeds(['bundle']);
+
+      setTimeout(() => {
+        setOrderNotification(null);
+      }, 5000);
+    }
   };
 
   const getStatusIcon = (status: string) => {

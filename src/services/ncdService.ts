@@ -70,6 +70,7 @@ export interface NcdClinic {
   contactPhone: string;
   isPremium?: boolean;
   premiumExpiry?: string;
+  subaccountId?: string;
 }
 
 export interface NcdPharmacy {
@@ -82,6 +83,7 @@ export interface NcdPharmacy {
   prices?: { [medId: string]: number };
   isPremium?: boolean;
   premiumExpiry?: string;
+  subaccountId?: string;
 }
 
 export interface NcdAlert {
@@ -1084,7 +1086,8 @@ export async function getClinics(): Promise<NcdClinic[]> {
           city: c.city,
           contactPhone: c.contact_phone,
           isPremium: c.is_premium || false,
-          premiumExpiry: c.premium_expiry || undefined
+          premiumExpiry: c.premium_expiry || undefined,
+          subaccountId: c.subaccount_id || undefined
         }));
       } else {
         await seedClinics();
@@ -1112,7 +1115,8 @@ export async function saveClinic(clinic: NcdClinic): Promise<void> {
           city: clinic.city,
           contact_phone: clinic.contactPhone,
           is_premium: clinic.isPremium || false,
-          premium_expiry: clinic.premiumExpiry || null
+          premium_expiry: clinic.premiumExpiry || null,
+          subaccount_id: clinic.subaccountId || null
         })
         .eq('id', clinic.id);
       if (error) throw error;
@@ -1140,7 +1144,8 @@ export async function getPharmacies(): Promise<NcdPharmacy[]> {
           isVerified: p.is_verified,
           prices: p.prices,
           isPremium: p.is_premium || false,
-          premiumExpiry: p.premium_expiry || undefined
+          premiumExpiry: p.premium_expiry || undefined,
+          subaccountId: p.subaccount_id || undefined
         }));
       } else {
         await seedPharmacies();
@@ -1170,7 +1175,8 @@ export async function savePharmacy(pharmacy: NcdPharmacy): Promise<void> {
           is_verified: pharmacy.isVerified,
           prices: pharmacy.prices,
           is_premium: pharmacy.isPremium || false,
-          premium_expiry: pharmacy.premiumExpiry || null
+          premium_expiry: pharmacy.premiumExpiry || null,
+          subaccount_id: pharmacy.subaccountId || null
         })
         .eq('id', pharmacy.id);
       if (error) throw error;

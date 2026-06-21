@@ -97,6 +97,10 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
   const [paymentError, setPaymentError] = useState('');
 
+  // Payout / Subaccount states
+  const [editingPayout, setEditingPayout] = useState(false);
+  const [tempSubaccountId, setTempSubaccountId] = useState('');
+
   const handleUpgradeFacility = (e: React.FormEvent) => {
     e.preventDefault();
     if (!billingName || !billingEmail) {
@@ -185,6 +189,39 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
         setPaymentStep('form');
       }
     });
+  };
+
+  // Load current subaccount ID when opening payout modal
+  useEffect(() => {
+    if (editingPayout) {
+      if (activeRole === 'clinic') {
+        setTempSubaccountId(activeClinic?.subaccountId || '');
+      } else {
+        const activePharmacy = pharmacies.find(p => p.id === activePharmacyId);
+        setTempSubaccountId(activePharmacy?.subaccountId || '');
+      }
+    }
+  }, [editingPayout, activeRole, activeClinicId, activePharmacyId, clinics, pharmacies]);
+
+  const handleSavePayout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (activeRole === 'clinic') {
+      if (activeClinic && onUpdateClinic) {
+        await onUpdateClinic({
+          ...activeClinic,
+          subaccountId: tempSubaccountId.trim() || undefined
+        });
+      }
+    } else {
+      const activePharmacy = pharmacies.find(p => p.id === activePharmacyId);
+      if (activePharmacy && onUpdatePharmacy) {
+        await onUpdatePharmacy({
+          ...activePharmacy,
+          subaccountId: tempSubaccountId.trim() || undefined
+        });
+      }
+    }
+    setEditingPayout(false);
   };
 
   // Collapsible cards state
@@ -533,6 +570,27 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                 👑 Upgrade Facility Plan
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => setEditingPayout(true)}
+              style={{
+                background: 'rgba(59, 130, 246, 0.15)',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+                color: 'white',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                fontSize: '0.7rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              💳 Payout Settings
+            </button>
           </div>
         </div>
       </div>
@@ -2730,6 +2788,94 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* Payout Settings Modal */}
+      {editingPayout && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          zIndex: 9999, padding: '20px'
+        }}>
+          <div style={{
+            background: '#111827', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px',
+            width: '100%', maxWidth: '450px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '20px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                💳 Payout & Settlement Settings
+              </h3>
+              <button 
+                onClick={() => setEditingPayout(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.06)', border: 'none', borderRadius: '50%',
+                  width: '28px', height: '28px', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', color: 'white', cursor: 'pointer'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSavePayout} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{
+                fontSize: '0.7rem',
+                color: '#60a5fa',
+                background: 'rgba(59, 130, 246, 0.06)',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid rgba(59, 130, 246, 0.15)',
+                lineHeight: '1.4'
+              }}>
+                ℹ️ <strong>Flutterwave Split Payments:</strong> Input your subaccount ID below to receive your payout directly from Flutterwave when patients process refills. If left blank, settlements default to the primary system account.
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                  Flutterwave Subaccount ID
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. RS_D3E2F4..."
+                  value={tempSubaccountId}
+                  onChange={(e) => setTempSubaccountId(e.target.value)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px', padding: '10px 12px', color: 'white', fontSize: '0.8rem', outline: 'none'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setEditingPayout(false)}
+                  style={{
+                    background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--text-secondary)',
+                    borderRadius: '8px', padding: '8px 16px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    background: 'var(--color-teal-light)', border: 'none', color: 'white',
+                    borderRadius: '8px', padding: '8px 16px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer'
+                  }}
+                >
+                  Save Settings
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

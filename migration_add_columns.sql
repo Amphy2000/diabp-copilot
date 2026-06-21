@@ -56,4 +56,11 @@ ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT false;
 ALTER TABLE ncd_pharmacies 
 ADD COLUMN IF NOT EXISTS premium_expiry TEXT DEFAULT NULL;
 
+-- 8. Add 'subaccount_id' columns to 'ncd_pharmacies' and 'ncd_clinics' tables if they don't exist
+ALTER TABLE ncd_pharmacies 
+ADD COLUMN IF NOT EXISTS subaccount_id TEXT DEFAULT NULL;
+
+ALTER TABLE ncd_clinics 
+ADD COLUMN IF NOT EXISTS subaccount_id TEXT DEFAULT NULL;
+
 

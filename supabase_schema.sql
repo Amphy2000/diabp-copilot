@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS ncd_clinics (
   contact_phone TEXT NOT NULL,
   is_premium BOOLEAN DEFAULT false,
   premium_expiry TEXT DEFAULT NULL,
+  subaccount_id TEXT DEFAULT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -21,6 +22,7 @@ CREATE TABLE IF NOT EXISTS ncd_pharmacies (
   prices JSONB DEFAULT NULL, -- Custom medication pricing dictionary per pharmacy
   is_premium BOOLEAN DEFAULT false,
   premium_expiry TEXT DEFAULT NULL,
+  subaccount_id TEXT DEFAULT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
