@@ -11,7 +11,10 @@ import {
   Compass,
   Phone,
   MapPin,
-  ShoppingBag
+  ShoppingBag,
+  Lock,
+  ShieldCheck,
+  CreditCard
 } from 'lucide-react';
 import { 
   evaluateNcdRisk, 
@@ -44,6 +47,54 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
   const [isEditingContact, setIsEditingContact] = useState(false);
   const [editPhone, setEditPhone] = useState(profile.phone || '');
   const [editAddress, setEditAddress] = useState(profile.address || '');
+
+  // Premium subscription states
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual'>('monthly');
+  const [cardHolder, setCardHolder] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+  const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
+  const [paymentError, setPaymentError] = useState('');
+
+  const handleUpgradeSubscription = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cardHolder || !cardNumber || !cardExpiry || !cardCvv) {
+      setPaymentError("Please fill in all credit card details.");
+      return;
+    }
+    setPaymentError("");
+    setPaymentStep('processing');
+
+    // Simulate API bank transfer loading delay
+    await new Promise(resolve => setTimeout(resolve, 2200));
+
+    setPaymentStep('success');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Update patient profile status
+    const expiryDate = new Date();
+    if (selectedPlan === 'monthly') {
+      expiryDate.setMonth(expiryDate.getMonth() + 1);
+    } else {
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+    }
+
+    await onUpdateProfile({
+      ...profile,
+      isPremium: true,
+      premiumExpiry: expiryDate.toLocaleDateString()
+    });
+
+    // Reset checkout states
+    setUpgradeModalOpen(false);
+    setPaymentStep('form');
+    setCardHolder('');
+    setCardNumber('');
+    setCardExpiry('');
+    setCardCvv('');
+  };
 
   // Collapsible cards state
   const [collapsedAlerts, setCollapsedAlerts] = useState(false);
@@ -144,9 +195,18 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
           <h2>
             {profile.name}
             <span className="profile-badge">Active Patient</span>
+            {profile.isPremium ? (
+              <span className="profile-badge" style={{ background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)', color: 'black', marginLeft: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid #fef08a', fontWeight: 'bold' }}>
+                👑 Premium Member
+              </span>
+            ) : (
+              <span className="profile-badge" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', marginLeft: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                DiaBP Basic
+              </span>
+            )}
           </h2>
           <div className="patient-tags" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
               {(profile.conditions || []).map((cond, idx) => (
                 <span key={idx} className="tag-item">
                   • {cond}
@@ -155,6 +215,29 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
               <span className="tag-item">
                 Age: {profile.age} | Wt: {profile.weight}kg
               </span>
+              {!profile.isPremium && (
+                <button
+                  onClick={() => setUpgradeModalOpen(true)}
+                  style={{
+                    background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                    border: 'none',
+                    color: 'black',
+                    padding: '3px 8.5px',
+                    borderRadius: '100px',
+                    fontSize: '0.65rem',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    marginLeft: '8px',
+                    boxShadow: '0 0 10px rgba(234, 179, 8, 0.3)',
+                    transition: 'transform 0.15s ease'
+                  }}
+                >
+                  👑 Go Premium
+                </button>
+              )}
             </div>
 
             {isEditingContact ? (
@@ -669,13 +752,13 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
             </div>
 
             {/* High Tech Foot Scanner UI */}
-            <div className="foot-scanner-viewport">
+            <div className="foot-scanner-viewport" style={{ position: 'relative' }}>
               
               {/* Grid Lines */}
               <div className="scanner-grid-overlay"></div>
               
               {/* Stylized Foot Outline */}
-              <div className="foot-contour-shape">
+              <div className="foot-contour-shape" style={{ filter: profile.isPremium ? 'none' : 'blur(4px)' }}>
                 
                 {/* Toes Contours */}
                 <div className="toe-bubble-contour toe-1"></div>
@@ -717,6 +800,32 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
                   <Compass className="spinner-icon w-3.5 h-3.5" /> Analyzing Image...
                 </div>
               )}
+
+              {!profile.isPremium && (
+                <div style={{
+                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                  background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(3px)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  padding: '20px', zIndex: 10, textAlign: 'center'
+                }}>
+                  <Lock size={20} className="text-teal-400" style={{ marginBottom: '8px' }} />
+                  <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'white', display: 'block', marginBottom: '4px' }}>AI Hotspots Contour Locked</span>
+                  <p style={{ fontSize: '10px', color: 'var(--text-secondary)', margin: '0 0 12px 0', lineHeight: '1.4', maxWidth: '85%' }}>
+                    Upgrade to Premium to visualize high-pressure hotspots sole mapping and prevent diabetic foot ulcers.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setUpgradeModalOpen(true)}
+                    style={{
+                      background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)', border: 'none', color: 'black',
+                      padding: '6px 14px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer',
+                      boxShadow: '0 0 10px rgba(234, 179, 8, 0.2)'
+                    }}
+                  >
+                    👑 Unlock Premium Scan
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Scan Action Controls */}
@@ -750,34 +859,61 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
 
           {/* Foot Care Recommendations */}
           {scanRecord && !scanning && (
-            <div className="glass-panel recommendations-wrapper animate-scale-in" style={{ padding: '15px' }}>
-              <div 
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-                onClick={() => setCollapsedRecs(!collapsedRecs)}
-              >
-                <h4 className="card-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-teal-light)', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  AI Recommended Actions
-                </h4>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  {collapsedRecs ? 'Expand ▾' : 'Collapse ▴'}
-                </span>
-              </div>
-              
-              {!collapsedRecs && (
-                <ul className="recommendations-list" style={{ marginTop: '10px' }}>
-                  {scanRecord.recommendations.map((rec, index) => (
-                    <li key={index} className="recommendation-bullet-item">
-                      {rec}
-                    </li>
-                  ))}
-                </ul>
-              )}
+            <div className="glass-panel recommendations-wrapper animate-scale-in" style={{ padding: '15px', position: 'relative', overflow: 'hidden' }}>
+              {/* Blur wrapper for basic tier */}
+              <div style={{ filter: profile.isPremium ? 'none' : 'blur(5px)', transition: 'filter 0.3s ease' }}>
+                <div 
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                  onClick={() => setCollapsedRecs(!collapsedRecs)}
+                >
+                  <h4 className="card-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-teal-light)', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    AI Recommended Actions
+                  </h4>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {collapsedRecs ? 'Expand ▾' : 'Collapse ▴'}
+                  </span>
+                </div>
+                
+                {!collapsedRecs && (
+                  <ul className="recommendations-list" style={{ marginTop: '10px' }}>
+                    {scanRecord.recommendations.map((rec, index) => (
+                      <li key={index} className="recommendation-bullet-item">
+                        {rec}
+                      </li>
+                    ))}
+                  </ul>
+                )}
 
-              {collapsedRecs && scanRecord.recommendations.length > 0 && (
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px', textAlign: 'left', fontStyle: 'italic' }}>
-                  Latest: {scanRecord.recommendations[0]} 
-                  {scanRecord.recommendations.length > 1 && ` (+${scanRecord.recommendations.length - 1} more actions)`}
+                {collapsedRecs && scanRecord.recommendations.length > 0 && (
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px', textAlign: 'left', fontStyle: 'italic' }}>
+                    Latest: {scanRecord.recommendations[0]} 
+                    {scanRecord.recommendations.length > 1 && ` (+${scanRecord.recommendations.length - 1} more actions)`}
+                  </div>
+                )}
+              </div>
+
+              {/* Locked overlay for free tier */}
+              {!profile.isPremium && (
+                <div style={{
+                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                  background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(2px)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  padding: '12px', zIndex: 10, textAlign: 'center'
+                }}>
+                  <Lock size={16} className="text-teal-400" style={{ marginBottom: '4px' }} />
+                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'white', display: 'block', marginBottom: '4px' }}>AI Recommended Actions Locked</span>
+                  <button
+                    type="button"
+                    onClick={() => setUpgradeModalOpen(true)}
+                    style={{
+                      background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)', border: 'none', color: 'black',
+                      padding: '4px 10px', borderRadius: '4px', fontSize: '9px', fontWeight: 'bold', cursor: 'pointer',
+                      boxShadow: '0 0 10px rgba(234, 179, 8, 0.2)'
+                    }}
+                  >
+                    👑 Unlock Recommendations
+                  </button>
                 </div>
               )}
             </div>
@@ -786,6 +922,266 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
         </div>
 
       </div>
+
+      {/* Premium Upgrade Billing Modal */}
+      {upgradeModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#111827',
+            border: '2px solid #eab308',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '500px',
+            boxShadow: '0 25px 50px -12px rgba(234, 179, 8, 0.15)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            position: 'relative'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '20px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'linear-gradient(180deg, rgba(234, 179, 8, 0.05) 0%, rgba(0,0,0,0) 100%)'
+            }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem', color: '#eab308', fontWeight: 'bold' }}>
+                👑 Upgrade to DiaBP Premium
+              </h3>
+              <button 
+                onClick={() => {
+                  setUpgradeModalOpen(false);
+                  setPaymentStep('form');
+                  setPaymentError('');
+                }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  cursor: 'pointer'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {paymentStep === 'form' && (
+              <form onSubmit={handleUpgradeSubscription} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Select Subscription Plan */}
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
+                    Choose Your Subscription Plan
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div 
+                      onClick={() => setSelectedPlan('monthly')}
+                      style={{
+                        padding: '12px',
+                        borderRadius: '10px',
+                        border: selectedPlan === 'monthly' ? '2px solid #eab308' : '1px solid rgba(255, 255, 255, 0.1)',
+                        background: selectedPlan === 'monthly' ? 'rgba(234, 179, 8, 0.05)' : 'rgba(255, 255, 255, 0.02)',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>Monthly Pass</div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#eab308', margin: '4px 0' }}>₦1,500</div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Billed Monthly</div>
+                    </div>
+                    <div 
+                      onClick={() => setSelectedPlan('annual')}
+                      style={{
+                        padding: '12px',
+                        borderRadius: '10px',
+                        border: selectedPlan === 'annual' ? '2px solid #eab308' : '1px solid rgba(255, 255, 255, 0.1)',
+                        background: selectedPlan === 'annual' ? 'rgba(234, 179, 8, 0.05)' : 'rgba(255, 255, 255, 0.02)',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        transition: 'all 0.2s ease',
+                        position: 'relative'
+                      }}
+                    >
+                      <span style={{
+                        position: 'absolute', top: '-8px', right: '10px',
+                        background: '#eab308', color: 'black', padding: '1px 6px',
+                        borderRadius: '100px', fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase'
+                      }}>
+                        Save 17%
+                      </span>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>Annual Pass</div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#eab308', margin: '4px 0' }}>₦15,000</div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Billed Yearly</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Secure Card Payment Section */}
+                <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                    <CreditCard size={14} className="text-teal-400" />
+                    <span style={{ fontSize: '0.75rem', color: 'white', fontWeight: 'bold' }}>Secure Credit / Debit Card Payment</span>
+                  </div>
+
+                  {paymentError && (
+                    <div style={{
+                      padding: '8px 12px', background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.2)', color: '#f87171',
+                      borderRadius: '6px', fontSize: '0.75rem', marginBottom: '12px'
+                    }}>
+                      {paymentError}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Cardholder Name</label>
+                      <input 
+                        type="text" 
+                        placeholder="Chief Chinedu Eze"
+                        value={cardHolder}
+                        onChange={(e) => setCardHolder(e.target.value)}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '0.8rem'
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Card Number</label>
+                      <input 
+                        type="text" 
+                        placeholder="4000 1234 5678 9010"
+                        value={cardNumber}
+                        onChange={(e) => setCardNumber(e.target.value)}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '0.8rem'
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Expiry Date</label>
+                        <input 
+                          type="text" 
+                          placeholder="MM/YY"
+                          value={cardExpiry}
+                          onChange={(e) => setCardExpiry(e.target.value)}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '0.8rem'
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>CVV</label>
+                        <input 
+                          type="password" 
+                          placeholder="•••"
+                          maxLength={4}
+                          value={cardCvv}
+                          onChange={(e) => setCardCvv(e.target.value)}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '0.8rem'
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <ShieldCheck size={12} className="text-teal-400" /> SSL Encrypted & Secure
+                  </span>
+                  <span>Total Due: {selectedPlan === 'monthly' ? '₦1,500' : '₦15,000'}</span>
+                </div>
+
+                <button
+                  type="submit"
+                  style={{
+                    background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                    border: 'none',
+                    color: 'black',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    marginTop: '8px',
+                    boxShadow: '0 4px 12px rgba(234, 179, 8, 0.25)',
+                    transition: 'transform 0.1s ease'
+                  }}
+                >
+                  Pay & Activate Premium Status
+                </button>
+              </form>
+            )}
+
+            {paymentStep === 'processing' && (
+              <div style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', minHeight: '300px' }}>
+                <div style={{
+                  width: '50px',
+                  height: '50px',
+                  border: '3px solid rgba(234, 179, 8, 0.2)',
+                  borderTop: '3px solid #eab308',
+                  borderRadius: '50%'
+                }} className="spinner-icon"></div>
+                <div style={{ textAlign: 'center' }}>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', color: 'white', fontWeight: 'bold' }}>Verifying Transaction</h4>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Communicating securely with your bank. Please do not refresh.</p>
+                </div>
+              </div>
+            )}
+
+            {paymentStep === 'success' && (
+              <div style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', minHeight: '300px' }}>
+                <div style={{
+                  width: '50px',
+                  height: '50px',
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '2px solid #10b981'
+                }}>
+                  <ShieldCheck size={28} className="text-emerald-400" />
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', color: '#10b981', fontWeight: 'bold' }}>Upgrade Successful!</h4>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>You are now a DiaBP Premium Member. Enjoy unrestricted medical audits.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
   );

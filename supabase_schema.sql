@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS ncd_profiles (
   assigned_pharmacy_id UUID REFERENCES ncd_pharmacies(id) ON DELETE SET NULL,
   phone TEXT DEFAULT NULL,
   address TEXT DEFAULT NULL,
+  is_premium BOOLEAN DEFAULT false,
+  premium_expiry TEXT DEFAULT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

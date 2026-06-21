@@ -44,6 +44,8 @@ export interface PatientNcdProfile {
   assignedPharmacyId: string | null;
   phone?: string;
   address?: string;
+  isPremium?: boolean;
+  premiumExpiry?: string;
 }
 
 export interface NcdRefillOrder {
@@ -120,6 +122,7 @@ export const INITIAL_NCD_PATIENT: PatientNcdProfile = {
   baselineBp: "145/90 mmHg",
   targetGlucoseRange: "70 - 130 mg/dL (Fasting)",
   streakDays: 8,
+  isPremium: false,
   activeMeds: [
     "Metformin 1000mg Twice Daily",
     "Amlodipine 10mg Daily",
@@ -338,6 +341,8 @@ export async function getPatientProfile(userId?: string): Promise<PatientNcdProf
           assignedPharmacyId: profileData.assigned_pharmacy_id,
           phone: profileData.phone || undefined,
           address: profileData.address || undefined,
+          isPremium: profileData.is_premium || false,
+          premiumExpiry: profileData.premium_expiry || undefined,
           bpHistory: bpHistory.length > 0 ? bpHistory : INITIAL_NCD_PATIENT.bpHistory,
           glucoseHistory: glucoseHistory.length > 0 ? glucoseHistory : INITIAL_NCD_PATIENT.glucoseHistory,
           footScanHistory: footScanHistory.length > 0 ? footScanHistory : INITIAL_NCD_PATIENT.footScanHistory
@@ -403,7 +408,9 @@ export async function savePatientProfile(profile: PatientNcdProfile, userId?: st
         assigned_clinic_id: isValidUuid(profile.assignedClinicId) ? profile.assignedClinicId : null,
         assigned_pharmacy_id: isValidUuid(profile.assignedPharmacyId) ? profile.assignedPharmacyId : null,
         phone: profile.phone || null,
-        address: profile.address || null
+        address: profile.address || null,
+        is_premium: profile.isPremium || false,
+        premium_expiry: profile.premiumExpiry || null
       };
 
       const { data: existing, error: selectErr } = await supabase.from('ncd_profiles').select('id').eq('id', targetId).limit(1);

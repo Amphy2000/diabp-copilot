@@ -36,3 +36,11 @@ ADD COLUMN IF NOT EXISTS phone TEXT;
 ALTER TABLE ncd_profiles 
 ADD COLUMN IF NOT EXISTS address TEXT;
 
+-- 6. Add 'is_premium' and 'premium_expiry' columns to 'ncd_profiles' table if they don't exist
+ALTER TABLE ncd_profiles 
+ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT false;
+
+ALTER TABLE ncd_profiles 
+ADD COLUMN IF NOT EXISTS premium_expiry TEXT DEFAULT NULL;
+
+

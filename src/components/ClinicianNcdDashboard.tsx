@@ -450,7 +450,10 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                         className="triage-queue-item"
                       >
                         <div>
-                          <div style={{ fontWeight: 'bold', color: 'white', fontSize: '12px', textAlign: 'left' }}>{p.name}</div>
+                          <div style={{ fontWeight: 'bold', color: 'white', fontSize: '12px', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {p.name}
+                            {p.isPremium && <span title="Premium Priority Patient" style={{ cursor: 'help' }}>👑</span>}
+                          </div>
                           <div style={{ fontSize: '10px', color: '#f87171', marginTop: '2px', textAlign: 'left' }}>
                             Critical BP: {latestBp.systolic}/{latestBp.diastolic} mmHg
                           </div>
@@ -648,7 +651,24 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                         }}
                         onClick={() => handleOpenPatientFile(p)}
                       >
-                        <td style={{ padding: '12px 8px', fontWeight: 'bold', color: 'white' }}>{p.name}</td>
+                        <td style={{ padding: '12px 8px', fontWeight: 'bold', color: 'white' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {p.name}
+                            {p.isPremium && (
+                              <span style={{ 
+                                background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)', 
+                                color: 'black', 
+                                padding: '1px 5px', 
+                                borderRadius: '4px', 
+                                fontSize: '8px', 
+                                fontWeight: 'bold',
+                                border: '1px solid #fef08a'
+                              }}>
+                                👑 Premium
+                              </span>
+                            )}
+                          </span>
+                        </td>
                         <td style={{ padding: '12px 8px' }}>{p.age}</td>
                         <td style={{ padding: '12px 8px' }}>
                           <span style={{ color: '#60a5fa' }}>{latestBp.systolic}/{latestBp.diastolic}</span> | <span style={{ color: '#fb923c' }}>{latestGlucose.level} mg/dL</span>
@@ -717,8 +737,24 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
               {/* Patient File Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '16px' }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'white', fontWeight: '800' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'white', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {selectedPatient.name}
+                    {selectedPatient.isPremium && (
+                      <span style={{ 
+                        background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)', 
+                        color: 'black', 
+                        padding: '2px 8px', 
+                        borderRadius: '100px', 
+                        fontSize: '9px', 
+                        fontWeight: 'bold',
+                        border: '1px solid #fef08a',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '2px'
+                      }}>
+                        👑 Premium
+                      </span>
+                    )}
                   </h3>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                     <span>Age: <strong>{selectedPatient.age}</strong></span>
