@@ -33,9 +33,13 @@ import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy, NcdAler
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 
 const NIGERIAN_BANKS = [
-  { code: '044', name: 'Access Bank' },
   { code: '058', name: 'GTBank' },
   { code: '057', name: 'Zenith Bank' },
+  { code: '044', name: 'Access Bank' },
+  { code: '999992', name: 'OPay' },
+  { code: '50515', name: 'Moniepoint MFB' },
+  { code: '999991', name: 'PalmPay' },
+  { code: '50211', name: 'Kuda Bank' },
   { code: '033', name: 'United Bank for Africa (UBA)' },
   { code: '011', name: 'First Bank of Nigeria' },
   { code: '232', name: 'Sterling Bank' },
@@ -133,6 +137,8 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   const [isCreatingSubaccount, setIsCreatingSubaccount] = useState(false);
   const [createSubaccountError, setCreateSubaccountError] = useState('');
   const [createSubaccountSuccess, setCreateSubaccountSuccess] = useState('');
+  const [resolvedAccountName, setResolvedAccountName] = useState('');
+  const [isResolvingAccount, setIsResolvingAccount] = useState(false);
 
   const handleUpgradeFacility = (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,6 +236,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
       setCreateSubaccountError('');
       setCreateSubaccountSuccess('');
       setAccountNumber('');
+      setResolvedAccountName('');
       
       const activeFacilityName = activeRole === 'clinic' ? activeClinic?.name : activePharmacy?.name;
       const defaultEmail = activeFacilityName 
@@ -237,13 +244,69 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
         : 'billing@diabp.com';
       setPayoutEmail(defaultEmail);
 
-      if (activeRole === 'clinic') {
-        setTempSubaccountId(activeClinic?.subaccountId || '');
+      const dbSubaccountId = activeRole === 'clinic' ? activeClinic?.subaccountId : activePharmacy?.subaccountId;
+      if (dbSubaccountId) {
+        const parts = dbSubaccountId.split('|||');
+        setTempSubaccountId(parts[0]);
+        if (parts[1] && parts[2]) {
+          const matchedBank = NIGERIAN_BANKS.find(b => b.name === parts[1]);
+          if (matchedBank) setBankCode(matchedBank.code);
+          setAccountNumber(parts[2]);
+        }
       } else {
-        setTempSubaccountId(activePharmacy?.subaccountId || '');
+        setTempSubaccountId('');
       }
     }
   }, [editingPayout, activeRole, activeClinicId, activePharmacyId, clinics, pharmacies, activeClinic, activePharmacy]);
+
+  // Account name verification side effect
+  useEffect(() => {
+    const resolveAccountName = async () => {
+      if (accountNumber.length !== 10) {
+        setResolvedAccountName('');
+        return;
+      }
+
+      setIsResolvingAccount(true);
+      setResolvedAccountName('');
+      setCreateSubaccountError('');
+
+      try {
+        if (isSupabaseConfigured) {
+          const { data, error } = await supabase.functions.invoke('create-subaccount', {
+            body: {
+              action: 'resolve',
+              account_bank: bankCode,
+              account_number: accountNumber
+            }
+          });
+
+          if (error) throw new Error(error.message);
+          
+          if (data?.status === 'error' || data?.error) {
+            throw new Error(data.message || data.error || 'Failed to verify account number.');
+          }
+
+          if (data?.data?.account_name) {
+            setResolvedAccountName(data.data.account_name);
+          } else {
+            throw new Error('Account name could not be resolved.');
+          }
+        } else {
+          // Mock verification for local playground testing
+          await new Promise(resolve => setTimeout(resolve, 800));
+          const matchedBank = NIGERIAN_BANKS.find(b => b.code === bankCode);
+          setResolvedAccountName(`MOCK:${(activeRole === 'clinic' ? activeClinic?.name : activePharmacy?.name) || 'FACILITY SOLUTIONS'} LTD (${matchedBank?.name})`);
+        }
+      } catch (err: any) {
+        setCreateSubaccountError(err.message || 'Could not verify account details with bank.');
+      } finally {
+        setIsResolvingAccount(false);
+      }
+    };
+
+    resolveAccountName();
+  }, [accountNumber, bankCode, isSupabaseConfigured, activeRole, activeClinic, activePharmacy]);
 
   const handleCreateSubaccount = async () => {
     if (!accountNumber || accountNumber.length < 10) {
@@ -291,6 +354,10 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
         resultSubaccountId = `RS_MOCK_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
       }
 
+      const matchedBank = NIGERIAN_BANKS.find(b => b.code === bankCode);
+      const bankName = matchedBank ? matchedBank.name : 'Unknown Bank';
+      const serializedValue = `${resultSubaccountId}|||${bankName}|||${accountNumber}`;
+
       setTempSubaccountId(resultSubaccountId);
       setCreateSubaccountSuccess(`Success! Registered Subaccount ID: ${resultSubaccountId}`);
       
@@ -299,14 +366,14 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
         if (activeClinic && onUpdateClinic) {
           await onUpdateClinic({
             ...activeClinic,
-            subaccountId: resultSubaccountId
+            subaccountId: serializedValue
           });
         }
       } else {
         if (activePharmacy && onUpdatePharmacy) {
           await onUpdatePharmacy({
             ...activePharmacy,
-            subaccountId: resultSubaccountId
+            subaccountId: serializedValue
           });
         }
       }
@@ -319,18 +386,26 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
 
   const handleSavePayout = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    let valueToSave = tempSubaccountId.trim() || undefined;
+    if (valueToSave && payoutTab === 'automatic' && accountNumber) {
+      const matchedBank = NIGERIAN_BANKS.find(b => b.code === bankCode);
+      const bankName = matchedBank ? matchedBank.name : 'Unknown Bank';
+      valueToSave = `${valueToSave}|||${bankName}|||${accountNumber}`;
+    }
+
     if (activeRole === 'clinic') {
       if (activeClinic && onUpdateClinic) {
         await onUpdateClinic({
           ...activeClinic,
-          subaccountId: tempSubaccountId.trim() || undefined
+          subaccountId: valueToSave
         });
       }
     } else {
       if (activePharmacy && onUpdatePharmacy) {
         await onUpdatePharmacy({
           ...activePharmacy,
-          subaccountId: tempSubaccountId.trim() || undefined
+          subaccountId: valueToSave
         });
       }
     }
@@ -3035,6 +3110,23 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                         borderRadius: '8px', padding: '10px 12px', color: 'white', fontSize: '0.8rem', outline: 'none'
                       }}
                     />
+                    
+                    {/* Real-time verification status */}
+                    {isResolvingAccount && (
+                      <div style={{ fontSize: '0.7rem', color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                        <svg style={{ width: '12px', height: '12px', animation: 'spin 1s linear infinite', display: 'inline-block' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Verifying details with bank...
+                      </div>
+                    )}
+                    
+                    {resolvedAccountName && (
+                      <div style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: 'bold', marginTop: '2px', background: 'rgba(16, 185, 129, 0.04)', padding: '6px 8px', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
+                        ✓ Account Name: {resolvedAccountName}
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -3077,13 +3169,13 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
 
                   <button
                     type="button"
-                    disabled={isCreatingSubaccount || accountNumber.length < 10}
+                    disabled={isCreatingSubaccount || accountNumber.length < 10 || isResolvingAccount || !resolvedAccountName}
                     onClick={handleCreateSubaccount}
                     style={{
                       background: 'var(--color-teal-light)', border: 'none', color: 'white',
                       borderRadius: '8px', padding: '10px 16px', fontSize: '0.75rem', fontWeight: 'bold', 
-                      cursor: accountNumber.length < 10 || isCreatingSubaccount ? 'not-allowed' : 'pointer',
-                      opacity: accountNumber.length < 10 || isCreatingSubaccount ? 0.6 : 1,
+                      cursor: accountNumber.length < 10 || isCreatingSubaccount || isResolvingAccount || !resolvedAccountName ? 'not-allowed' : 'pointer',
+                      opacity: accountNumber.length < 10 || isCreatingSubaccount || isResolvingAccount || !resolvedAccountName ? 0.6 : 1,
                       display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px'
                     }}
                   >

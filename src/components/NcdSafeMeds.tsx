@@ -170,10 +170,13 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
       const pharmacy = pharmacies.find(p => p.id === profile.assignedPharmacyId);
       const subaccountsList: any[] = [];
       if (pharmacy?.subaccountId) {
-        subaccountsList.push({
-          id: pharmacy.subaccountId,
-          transaction_split_ratio: 95 // 95% to pharmacy, 5% stays as platform fee
-        });
+        const cleanSubaccountId = pharmacy.subaccountId.split('|||')[0].trim();
+        if (cleanSubaccountId) {
+          subaccountsList.push({
+            id: cleanSubaccountId,
+            transaction_split_ratio: 95 // 95% to pharmacy, 5% stays as platform fee
+          });
+        }
       }
 
       const txRef = `flw-refill-${orderId}-${Date.now()}`;

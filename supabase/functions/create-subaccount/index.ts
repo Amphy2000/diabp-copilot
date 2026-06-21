@@ -22,13 +22,42 @@ serve(async (req) => {
       throw new Error("Missing FLUTTERWAVE_SECRET_KEY environment variable in Supabase.");
     }
 
-    const { account_bank, account_number, business_name, business_email } = await req.json();
+    const body = await req.json();
+    const { action, account_bank, account_number, business_name, business_email } = body;
 
-    if (!account_bank || !account_number || !business_name || !business_email) {
+    if (!account_bank || !account_number) {
+      throw new Error("Missing required bank account details.");
+    }
+
+    // Action 1: Verify / Resolve Account Number
+    if (action === "resolve") {
+      const response = await fetch("https://api.flutterwave.com/v3/accounts/resolve", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${flwSecretKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          account_bank,
+          account_number
+        })
+      });
+
+      const data = await response.json();
+      return new Response(JSON.stringify(data), {
+        headers: { 
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+        status: response.status
+      });
+    }
+
+    // Action 2: Create Subaccount (Default)
+    if (!business_name || !business_email) {
       throw new Error("Missing required payout registration parameters.");
     }
 
-    // Call Flutterwave subaccount creation endpoint
     const response = await fetch("https://api.flutterwave.com/v3/subaccounts", {
       method: "POST",
       headers: {
