@@ -1087,8 +1087,7 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
                     lineHeight: '1.3',
                     textAlign: 'left'
                   }}>
-                    ⚡ Powered by <strong>Flutterwave Secure Checkout</strong><br/>
-                    Public Key: <code style={{ color: 'white' }}>FLWPUBK-e2deff...9558-X</code>
+                    ⚡ Powered by <strong>Flutterwave Secure Checkout</strong>
                   </div>
 
                   {paymentError && (
