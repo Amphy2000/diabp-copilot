@@ -465,6 +465,18 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
               )}
             </>
           )}
+
+          {collapsedTriageQueue && (
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '2px 0 0 0' }}>
+              {triagePatients.length === 0 ? (
+                <span>✓ All patient vitals are stable.</span>
+              ) : (
+                <span>
+                  ⚠️ <strong>{triagePatients.length} patient{triagePatients.length > 1 ? 's' : ''}</strong> needing triage. Latest: {triagePatients[0].name} ({triagePatients[0].bpHistory?.[triagePatients[0].bpHistory.length - 1]?.systolic}/{triagePatients[0].bpHistory?.[triagePatients[0].bpHistory.length - 1]?.diastolic} mmHg)
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Live System Automation activity feed */}
@@ -561,6 +573,18 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
             </div>
           )}
             </>
+          )}
+
+          {collapsedAlertsLog && (
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '2px 0 0 0' }}>
+              {alerts.length === 0 ? (
+                <span>No automation actions logged.</span>
+              ) : (
+                <span>
+                  🤖 <strong>{alerts.length} alert{alerts.length > 1 ? 's' : ''}</strong> logged. Latest: {alerts[0].title} ({alerts[0].patientName})
+                </span>
+              )}
+            </div>
           )}
         </div>
 
@@ -809,6 +833,24 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                     })}
                   </div>
                 )}
+
+                {collapsedPatientVitals && (
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '2px 0 0 0' }}>
+                    {selectedPatient.bpHistory && selectedPatient.bpHistory.length > 0 ? (
+                      (() => {
+                        const bp = selectedPatient.bpHistory[selectedPatient.bpHistory.length - 1];
+                        const sugar = (selectedPatient.glucoseHistory || [])[selectedPatient.bpHistory.length - 1] || { level: 100, type: 'Fasting' };
+                        return (
+                          <span>
+                            Latest ({bp.date}): <strong>BP {bp.systolic}/{bp.diastolic} mmHg</strong> | <strong>Glucose {sugar.level} mg/dL</strong> ({sugar.type})
+                          </span>
+                        );
+                      })()
+                    ) : (
+                      <span>No vitals recorded.</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Foot Scan History Soles contour mapping */}
@@ -905,6 +947,12 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                         </div>
                       </div>
                     </>
+                  )}
+
+                  {collapsedTitration && (
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '2px 0 0 0' }}>
+                      Current Regimen: <strong>{(selectedPatient.activeMeds || []).join(', ') || 'None Prescribed'}</strong>
+                    </div>
                   )}
                 </div>
               ) : (
@@ -1026,6 +1074,15 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                       </div>
                     </>
                   )}
+
+                  {collapsedDispensingAudit && (
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '2px 0 0 0' }}>
+                      Audit Progress: <strong>{(() => {
+                        const completedChecks = [checklist.rxVerified, checklist.nafdacAudit, checklist.vitalsAudit, checklist.identityVerified, checklist.bundlePackaged].filter(Boolean).length;
+                        return `${completedChecks}/5 tasks completed`;
+                      })()}</strong>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1082,6 +1139,15 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                           <MessageSquare size={12} /> Send Refill WhatsApp Reminder
                         </button>
                       )}
+                    </div>
+                  );
+                })()}
+
+                {collapsedPatientAdherence && (() => {
+                  const tracker = getRefillTracker(selectedPatient.id || 'mock-patient-default', orders);
+                  return (
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '2px 0 0 0' }}>
+                      Supply Remaining: <strong style={{ color: tracker.status === 'Overdue' ? '#f87171' : tracker.status === 'Low Supply' ? '#fb923c' : 'var(--color-teal-light)' }}>{tracker.daysRemaining} days ({tracker.status})</strong>
                     </div>
                   );
                 })()}
@@ -1819,6 +1885,14 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
           </div>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{collapsedMasterDirectory ? 'Expand Directory ▾' : 'Collapse Directory ▴'}</span>
         </div>
+
+        {collapsedMasterDirectory && (
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '6px 0 0 0', display: 'flex', gap: '16px' }}>
+            <span>Patients Assigned: <strong>{patients.length}</strong></span>
+            <span>•</span>
+            <span>Total Refill Orders: <strong>{orders.length}</strong></span>
+          </div>
+        )}
 
         {!collapsedMasterDirectory && (
           <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>

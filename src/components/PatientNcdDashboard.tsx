@@ -441,6 +441,27 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
                 )}
               </>
             )}
+
+            {collapsedAlerts && (
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '4px 0 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '80%' }}>
+                  {alerts.length === 0 ? '✓ No active notifications.' : `🔔 ${alerts.length} Care Alert${alerts.length > 1 ? 's' : ''}: ${alerts[0].title}`}
+                </span>
+                {alerts.length > 0 && (
+                  <span style={{
+                    fontSize: '9px',
+                    padding: '1px 6px',
+                    borderRadius: '4px',
+                    background: alerts[0].type === 'critical' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(56, 189, 248, 0.15)',
+                    color: alerts[0].type === 'critical' ? '#f87171' : '#38bdf8',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase'
+                  }}>
+                    {alerts[0].type}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Vitals Logger Form */}
@@ -614,6 +635,24 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
                 })}
               </div>
             )}
+
+            {collapsedVitals && (
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '4px 0 0 0' }}>
+                {profile.bpHistory && profile.bpHistory.length > 0 ? (
+                  (() => {
+                    const bp = profile.bpHistory[profile.bpHistory.length - 1];
+                    const sugar = (profile.glucoseHistory || [])[profile.bpHistory.length - 1] || { level: 120, type: 'Fasting' };
+                    return (
+                      <span>
+                        Latest Log ({bp.date}): <strong>BP {bp.systolic}/{bp.diastolic}</strong> mmHg | <strong>Sugar {sugar.level}</strong> mg/dL ({sugar.type})
+                      </span>
+                    );
+                  })()
+                ) : (
+                  <span>No vitals recorded yet.</span>
+                )}
+              </div>
+            )}
           </div>
 
         </div>
@@ -733,6 +772,13 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
                     </li>
                   ))}
                 </ul>
+              )}
+
+              {collapsedRecs && scanRecord.recommendations.length > 0 && (
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px', textAlign: 'left', fontStyle: 'italic' }}>
+                  Latest: {scanRecord.recommendations[0]} 
+                  {scanRecord.recommendations.length > 1 && ` (+${scanRecord.recommendations.length - 1} more actions)`}
+                </div>
               )}
             </div>
           )}
