@@ -45,6 +45,11 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
   const [editPhone, setEditPhone] = useState(profile.phone || '');
   const [editAddress, setEditAddress] = useState(profile.address || '');
 
+  // Collapsible cards state
+  const [collapsedAlerts, setCollapsedAlerts] = useState(false);
+  const [collapsedVitals, setCollapsedVitals] = useState(false);
+  const [collapsedRecs, setCollapsedRecs] = useState(false);
+
   // System Notifications
   const [alerts, setAlerts] = useState<NcdAlert[]>([]);
   
@@ -374,56 +379,67 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
 
           {/* System Notifications & Automated Alerts Log */}
           <div className="glass-panel" style={{ background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.4) 100%)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="card-header-divider" style={{ marginBottom: '12px' }}>
-              <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div 
+              className="card-header-divider" 
+              style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+              onClick={() => setCollapsedAlerts(!collapsedAlerts)}
+            >
+              <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                 <Activity className="card-title-icon text-teal-400 animate-pulse" />
                 Live Care Reminders & System Alerts
               </h3>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                {collapsedAlerts ? 'Expand ▾' : 'Collapse ▴'}
+              </span>
             </div>
 
-            {alerts.length === 0 ? (
-              <p className="scan-status-info" style={{ textAlign: 'center', padding: '1.5rem 0' }}>No active notifications.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '180px', overflowY: 'auto', paddingRight: '4px' }}>
-                {alerts.map((alertItem) => {
-                  let badgeColor = 'rgba(56, 189, 248, 0.15)';
-                  let textColor = '#38bdf8';
-                  if (alertItem.type === 'critical') {
-                    badgeColor = 'rgba(239, 68, 68, 0.15)';
-                    textColor = '#f87171';
-                  } else if (alertItem.type === 'success') {
-                    badgeColor = 'rgba(16, 185, 129, 0.15)';
-                    textColor = '#34d399';
-                  }
-                  
-                  return (
-                    <div 
-                      key={alertItem.id} 
-                      style={{ 
-                        padding: '10px 12px', 
-                        background: 'rgba(255,255,255,0.02)', 
-                        borderRadius: '8px', 
-                        borderLeft: `3px solid ${textColor}`, 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        gap: '4px',
-                        fontSize: '12px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 'bold', color: 'white', textAlign: 'left' }}>{alertItem.title}</span>
-                        <span style={{ fontSize: '9px', padding: '2px 6px', borderRadius: '4px', background: badgeColor, color: textColor, fontWeight: 'bold', textTransform: 'uppercase' }}>
-                          {alertItem.type}
-                        </span>
-                      </div>
-                      <p style={{ color: 'var(--text-secondary)', fontSize: '11px', lineHeight: '1.35', margin: '0', textAlign: 'left' }}>{alertItem.message}</p>
-                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', textAlign: 'right' }}>
-                        {new Date(alertItem.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+            {!collapsedAlerts && (
+              <>
+                {alerts.length === 0 ? (
+                  <p className="scan-status-info" style={{ textAlign: 'center', padding: '1.5rem 0' }}>No active notifications.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '180px', overflowY: 'auto', paddingRight: '4px' }}>
+                    {alerts.map((alertItem) => {
+                      let badgeColor = 'rgba(56, 189, 248, 0.15)';
+                      let textColor = '#38bdf8';
+                      if (alertItem.type === 'critical') {
+                        badgeColor = 'rgba(239, 68, 68, 0.15)';
+                        textColor = '#f87171';
+                      } else if (alertItem.type === 'success') {
+                        badgeColor = 'rgba(16, 185, 129, 0.15)';
+                        textColor = '#34d399';
+                      }
+                      
+                      return (
+                        <div 
+                          key={alertItem.id} 
+                          style={{ 
+                            padding: '10px 12px', 
+                            background: 'rgba(255,255,255,0.02)', 
+                            borderRadius: '8px', 
+                            borderLeft: `3px solid ${textColor}`, 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            gap: '4px',
+                            fontSize: '12px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 'bold', color: 'white', textAlign: 'left' }}>{alertItem.title}</span>
+                            <span style={{ fontSize: '9px', padding: '2px 6px', borderRadius: '4px', background: badgeColor, color: textColor, fontWeight: 'bold', textTransform: 'uppercase' }}>
+                              {alertItem.type}
+                            </span>
+                          </div>
+                          <p style={{ color: 'var(--text-secondary)', fontSize: '11px', lineHeight: '1.35', margin: '0', textAlign: 'left' }}>{alertItem.message}</p>
+                          <span style={{ fontSize: '9px', color: 'var(--text-muted)', textAlign: 'right' }}>
+                            {new Date(alertItem.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -566,29 +582,38 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
 
           {/* Vitals History Log list */}
           <div className="glass-panel history-section">
-            <div className="card-header-divider" style={{ borderBottom: 'none', paddingBottom: 0, marginBottom: '0.5rem' }}>
-              <h3 className="card-title" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            <div 
+              className="card-header-divider" 
+              style={{ borderBottom: 'none', paddingBottom: 0, marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+              onClick={() => setCollapsedVitals(!collapsedVitals)}
+            >
+              <h3 className="card-title" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                 <Clock className="card-title-icon text-gray-500" />
                 Recent Vitals History
               </h3>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                {collapsedVitals ? 'Expand ▾' : 'Collapse ▴'}
+              </span>
             </div>
             
-            <div className="history-scroll-box">
-              {(profile.bpHistory || []).map((bp, index) => {
-                const sugar = (profile.glucoseHistory || [])[index] || { level: 120, type: 'Fasting' };
-                return (
-                  <div key={index} className="history-item-row">
-                    <span className="history-date">{bp.date}</span>
-                    <span className="history-bp-val">
-                      BP: <strong>{bp.systolic}/{bp.diastolic}</strong> mmHg
-                    </span>
-                    <span className="history-glucose-val">
-                      Sugar: <strong>{sugar.level}</strong> mg/dL ({sugar.type})
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+            {!collapsedVitals && (
+              <div className="history-scroll-box">
+                {(profile.bpHistory || []).map((bp, index) => {
+                  const sugar = (profile.glucoseHistory || [])[index] || { level: 120, type: 'Fasting' };
+                  return (
+                    <div key={index} className="history-item-row">
+                      <span className="history-date">{bp.date}</span>
+                      <span className="history-bp-val">
+                        BP: <strong>{bp.systolic}/{bp.diastolic}</strong> mmHg
+                      </span>
+                      <span className="history-glucose-val">
+                        Sugar: <strong>{sugar.level}</strong> mg/dL ({sugar.type})
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
         </div>
@@ -686,18 +711,29 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
 
           {/* Foot Care Recommendations */}
           {scanRecord && !scanning && (
-            <div className="glass-panel recommendations-wrapper animate-scale-in">
-              <h4 className="card-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-teal-light)' }}>
-                <CheckCircle className="w-3.5 h-3.5" />
-                AI Recommended Actions:
-              </h4>
-              <ul className="recommendations-list">
-                {scanRecord.recommendations.map((rec, index) => (
-                  <li key={index} className="recommendation-bullet-item">
-                    {rec}
-                  </li>
-                ))}
-              </ul>
+            <div className="glass-panel recommendations-wrapper animate-scale-in" style={{ padding: '15px' }}>
+              <div 
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                onClick={() => setCollapsedRecs(!collapsedRecs)}
+              >
+                <h4 className="card-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-teal-light)', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  AI Recommended Actions
+                </h4>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  {collapsedRecs ? 'Expand ▾' : 'Collapse ▴'}
+                </span>
+              </div>
+              
+              {!collapsedRecs && (
+                <ul className="recommendations-list" style={{ marginTop: '10px' }}>
+                  {scanRecord.recommendations.map((rec, index) => (
+                    <li key={index} className="recommendation-bullet-item">
+                      {rec}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 

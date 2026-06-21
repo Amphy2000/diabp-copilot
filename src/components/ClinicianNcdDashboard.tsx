@@ -82,6 +82,23 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   const [editingPrices, setEditingPrices] = useState(false);
   const [tempPrices, setTempPrices] = useState<{ [medId: string]: number }>({});
 
+  // Collapsible cards state
+  const [collapsedAlertsLog, setCollapsedAlertsLog] = useState(false);
+  const [collapsedTriageQueue, setCollapsedTriageQueue] = useState(false);
+  const [collapsedPatientVitals, setCollapsedPatientVitals] = useState(false);
+  const [collapsedPatientAdherence, setCollapsedPatientAdherence] = useState(false);
+  const [collapsedTitration, setCollapsedTitration] = useState(false);
+  const [collapsedDispensingAudit, setCollapsedDispensingAudit] = useState(false);
+  
+  // Data Directory / Export Modal state
+  const [exportPatient, setExportPatient] = useState<PatientNcdProfile | null>(null);
+  const [exportTab, setExportTab] = useState<'vitals' | 'scans' | 'orders' | 'json'>('vitals');
+
+  // Master clinical directory search/filter states
+  const [directorySearch, setDirectorySearch] = useState('');
+  const [directoryType, setDirectoryType] = useState<'all' | 'vitals' | 'scans' | 'orders'>('all');
+  const [collapsedMasterDirectory, setCollapsedMasterDirectory] = useState(true); // Default collapsed
+
   // Pharmacist Checklist State
   const [checklist, setChecklist] = useState({
     rxVerified: false,
@@ -380,74 +397,93 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
         
         {/* Triage & Auto-Refill Panel */}
         <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setCollapsedTriageQueue(!collapsedTriageQueue)}>
             <h4 style={{ margin: 0, fontSize: '0.85rem', color: '#f87171', fontWeight: 800, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <ShieldAlert className="w-4 h-4 text-red-400 animate-pulse" /> Critical Triage Queue
+              <ShieldAlert className="w-4 h-4 text-red-400 animate-pulse" /> Critical Triage Queue ({triagePatients.length})
             </h4>
             
-            {/* Auto-Refill Automation Switch */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '4px 8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ fontSize: '10px', fontWeight: 'bold', color: autoRefillEnabled ? 'var(--color-teal-light)' : 'var(--text-muted)' }}>
-                {autoRefillEnabled ? '🤖 Auto-Refill: ON' : '🤖 Auto-Refill: OFF'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
+              {/* Auto-Refill Automation Switch */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '4px 8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <span style={{ fontSize: '10px', fontWeight: 'bold', color: autoRefillEnabled ? 'var(--color-teal-light)' : 'var(--text-muted)' }}>
+                  {autoRefillEnabled ? '🤖 Auto-Refill: ON' : '🤖 Auto-Refill: OFF'}
+                </span>
+                <input
+                  type="checkbox"
+                  checked={autoRefillEnabled}
+                  onChange={(e) => handleToggleAutoRefill(e.target.checked)}
+                  style={{ cursor: 'pointer', accentColor: 'var(--color-teal-light)' }}
+                />
+              </div>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '6px' }}>
+                {collapsedTriageQueue ? 'Expand ▾' : 'Collapse ▴'}
               </span>
-              <input
-                type="checkbox"
-                checked={autoRefillEnabled}
-                onChange={(e) => handleToggleAutoRefill(e.target.checked)}
-                style={{ cursor: 'pointer', accentColor: 'var(--color-teal-light)' }}
-              />
             </div>
           </div>
 
-          {triagePatients.length === 0 ? (
-            <div style={{ padding: '20px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', borderRadius: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
-              ✓ All patient vitals are stable. No triage actions required.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '140px', overflowY: 'auto' }}>
-              {triagePatients.map(p => {
-                const bpArr = p.bpHistory || [];
-                const latestBp = bpArr.length > 0 ? bpArr[bpArr.length - 1] : { systolic: 120, diastolic: 80 };
-                return (
-                  <div 
-                    key={p.id}
-                    onClick={() => handleOpenPatientFile(p)}
-                    style={{ 
-                      padding: '8px 10px', 
-                      background: 'rgba(239, 68, 68, 0.05)', 
-                      border: '1px solid rgba(239, 68, 68, 0.15)', 
-                      borderRadius: '8px', 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                    className="triage-queue-item"
-                  >
-                    <div>
-                      <div style={{ fontWeight: 'bold', color: 'white', fontSize: '12px', textAlign: 'left' }}>{p.name}</div>
-                      <div style={{ fontSize: '10px', color: '#f87171', marginTop: '2px', textAlign: 'left' }}>
-                        Critical BP: {latestBp.systolic}/{latestBp.diastolic} mmHg
+          {!collapsedTriageQueue && (
+            <>
+              {triagePatients.length === 0 ? (
+                <div style={{ padding: '20px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', borderRadius: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                  ✓ All patient vitals are stable. No triage actions required.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '140px', overflowY: 'auto' }}>
+                  {triagePatients.map(p => {
+                    const bpArr = p.bpHistory || [];
+                    const latestBp = bpArr.length > 0 ? bpArr[bpArr.length - 1] : { systolic: 120, diastolic: 80 };
+                    return (
+                      <div 
+                        key={p.id}
+                        onClick={() => handleOpenPatientFile(p)}
+                        style={{ 
+                          padding: '8px 10px', 
+                          background: 'rgba(239, 68, 68, 0.05)', 
+                          border: '1px solid rgba(239, 68, 68, 0.15)', 
+                          borderRadius: '8px', 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'center',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                        className="triage-queue-item"
+                      >
+                        <div>
+                          <div style={{ fontWeight: 'bold', color: 'white', fontSize: '12px', textAlign: 'left' }}>{p.name}</div>
+                          <div style={{ fontSize: '10px', color: '#f87171', marginTop: '2px', textAlign: 'left' }}>
+                            Critical BP: {latestBp.systolic}/{latestBp.diastolic} mmHg
+                          </div>
+                        </div>
+                        <span style={{ fontSize: '10px', color: 'var(--color-teal-light)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          Review File <ArrowRight size={10} />
+                        </span>
                       </div>
-                    </div>
-                    <span style={{ fontSize: '10px', color: 'var(--color-teal-light)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                      Review File <ArrowRight size={10} />
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
         </div>
 
         {/* Live System Automation activity feed */}
         <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <h4 style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-teal-light)', fontWeight: 800, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Activity className="w-4 h-4 text-teal-400" /> System Automation & Reminders Log
-          </h4>
+          <div 
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+            onClick={() => setCollapsedAlertsLog(!collapsedAlertsLog)}
+          >
+            <h4 style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-teal-light)', fontWeight: 800, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Activity className="w-4 h-4 text-teal-400" /> System Automation & Reminders Log
+            </h4>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              {collapsedAlertsLog ? 'Expand ▾' : 'Collapse ▴'}
+            </span>
+          </div>
 
-          {alerts.length === 0 ? (
+          {!collapsedAlertsLog && (
+            <>
+              {alerts.length === 0 ? (
             <div style={{ padding: '20px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', borderRadius: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
               No automation actions logged.
             </div>
@@ -523,6 +559,8 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                 );
               })}
             </div>
+          )}
+            </>
           )}
         </div>
 
@@ -680,12 +718,36 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                     </div>
                   )}
                 </div>
-                <button 
-                  onClick={() => setSelectedPatient(null)}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-                >
-                  <X size={16} />
-                </button>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    onClick={() => {
+                      setExportPatient(selectedPatient);
+                      setExportTab('vitals');
+                    }}
+                    style={{
+                      background: 'rgba(20, 184, 166, 0.12)',
+                      border: '1px solid var(--color-teal-light)',
+                      color: 'var(--color-teal-light)',
+                      borderRadius: '6px',
+                      padding: '4px 8px',
+                      fontSize: '0.7rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    🗂️ Data Directory / Export
+                  </button>
+                  <button 
+                    onClick={() => setSelectedPatient(null)}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
 
               {/* Patient Alerts Box */}
@@ -725,19 +787,28 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
 
               {/* Vitals History Log list */}
               <div style={{ background: 'rgba(255,255,255,0.01)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.03)', padding: '12px' }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: '0.75rem', color: 'white', fontWeight: 'bold' }}>Vitals Logs History</h4>
-                <div style={{ maxHeight: '100px', overflowY: 'auto', fontSize: '0.75rem' }}>
-                  {(selectedPatient.bpHistory || []).map((bp, idx) => {
-                    const sugar = (selectedPatient.glucoseHistory || [])[idx] || { level: 100, type: 'Fasting' };
-                    return (
-                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>{bp.date}</span>
-                        <span>BP: <strong>{bp.systolic}/{bp.diastolic}</strong></span>
-                        <span>Glucose: <strong>{sugar.level} mg/dL</strong> ({sugar.type})</span>
-                      </div>
-                    );
-                  })}
+                <div 
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: collapsedPatientVitals ? '0' : '8px' }}
+                  onClick={() => setCollapsedPatientVitals(!collapsedPatientVitals)}
+                >
+                  <h4 style={{ margin: 0, fontSize: '0.75rem', color: 'white', fontWeight: 'bold' }}>Vitals Logs History</h4>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{collapsedPatientVitals ? 'Expand ▾' : 'Collapse ▴'}</span>
                 </div>
+                
+                {!collapsedPatientVitals && (
+                  <div style={{ maxHeight: '100px', overflowY: 'auto', fontSize: '0.75rem' }}>
+                    {(selectedPatient.bpHistory || []).map((bp, idx) => {
+                      const sugar = (selectedPatient.glucoseHistory || [])[idx] || { level: 100, type: 'Fasting' };
+                      return (
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>{bp.date}</span>
+                          <span>BP: <strong>{bp.systolic}/{bp.diastolic}</strong></span>
+                          <span>Glucose: <strong>{sugar.level} mg/dL</strong> ({sugar.type})</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Foot Scan History Soles contour mapping */}
@@ -773,176 +844,204 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
               {/* Dosing Titration Form & Copilot Recommendations / Refill Verification Checklist */}
               {activeRole === 'clinic' ? (
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
-                  <h4 style={{ margin: '0 0 12px 0', fontSize: '0.8rem', color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Calculator size={14} className="text-blue-400" /> AI Regimen Titration Copilot
-                  </h4>
+                  <div 
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: collapsedTitration ? '0' : '12px' }}
+                    onClick={() => setCollapsedTitration(!collapsedTitration)}
+                  >
+                    <h4 style={{ margin: 0, fontSize: '0.8rem', color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Calculator size={14} className="text-blue-400" /> AI Regimen Titration Copilot
+                    </h4>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{collapsedTitration ? 'Expand ▾' : 'Collapse ▴'}</span>
+                  </div>
                   
-                  {/* Active Meds display */}
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                    {(selectedPatient.activeMeds || []).map((med, i) => (
-                      <span key={i} style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '100px', color: 'white' }}>
-                        {med}
-                      </span>
-                    ))}
-                  </div>
+                  {!collapsedTitration && (
+                    <>
+                      {/* Active Meds display */}
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                        {(selectedPatient.activeMeds || []).map((med, i) => (
+                          <span key={i} style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '100px', color: 'white' }}>
+                            {med}
+                          </span>
+                        ))}
+                      </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Systolic / Diastolic</label>
-                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                        <input type="number" value={auditSystolic} onChange={(e) => setAuditSystolic(Number(e.target.value))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px', color: 'white', fontSize: '0.75rem' }} />
-                        <span style={{ color: 'rgba(255,255,255,0.2)' }}>/</span>
-                        <input type="number" value={auditDiastolic} onChange={(e) => setAuditDiastolic(Number(e.target.value))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px', color: 'white', fontSize: '0.75rem' }} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Systolic / Diastolic</label>
+                          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                            <input type="number" value={auditSystolic} onChange={(e) => setAuditSystolic(Number(e.target.value))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px', color: 'white', fontSize: '0.75rem' }} />
+                            <span style={{ color: 'rgba(255,255,255,0.2)' }}>/</span>
+                            <input type="number" value={auditDiastolic} onChange={(e) => setAuditDiastolic(Number(e.target.value))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px', color: 'white', fontSize: '0.75rem' }} />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Glucose Level (mg/dL)</label>
+                          <input type="number" value={auditGlucose} onChange={(e) => setAuditGlucose(Number(e.target.value))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px', color: 'white', fontSize: '0.75rem' }} />
+                        </div>
                       </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Glucose Level (mg/dL)</label>
-                      <input type="number" value={auditGlucose} onChange={(e) => setAuditGlucose(Number(e.target.value))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px', color: 'white', fontSize: '0.75rem' }} />
-                    </div>
-                  </div>
 
-                  {/* AI Auditing results block */}
-                  <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '10px', padding: '12px' }}>
-                    {activeAuditResults.warning && (
-                      <div style={{ display: 'flex', gap: '8px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', padding: '10px', borderRadius: '8px', color: '#f87171', fontSize: '0.7rem', marginBottom: '10px' }}>
-                        <ShieldAlert size={14} className="shrink-0" style={{ marginTop: '2px' }} />
-                        <div><strong>Dosing Warning:</strong> {activeAuditResults.warning}</div>
-                      </div>
-                    )}
+                      {/* AI Auditing results block */}
+                      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '10px', padding: '12px' }}>
+                        {activeAuditResults.warning && (
+                          <div style={{ display: 'flex', gap: '8px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', padding: '10px', borderRadius: '8px', color: '#f87171', fontSize: '0.7rem', marginBottom: '10px' }}>
+                            <ShieldAlert size={14} className="shrink-0" style={{ marginTop: '2px' }} />
+                            <div><strong>Dosing Warning:</strong> {activeAuditResults.warning}</div>
+                          </div>
+                        )}
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.7rem' }}>
-                      <div>
-                        <span style={{ color: 'var(--text-muted)', fontWeight: 'bold' }}>Audit Notes:</span>
-                        <ul style={{ margin: '4px 0 0 0', paddingLeft: '14px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                          {activeAuditResults.notes.map((note, i) => <li key={i}>{note}</li>)}
-                        </ul>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.7rem' }}>
+                          <div>
+                            <span style={{ color: 'var(--text-muted)', fontWeight: 'bold' }}>Audit Notes:</span>
+                            <ul style={{ margin: '4px 0 0 0', paddingLeft: '14px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                              {activeAuditResults.notes.map((note, i) => <li key={i}>{note}</li>)}
+                            </ul>
+                          </div>
+                          <div>
+                            <span style={{ color: 'var(--color-teal-light)', fontWeight: 'bold' }}>AI Recommendations:</span>
+                            <ul style={{ margin: '4px 0 0 0', paddingLeft: '14px', color: 'white', lineHeight: '1.4' }}>
+                              {activeAuditResults.recommendations.map((rec, i) => <li key={i}>{rec}</li>)}
+                            </ul>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <span style={{ color: 'var(--color-teal-light)', fontWeight: 'bold' }}>AI Recommendations:</span>
-                        <ul style={{ margin: '4px 0 0 0', paddingLeft: '14px', color: 'white', lineHeight: '1.4' }}>
-                          {activeAuditResults.recommendations.map((rec, i) => <li key={i}>{rec}</li>)}
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
-                  <h4 style={{ margin: '0 0 12px 0', fontSize: '0.8rem', color: 'var(--color-teal-light)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <ShieldCheck size={14} /> SafeMeds Dispensing Audit Checklist
-                  </h4>
-                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                    Perform mandatory safety audits before releasing prescription medications to prevent counterfeit distribution or adverse dosing.
-                  </p>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(0,0,0,0.15)', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)' }}>
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.75rem', color: 'white', cursor: 'pointer' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={checklist.rxVerified} 
-                        onChange={(e) => setChecklist({ ...checklist, rxVerified: e.target.checked })} 
-                        style={{ accentColor: '#14b8a6', marginTop: '2px' }} 
-                      />
-                      <div>
-                        <strong>Verify Doctor\'s Prescription Signature</strong>
-                        <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Audit PDF file metadata and doctor credentials.</span>
-                        {(() => {
-                          const pendingOrder = orders.find(o => o.patientId === selectedPatient.id && o.status === 'Pending Verification');
-                          if (pendingOrder && pendingOrder.prescriptionDetails) {
-                            const isBase64 = pendingOrder.prescriptionDetails.startsWith('data:');
-                            return (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setViewingPrescriptionOrder(pendingOrder);
-                                }}
-                                style={{
-                                  background: 'rgba(20, 184, 166, 0.15)',
-                                  border: '1px solid var(--color-teal-light)',
-                                  color: 'var(--color-teal-light)',
-                                  borderRadius: '4px',
-                                  padding: '2px 8px',
-                                  fontSize: '10px',
-                                  fontWeight: 'bold',
-                                  cursor: 'pointer',
-                                  marginTop: '6px',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}
-                              >
-                                <Eye size={10} /> {isBase64 ? 'View Uploaded Prescription' : 'View Manual Details'}
-                              </button>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </div>
-                    </label>
-
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.75rem', color: 'white', cursor: 'pointer' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={checklist.nafdacAudit} 
-                        onChange={(e) => setChecklist({ ...checklist, nafdacAudit: e.target.checked })} 
-                        style={{ accentColor: '#14b8a6', marginTop: '2px' }} 
-                      />
-                      <div>
-                        <strong>NAFDAC Serial Potency Scan</strong>
-                        <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Verify drug packaging anti-counterfeit QR code.</span>
-                      </div>
-                    </label>
-
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.75rem', color: 'white', cursor: 'pointer' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={checklist.vitalsAudit} 
-                        onChange={(e) => setChecklist({ ...checklist, vitalsAudit: e.target.checked })} 
-                        style={{ accentColor: '#14b8a6', marginTop: '2px' }} 
-                      />
-                      <div>
-                        <strong>Log-Vitals Compliance Review</strong>
-                        <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Log review: Patient\'s blood pressure is within stable bounds for refill.</span>
-                      </div>
-                    </label>
-
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.75rem', color: 'white', cursor: 'pointer' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={checklist.identityVerified} 
-                        onChange={(e) => setChecklist({ ...checklist, identityVerified: e.target.checked })} 
-                        style={{ accentColor: '#14b8a6', marginTop: '2px' }} 
-                      />
-                      <div>
-                        <strong>Confirm Patient Identity</strong>
-                        <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Match demographic record and photo.</span>
-                      </div>
-                    </label>
-
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.75rem', color: 'white', cursor: 'pointer' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={checklist.bundlePackaged} 
-                        onChange={(e) => setChecklist({ ...checklist, bundlePackaged: e.target.checked })} 
-                        style={{ accentColor: '#14b8a6', marginTop: '2px' }} 
-                      />
-                      <div>
-                        <strong>Package Chronic Meds Bundle</strong>
-                        <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Ensure exact tablet count (Metformin, Amlodipine, Lisinopril).</span>
-                      </div>
-                    </label>
+                  <div 
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: collapsedDispensingAudit ? '0' : '12px' }}
+                    onClick={() => setCollapsedDispensingAudit(!collapsedDispensingAudit)}
+                  >
+                    <h4 style={{ margin: 0, fontSize: '0.8rem', color: 'var(--color-teal-light)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <ShieldCheck size={14} /> SafeMeds Dispensing Audit Checklist
+                    </h4>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{collapsedDispensingAudit ? 'Expand ▾' : 'Collapse ▴'}</span>
                   </div>
+
+                  {!collapsedDispensingAudit && (
+                    <>
+                      <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '12px', marginTop: '6px' }}>
+                        Perform mandatory safety audits before releasing prescription medications to prevent counterfeit distribution or adverse dosing.
+                      </p>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(0,0,0,0.15)', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.75rem', color: 'white', cursor: 'pointer' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={checklist.rxVerified} 
+                            onChange={(e) => setChecklist({ ...checklist, rxVerified: e.target.checked })} 
+                            style={{ accentColor: '#14b8a6', marginTop: '2px' }} 
+                          />
+                          <div>
+                            <strong>Verify Doctor\'s Prescription Signature</strong>
+                            <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Audit PDF file metadata and doctor credentials.</span>
+                            {(() => {
+                              const pendingOrder = orders.find(o => o.patientId === selectedPatient.id && o.status === 'Pending Verification');
+                              if (pendingOrder && pendingOrder.prescriptionDetails) {
+                                const isBase64 = pendingOrder.prescriptionDetails.startsWith('data:');
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setViewingPrescriptionOrder(pendingOrder);
+                                    }}
+                                    style={{
+                                      background: 'rgba(20, 184, 166, 0.15)',
+                                      border: '1px solid var(--color-teal-light)',
+                                      color: 'var(--color-teal-light)',
+                                      borderRadius: '4px',
+                                      padding: '2px 8px',
+                                      fontSize: '10px',
+                                      fontWeight: 'bold',
+                                      cursor: 'pointer',
+                                      marginTop: '6px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                  >
+                                    <Eye size={10} /> {isBase64 ? 'View Uploaded Prescription' : 'View Manual Details'}
+                                  </button>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.75rem', color: 'white', cursor: 'pointer' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={checklist.nafdacAudit} 
+                            onChange={(e) => setChecklist({ ...checklist, nafdacAudit: e.target.checked })} 
+                            style={{ accentColor: '#14b8a6', marginTop: '2px' }} 
+                          />
+                          <div>
+                            <strong>NAFDAC Serial Potency Scan</strong>
+                            <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Verify drug packaging anti-counterfeit QR code.</span>
+                          </div>
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.75rem', color: 'white', cursor: 'pointer' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={checklist.vitalsAudit} 
+                            onChange={(e) => setChecklist({ ...checklist, vitalsAudit: e.target.checked })} 
+                            style={{ accentColor: '#14b8a6', marginTop: '2px' }} 
+                          />
+                          <div>
+                            <strong>Log-Vitals Compliance Review</strong>
+                            <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Log review: Patient\'s blood pressure is within stable bounds for refill.</span>
+                          </div>
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.75rem', color: 'white', cursor: 'pointer' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={checklist.identityVerified} 
+                            onChange={(e) => setChecklist({ ...checklist, identityVerified: e.target.checked })} 
+                            style={{ accentColor: '#14b8a6', marginTop: '2px' }} 
+                          />
+                          <div>
+                            <strong>Confirm Patient Identity</strong>
+                            <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Match demographic record and photo.</span>
+                          </div>
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.75rem', color: 'white', cursor: 'pointer' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={checklist.bundlePackaged} 
+                            onChange={(e) => setChecklist({ ...checklist, bundlePackaged: e.target.checked })} 
+                            style={{ accentColor: '#14b8a6', marginTop: '2px' }} 
+                          />
+                          <div>
+                            <strong>Package Chronic Meds Bundle</strong>
+                            <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Ensure exact tablet count (Metformin, Amlodipine, Lisinopril).</span>
+                          </div>
+                        </label>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
               {/* Refill Adherence Tracker Panel */}
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <ShoppingBag size={14} className="text-teal-400" /> SafeMeds Refill Adherence
-                </h4>
-                {(() => {
+                <div 
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: collapsedPatientAdherence ? '0' : '12px' }}
+                  onClick={() => setCollapsedPatientAdherence(!collapsedPatientAdherence)}
+                >
+                  <h4 style={{ margin: 0, fontSize: '0.85rem', color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <ShoppingBag size={14} className="text-teal-400" /> SafeMeds Refill Adherence
+                  </h4>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{collapsedPatientAdherence ? 'Expand ▾' : 'Collapse ▴'}</span>
+                </div>
+                
+                {!collapsedPatientAdherence && (() => {
                   const tracker = getRefillTracker(selectedPatient.id || 'mock-patient-default', orders);
                   const activePharmacyName = pharmacies.find(ph => ph.id === selectedPatient.assignedPharmacyId)?.name || 'H-Medix Pharmacy Wuse II';
                   
@@ -1699,6 +1798,396 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
               >
                 Save Pricing
               </button>
+            </div>
+          </div>
+        </div>
+        )}
+
+      {/* Master Clinical Logs Directory Audit Panel */}
+      <div className="glass-panel" style={{ marginTop: '24px', background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.3) 0%, rgba(15, 23, 42, 0.3) 100%)', border: '1px solid rgba(255,255,255,0.05)', padding: '20px', borderRadius: '16px' }}>
+        <div 
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', borderBottom: collapsedMasterDirectory ? 'none' : '1px solid rgba(255,255,255,0.06)', paddingBottom: collapsedMasterDirectory ? '0' : '12px' }}
+          onClick={() => setCollapsedMasterDirectory(!collapsedMasterDirectory)}
+        >
+          <div>
+            <h3 style={{ margin: 0, fontSize: '0.95rem', color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              🗂️ Global Clinical Logs Directory (Master Auditing Portal)
+            </h3>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+              Access full historic records of vitals entries, foot sole scans, and refills across all patients for discrepancy auditing.
+            </p>
+          </div>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{collapsedMasterDirectory ? 'Expand Directory ▾' : 'Collapse Directory ▴'}</span>
+        </div>
+
+        {!collapsedMasterDirectory && (
+          <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {/* Master Audit Filters & Tools */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  placeholder="Filter by patient name..."
+                  value={directorySearch}
+                  onChange={(e) => setDirectorySearch(e.target.value)}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '6px 12px', color: 'white', fontSize: '0.75rem', width: '180px', outline: 'none' }}
+                />
+                
+                <select
+                  value={directoryType}
+                  onChange={(e) => setDirectoryType(e.target.value as any)}
+                  style={{ background: '#1c1c1e', color: 'white', border: '1px solid rgba(255,255,255,0.1)', padding: '6px 10px', borderRadius: '8px', fontSize: '0.75rem' }}
+                >
+                  <option value="all">All Logs Types</option>
+                  <option value="vitals">Vitals Entries</option>
+                  <option value="scans">Diabetic Foot Scans</option>
+                  <option value="orders">Refill Orders</option>
+                </select>
+              </div>
+
+              {/* Master Export Button */}
+              <button
+                onClick={() => {
+                  const rows = [["Patient", "Date", "Log Type", "Details"]];
+                  filteredPatients.forEach(p => {
+                    if (directoryType === 'all' || directoryType === 'vitals') {
+                      (p.bpHistory || []).forEach((bp, i) => {
+                        const gl = (p.glucoseHistory || [])[i] || { level: 120, type: 'Fasting' };
+                        rows.push([p.name, bp.date, "Vitals Log", `BP: ${bp.systolic}/${bp.diastolic} mmHg | Glucose: ${gl.level} mg/dL (${gl.type})`]);
+                      });
+                    }
+                    if (directoryType === 'all' || directoryType === 'scans') {
+                      (p.footScanHistory || []).forEach(scan => {
+                        rows.push([p.name, scan.date, "Foot Scan", `Risk: ${scan.riskScore}% | Hotspots: ${scan.hasHotspots ? 'Yes' : 'No'}`]);
+                      });
+                    }
+                    if (directoryType === 'all' || directoryType === 'orders') {
+                      orders.filter(o => o.patientId === p.id).forEach(o => {
+                        rows.push([p.name, o.date, `Order Refill ${o.id}`, `Items: ${o.items.join(' + ')} | Total: ₦${o.totalNaira} | Status: ${o.status}`]);
+                      });
+                    }
+                  });
+                  
+                  const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.map(val => `"${val.replace(/"/g, '""')}"`).join(",")).join("\n");
+                  const encodedUri = encodeURI(csvContent);
+                  const link = document.createElement("a");
+                  link.setAttribute("href", encodedUri);
+                  link.setAttribute("download", `diabp_master_audit_directory_${new Date().toLocaleDateString()}.csv`);
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                style={{
+                  background: 'var(--color-teal-light)',
+                  border: 'none',
+                  color: 'white',
+                  borderRadius: '8px',
+                  padding: '8px 14px',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                📥 Export Master Audit CSV
+              </button>
+            </div>
+
+            {/* Logs master directory grid log view */}
+            <div style={{ maxHeight: '250px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', background: 'rgba(0,0,0,0.15)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-muted)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <th style={{ padding: '8px 10px' }}>Patient Name</th>
+                    <th style={{ padding: '8px 10px' }}>Log Date</th>
+                    <th style={{ padding: '8px 10px' }}>Type</th>
+                    <th style={{ padding: '8px 10px' }}>Clinical Details / Record Audit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const allLogs: Array<{ patientName: string; date: string; type: string; details: string; rawData: any }> = [];
+                    
+                    filteredPatients.forEach(p => {
+                      if (directoryType === 'all' || directoryType === 'vitals') {
+                        (p.bpHistory || []).forEach((bp, i) => {
+                          const gl = (p.glucoseHistory || [])[i] || { level: 120, type: 'Fasting' };
+                          allLogs.push({
+                            patientName: p.name,
+                            date: bp.date,
+                            type: 'Vitals Log',
+                            details: `BP: ${bp.systolic}/${bp.diastolic} mmHg | Glucose: ${gl.level} mg/dL (${gl.type})`,
+                            rawData: { bp, glucose: gl }
+                          });
+                        });
+                      }
+                      
+                      if (directoryType === 'all' || directoryType === 'scans') {
+                        (p.footScanHistory || []).forEach(scan => {
+                          allLogs.push({
+                            patientName: p.name,
+                            date: scan.date,
+                            type: 'Foot Scan',
+                            details: `Risk Index: ${scan.riskScore}% | Hotspots: ${scan.hasHotspots ? 'Yes' : 'No'} | Recommendations: ${scan.recommendations.join('; ')}`,
+                            rawData: scan
+                          });
+                        });
+                      }
+                      
+                      if (directoryType === 'all' || directoryType === 'orders') {
+                        orders.filter(o => o.patientId === p.id).forEach(o => {
+                          allLogs.push({
+                            patientName: p.name,
+                            date: o.date,
+                            type: `Refill ${o.id}`,
+                            details: `Items: ${o.items.join(', ')} | Total: ₦${o.totalNaira.toLocaleString()} | Status: ${o.status}`,
+                            rawData: o
+                          });
+                        });
+                      }
+                    });
+
+                    const filteredLogs = allLogs.filter(log => 
+                      log.patientName.toLowerCase().includes(directorySearch.toLowerCase())
+                    );
+
+                    if (filteredLogs.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={4} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                            No matching log entries found in directory history.
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filteredLogs.map((log, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                        <td style={{ padding: '8px 10px', color: 'white', fontWeight: 'bold' }}>{log.patientName}</td>
+                        <td style={{ padding: '8px 10px', color: 'var(--text-secondary)' }}>{log.date}</td>
+                        <td style={{ padding: '8px 10px' }}>
+                          <span style={{
+                            background: log.type.includes('Vitals') ? 'rgba(59, 130, 246, 0.12)' : log.type.includes('Scan') ? 'rgba(20, 184, 166, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                            color: log.type.includes('Vitals') ? '#60a5fa' : log.type.includes('Scan') ? 'var(--color-teal-light)' : '#f87171',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontSize: '9px',
+                            fontWeight: 'bold'
+                          }}>
+                            {log.type}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 10px', color: '#e5e7eb', fontFamily: 'monospace', fontSize: '11px' }}>{log.details}</td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Interactive Selected Patient Export Modal */}
+      {exportPatient && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          zIndex: 9999, padding: '20px'
+        }}>
+          <div style={{
+            background: '#111827', border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '16px', width: '100%', maxWidth: '650px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden'
+          }}>
+            {/* Header */}
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', color: 'white' }}>
+                  🗂️ Patient Data Directory: {exportPatient.name}
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Active patient records history and discrepancy auditing log.
+                </p>
+              </div>
+              <button
+                onClick={() => setExportPatient(null)}
+                style={{ background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Export Tabs */}
+            <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.1)' }}>
+              {(['vitals', 'scans', 'orders', 'json'] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setExportTab(tab)}
+                  style={{
+                    flex: 1, padding: '12px', background: 'none', border: 'none',
+                    borderBottom: exportTab === tab ? '2px solid var(--color-teal-light)' : 'none',
+                    color: exportTab === tab ? 'white' : 'var(--text-muted)',
+                    fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer',
+                    textTransform: 'uppercase'
+                  }}
+                >
+                  {tab === 'vitals' ? '📈 Vitals' : tab === 'scans' ? '🦶 Foot Scans' : tab === 'orders' ? '💊 Refills' : '📋 Raw JSON'}
+                </button>
+              ))}
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '20px', overflowY: 'auto', maxHeight: '50vh', background: '#0d1117' }}>
+              
+              {exportTab === 'vitals' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <span>LOG DATE</span>
+                    <span>BLOOD PRESSURE (mmHg)</span>
+                    <span>BLOOD GLUCOSE (mg/dL)</span>
+                  </div>
+                  {(exportPatient.bpHistory || []).map((bp, i) => {
+                    const gl = (exportPatient.glucoseHistory || [])[i] || { level: 120, type: 'Fasting' };
+                    return (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'white', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>{bp.date}</span>
+                        <strong style={{ color: '#60a5fa' }}>{bp.systolic}/{bp.diastolic} mmHg</strong>
+                        <strong style={{ color: '#fb923c' }}>{gl.level} mg/dL ({gl.type})</strong>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {exportTab === 'scans' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {(exportPatient.footScanHistory || []).map((scan, i) => (
+                    <div key={i} style={{ padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', fontSize: '0.75rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', color: 'white', marginBottom: '4px' }}>
+                        <span>Scan Date: {scan.date}</span>
+                        <span style={{ color: scan.hasHotspots ? '#f87171' : 'var(--color-teal-light)' }}>Risk Score: {scan.riskScore}%</span>
+                      </div>
+                      <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                        Hotspots: {scan.hasHotspots ? '⚠️ Detected Sensory Redness clusters' : '✓ Normal sole circulatory structures.'}
+                      </p>
+                      <div style={{ marginTop: '6px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        Recs: {scan.recommendations.join(', ')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {exportTab === 'orders' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {orders.filter(o => o.patientId === exportPatient.id).map((order, i) => (
+                    <div key={i} style={{ padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', fontSize: '0.75rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', color: 'white', marginBottom: '4px' }}>
+                        <span>Refill Order ID: {order.id}</span>
+                        <span>{order.date}</span>
+                      </div>
+                      <div style={{ color: 'var(--color-teal-light)', marginBottom: '4px' }}>
+                        Items: <strong>{order.items.join(', ')}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                        <span>Total Paid: ₦{order.totalNaira.toLocaleString()}</span>
+                        <span style={{ color: order.status === 'Delivered' ? '#34d399' : '#fb923c' }}>{order.status}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {exportTab === 'json' && (
+                <pre style={{
+                  margin: 0, padding: '12px', background: 'black',
+                  color: '#34d399', fontSize: '0.7rem', borderRadius: '8px',
+                  overflowX: 'auto', whiteSpace: 'pre-wrap', fontFamily: 'monospace',
+                  textAlign: 'left'
+                }}>
+                  {JSON.stringify({
+                    profile: {
+                      id: exportPatient.id,
+                      name: exportPatient.name,
+                      age: exportPatient.age,
+                      weight: exportPatient.weight,
+                      conditions: exportPatient.conditions,
+                      activeMeds: exportPatient.activeMeds,
+                      phone: exportPatient.phone,
+                      address: exportPatient.address
+                    },
+                    vitals: {
+                      bp: exportPatient.bpHistory,
+                      glucose: exportPatient.glucoseHistory
+                    },
+                    footScans: exportPatient.footScanHistory,
+                    refills: orders.filter(o => o.patientId === exportPatient.id)
+                  }, null, 2)}
+                </pre>
+              )}
+
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(0,0,0,0.2)', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                onClick={() => setExportPatient(null)}
+                style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)', background: 'transparent', color: 'white', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Close Audit
+              </button>
+              
+              {exportTab === 'json' ? (
+                <button
+                  onClick={() => {
+                    const data = {
+                      profile: exportPatient,
+                      orders: orders.filter(o => o.patientId === exportPatient.id)
+                    };
+                    navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+                    alert("Raw JSON Patient records copied to clipboard!");
+                  }}
+                  style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--color-teal-light)', color: 'white', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}
+                >
+                  📋 Copy JSON to Clipboard
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    let csvContent = "";
+                    if (exportTab === 'vitals') {
+                      csvContent = "Date,Systolic,Diastolic,Glucose,Glucose Type\n" + (exportPatient.bpHistory || []).map((bp, i) => {
+                        const gl = (exportPatient.glucoseHistory || [])[i] || { level: 120, type: 'Fasting' };
+                        return `${bp.date},${bp.systolic},${bp.diastolic},${gl.level},${gl.type}`;
+                      }).join("\n");
+                    } else if (exportTab === 'scans') {
+                      csvContent = "Date,Risk Score,Has Hotspots,Recommendations\n" + (exportPatient.footScanHistory || []).map(s => {
+                        return `${s.date},${s.riskScore},${s.hasHotspots},"${s.recommendations.join('; ')}"`;
+                      }).join("\n");
+                    } else if (exportTab === 'orders') {
+                      csvContent = "Refill ID,Date,Items,Price,Status\n" + orders.filter(o => o.patientId === exportPatient.id).map(o => {
+                        return `${o.id},${o.date},"${o.items.join('; ')}",${o.totalNaira},${o.status}`;
+                      }).join("\n");
+                    }
+                    
+                    const encodedUri = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", `diabp_patient_audit_${exportPatient.name.replace(/\s+/g, '_')}_${exportTab}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--color-teal-light)', color: 'white', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}
+                >
+                  📥 Download CSV Log
+                </button>
+              )}
             </div>
           </div>
         </div>
