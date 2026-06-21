@@ -92,6 +92,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   const [autoRefillEnabled, setAutoRefillEnabled] = useState<boolean>(
     localStorage.getItem('diabp_auto_refill_automation') !== 'false'
   );
+  const [refillTab, setRefillTab] = useState<'pending' | 'ready' | 'completed'>('pending');
 
   useEffect(() => {
     getSystemAlerts().then(setAlerts);
@@ -137,6 +138,16 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
         const orderPatient = patients.find(p => p.id === o.patientId);
         return orderPatient?.assignedClinicId === activeClinicId;
       });
+
+  const pendingOrders = filteredOrders.filter(o => o.status === 'Pending Verification');
+  const readyOrders = filteredOrders.filter(o => o.status === 'Approved');
+  const completedOrders = filteredOrders.filter(o => o.status === 'Out for Delivery' || o.status === 'Delivered');
+
+  const activeTabOrders = refillTab === 'pending'
+    ? pendingOrders
+    : refillTab === 'ready'
+    ? readyOrders
+    : completedOrders;
 
   const handleOpenPatientFile = (patient: PatientNcdProfile) => {
     setSelectedPatient(patient);
@@ -718,10 +729,80 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
 
       {/* 3. Orders List Table */}
       <div className="glass-panel">
-        <div className="card-header-divider">
+        <div className="card-header-divider" style={{ borderBottom: 'none', paddingBottom: '0' }}>
           <h3 className="card-title">
             <ClipboardList className="card-title-icon text-teal-400" /> Prescriptions & Refill Requests
           </h3>
+        </div>
+
+        {/* Tab Navigation for Refills Queue */}
+        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 16px', overflowX: 'auto', gap: '8px' }}>
+          <button
+            onClick={() => setRefillTab('pending')}
+            style={{
+              padding: '12px 16px',
+              background: 'none',
+              border: 'none',
+              borderBottom: refillTab === 'pending' ? '2px solid #f87171' : 'none',
+              color: refillTab === 'pending' ? 'white' : 'var(--text-muted)',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Pending Audit 
+            <span style={{ fontSize: '9px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', padding: '2px 6px', borderRadius: '100px', fontWeight: 'bold' }}>
+              {pendingOrders.length}
+            </span>
+          </button>
+          <button
+            onClick={() => setRefillTab('ready')}
+            style={{
+              padding: '12px 16px',
+              background: 'none',
+              border: 'none',
+              borderBottom: refillTab === 'ready' ? '2px solid var(--color-teal-light)' : 'none',
+              color: refillTab === 'ready' ? 'white' : 'var(--text-muted)',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Ready to Dispense
+            <span style={{ fontSize: '9px', background: readyOrders.length > 0 ? 'rgba(20, 184, 166, 0.25)' : 'rgba(255,255,255,0.06)', color: readyOrders.length > 0 ? 'var(--color-teal-light)' : 'var(--text-muted)', padding: '2px 6px', borderRadius: '100px', fontWeight: 'bold' }}>
+              {readyOrders.length}
+            </span>
+          </button>
+          <button
+            onClick={() => setRefillTab('completed')}
+            style={{
+              padding: '12px 16px',
+              background: 'none',
+              border: 'none',
+              borderBottom: refillTab === 'completed' ? '2px solid #38bdf8' : 'none',
+              color: refillTab === 'completed' ? 'white' : 'var(--text-muted)',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Shipped & Delivered
+            <span style={{ fontSize: '9px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '2px 6px', borderRadius: '100px', fontWeight: 'bold' }}>
+              {completedOrders.length}
+            </span>
+          </button>
         </div>
 
         <div className="orders-table-wrapper">
@@ -738,14 +819,16 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
               </tr>
             </thead>
             <tbody>
-              {filteredOrders.length === 0 ? (
+              {activeTabOrders.length === 0 ? (
                 <tr>
                   <td colSpan={7} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    No refill verification requests mapped to this provider.
+                    {refillTab === 'pending' && "No refill requests pending clinical audit."}
+                    {refillTab === 'ready' && "No auto-approved refills waiting to be dispensed."}
+                    {refillTab === 'completed' && "No shipped or delivered refills logged."}
                   </td>
                 </tr>
               ) : (
-                filteredOrders.map((order, index) => (
+                activeTabOrders.map((order, index) => (
                   <tr key={index}>
                     <td style={{ fontWeight: 'bold', color: 'white' }}>{order.id}</td>
                     <td>
