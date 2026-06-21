@@ -1041,7 +1041,7 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
                 <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                     <CreditCard size={14} className="text-teal-400" />
-                    <span style={{ fontSize: '0.75rem', color: 'white', fontWeight: 'bold' }}>eCraftHub Secure Payment Gateway</span>
+                    <span style={{ fontSize: '0.75rem', color: 'white', fontWeight: 'bold' }}>DiaBP Pay (powered by Amphy)</span>
                   </div>
                   <div style={{
                     fontSize: '0.62rem',
