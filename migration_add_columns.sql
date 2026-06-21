@@ -28,3 +28,11 @@ CREATE TABLE IF NOT EXISTS ncd_alerts (
   type TEXT NOT NULL, -- 'info', 'warning', 'critical', 'success'
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- 5. Add 'phone' and 'address' columns to 'ncd_profiles' table if they don't exist
+ALTER TABLE ncd_profiles 
+ADD COLUMN IF NOT EXISTS phone TEXT;
+
+ALTER TABLE ncd_profiles 
+ADD COLUMN IF NOT EXISTS address TEXT;
+

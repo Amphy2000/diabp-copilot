@@ -42,6 +42,8 @@ export interface PatientNcdProfile {
   activeMeds: string[];
   assignedClinicId: string | null;
   assignedPharmacyId: string | null;
+  phone?: string;
+  address?: string;
 }
 
 export interface NcdRefillOrder {
@@ -111,6 +113,8 @@ export const INITIAL_NCD_ALERTS: NcdAlert[] = [
 export const INITIAL_NCD_PATIENT: PatientNcdProfile = {
   name: "Chief Chinedu Eze",
   age: 58,
+  phone: "+234 803 456 7890",
+  address: "12 Link Rd, Wuse II, Abuja",
   weight: 88, // kg
   conditions: ["Type 2 Diabetes Mellitus", "Essential Hypertension"],
   baselineBp: "145/90 mmHg",
@@ -332,6 +336,8 @@ export async function getPatientProfile(userId?: string): Promise<PatientNcdProf
           activeMeds: profileData.active_meds,
           assignedClinicId: profileData.assigned_clinic_id,
           assignedPharmacyId: profileData.assigned_pharmacy_id,
+          phone: profileData.phone || undefined,
+          address: profileData.address || undefined,
           bpHistory: bpHistory.length > 0 ? bpHistory : INITIAL_NCD_PATIENT.bpHistory,
           glucoseHistory: glucoseHistory.length > 0 ? glucoseHistory : INITIAL_NCD_PATIENT.glucoseHistory,
           footScanHistory: footScanHistory.length > 0 ? footScanHistory : INITIAL_NCD_PATIENT.footScanHistory
@@ -395,7 +401,9 @@ export async function savePatientProfile(profile: PatientNcdProfile, userId?: st
         streak_days: profile.streakDays,
         active_meds: profile.activeMeds,
         assigned_clinic_id: isValidUuid(profile.assignedClinicId) ? profile.assignedClinicId : null,
-        assigned_pharmacy_id: isValidUuid(profile.assignedPharmacyId) ? profile.assignedPharmacyId : null
+        assigned_pharmacy_id: isValidUuid(profile.assignedPharmacyId) ? profile.assignedPharmacyId : null,
+        phone: profile.phone || null,
+        address: profile.address || null
       };
 
       const { data: existing, error: selectErr } = await supabase.from('ncd_profiles').select('id').eq('id', targetId).limit(1);
@@ -1138,6 +1146,8 @@ export async function getPatientsForClinic(clinicId: string): Promise<PatientNcd
             activeMeds: p.active_meds,
             assignedClinicId: p.assigned_clinic_id,
             assignedPharmacyId: p.assigned_pharmacy_id,
+            phone: p.phone || undefined,
+            address: p.address || undefined,
             bpHistory: bpHistory.length > 0 ? bpHistory : INITIAL_NCD_PATIENT.bpHistory,
             glucoseHistory: glucoseHistory.length > 0 ? glucoseHistory : INITIAL_NCD_PATIENT.glucoseHistory,
             footScanHistory: footScanHistory.length > 0 ? footScanHistory : INITIAL_NCD_PATIENT.footScanHistory
@@ -1191,6 +1201,8 @@ export async function getPatientsForPharmacy(pharmacyId: string): Promise<Patien
             activeMeds: p.active_meds,
             assignedClinicId: p.assigned_clinic_id,
             assignedPharmacyId: p.assigned_pharmacy_id,
+            phone: p.phone || undefined,
+            address: p.address || undefined,
             bpHistory: bpHistory.length > 0 ? bpHistory : INITIAL_NCD_PATIENT.bpHistory,
             glucoseHistory: glucoseHistory.length > 0 ? glucoseHistory : INITIAL_NCD_PATIENT.glucoseHistory,
             footScanHistory: footScanHistory.length > 0 ? footScanHistory : INITIAL_NCD_PATIENT.footScanHistory

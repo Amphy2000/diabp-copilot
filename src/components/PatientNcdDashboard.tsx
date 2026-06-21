@@ -8,7 +8,9 @@ import {
   Clock, 
   CheckCircle,
   Plus,
-  Compass
+  Compass,
+  Phone,
+  MapPin
 } from 'lucide-react';
 import { 
   evaluateNcdRisk, 
@@ -34,6 +36,11 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
   const [glucoseType, setGlucoseType] = useState<'Fasting' | 'Post-Meal'>('Fasting');
   const [logMessage, setLogMessage] = useState<string | null>(null);
 
+  // Contact editing states
+  const [isEditingContact, setIsEditingContact] = useState(false);
+  const [editPhone, setEditPhone] = useState(profile.phone || '');
+  const [editAddress, setEditAddress] = useState(profile.address || '');
+
   // System Notifications
   const [alerts, setAlerts] = useState<NcdAlert[]>([]);
   
@@ -41,21 +48,29 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
     getSystemAlerts().then(setAlerts);
   }, [profile]);
 
+  useEffect(() => {
+    setEditPhone(profile.phone || '');
+    setEditAddress(profile.address || '');
+  }, [profile.phone, profile.address]);
+
   // Foot scanner simulation states
   const [scanning, setScanning] = useState<boolean>(false);
+  const footHistory = profile.footScanHistory || [];
   const [scanRecord, setScanRecord] = useState<FootScanRecord | null>(
-    profile.footScanHistory.length > 0 ? profile.footScanHistory[profile.footScanHistory.length - 1] : null
+    footHistory.length > 0 ? footHistory[footHistory.length - 1] : null
   );
 
   // Evaluate current risk indicators based on profile values
-  const currentBp = profile.bpHistory[profile.bpHistory.length - 1] || { systolic: 120, diastolic: 80 };
-  const currentGlucose = profile.glucoseHistory[profile.glucoseHistory.length - 1] || { level: 100, type: 'Fasting' };
+  const bpHistoryArr = profile.bpHistory || [];
+  const currentBp = bpHistoryArr.length > 0 ? bpHistoryArr[bpHistoryArr.length - 1] : { systolic: 120, diastolic: 80 };
+  const glucoseHistoryArr = profile.glucoseHistory || [];
+  const currentGlucose = glucoseHistoryArr.length > 0 ? glucoseHistoryArr[glucoseHistoryArr.length - 1] : { level: 100, type: 'Fasting' as const };
   
   const riskEval = evaluateNcdRisk(
     currentBp.systolic,
     currentBp.diastolic,
     currentGlucose.level,
-    currentGlucose.type
+    currentGlucose.type as any
   );
 
   // Handle logging a new BP / Glucose reading
@@ -67,14 +82,16 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
     
     const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     
-    const updatedBpHistory = [...profile.bpHistory, { date: today, systolic, diastolic }];
-    const updatedGlucoseHistory = [...profile.glucoseHistory, { date: today, level: glucose, type: glucoseType }];
+    const bpHist = profile.bpHistory || [];
+    const glucoseHist = profile.glucoseHistory || [];
+    const updatedBpHistory = [...bpHist, { date: today, systolic, diastolic }];
+    const updatedGlucoseHistory = [...glucoseHist, { date: today, level: glucose, type: glucoseType }];
 
     onUpdateProfile({
       ...profile,
       bpHistory: updatedBpHistory,
       glucoseHistory: updatedGlucoseHistory,
-      streakDays: profile.streakDays + 1
+      streakDays: (profile.streakDays || 0) + 1
     });
 
     setLogMessage("Vitals logged successfully. AI risk calculations updated.");
@@ -99,7 +116,7 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
         // Append to profile history
         onUpdateProfile({
           ...profile,
-          footScanHistory: [...profile.footScanHistory, result]
+          footScanHistory: [...(profile.footScanHistory || []), result]
         });
       }, 2500);
     }
@@ -119,15 +136,66 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
             {profile.name}
             <span className="profile-badge">Active Patient</span>
           </h2>
-          <div className="patient-tags">
-            {profile.conditions.map((cond, idx) => (
-              <span key={idx} className="tag-item">
-                • {cond}
+          <div className="patient-tags" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {(profile.conditions || []).map((cond, idx) => (
+                <span key={idx} className="tag-item">
+                  • {cond}
+                </span>
+              ))}
+              <span className="tag-item">
+                Age: {profile.age} | Wt: {profile.weight}kg
               </span>
-            ))}
-            <span className="tag-item">
-              Age: {profile.age} | Wt: {profile.weight}kg
-            </span>
+            </div>
+
+            {isEditingContact ? (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap' }}>
+                <input 
+                  type="text" 
+                  value={editPhone} 
+                  onChange={(e) => setEditPhone(e.target.value)} 
+                  placeholder="Phone Number"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '4px 8px', color: 'white', fontSize: '0.75rem', width: '130px' }}
+                />
+                <input 
+                  type="text" 
+                  value={editAddress} 
+                  onChange={(e) => setEditAddress(e.target.value)} 
+                  placeholder="Delivery Address"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '4px 8px', color: 'white', fontSize: '0.75rem', width: '200px' }}
+                />
+                <button 
+                  onClick={async () => {
+                    await onUpdateProfile({ ...profile, phone: editPhone, address: editAddress });
+                    setIsEditingContact(false);
+                  }}
+                  style={{ background: '#14b8a6', border: 'none', color: 'white', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer' }}
+                >
+                  Save
+                </button>
+                <button 
+                  onClick={() => {
+                    setEditPhone(profile.phone || '');
+                    setEditAddress(profile.address || '');
+                    setIsEditingContact(false);
+                  }}
+                  style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'white', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px', alignItems: 'center' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Phone size={12} className="text-teal-400" /> {profile.phone || 'No Phone Set'}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={12} className="text-blue-400" /> {profile.address || 'No Address Set'}</span>
+                <button 
+                  onClick={() => setIsEditingContact(true)}
+                  style={{ background: 'transparent', border: 'none', color: '#14b8a6', padding: 0, textDecoration: 'underline', fontSize: '0.7rem', cursor: 'pointer' }}
+                >
+                  Edit Contact Details
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -397,8 +465,8 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
             </div>
             
             <div className="history-scroll-box">
-              {profile.bpHistory.map((bp, index) => {
-                const sugar = profile.glucoseHistory[index] || { level: 120, type: 'Fasting' };
+              {(profile.bpHistory || []).map((bp, index) => {
+                const sugar = (profile.glucoseHistory || [])[index] || { level: 120, type: 'Fasting' };
                 return (
                   <div key={index} className="history-item-row">
                     <span className="history-date">{bp.date}</span>

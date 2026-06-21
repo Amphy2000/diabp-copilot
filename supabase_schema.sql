@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS ncd_profiles (
   active_meds TEXT[] NOT NULL,
   assigned_clinic_id UUID REFERENCES ncd_clinics(id) ON DELETE SET NULL,
   assigned_pharmacy_id UUID REFERENCES ncd_pharmacies(id) ON DELETE SET NULL,
+  phone TEXT DEFAULT NULL,
+  address TEXT DEFAULT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

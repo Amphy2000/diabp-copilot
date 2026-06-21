@@ -12,7 +12,9 @@ import {
   Heart,
   FileText,
   X,
-  ShieldCheck
+  ShieldCheck,
+  Phone,
+  MapPin
 } from 'lucide-react';
 import { 
   auditNcdRegimen,
@@ -155,13 +157,15 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
     // Pre-populate AI dosage auditor with patient values
     setAuditAge(patient.age);
     setAuditWeight(patient.weight);
-    setPatientMeds([...patient.activeMeds]);
+    setPatientMeds([...(patient.activeMeds || [])]);
     
-    const latestBp = patient.bpHistory[patient.bpHistory.length - 1] || { systolic: 120, diastolic: 80 };
+    const bpArr = patient.bpHistory || [];
+    const latestBp = bpArr.length > 0 ? bpArr[bpArr.length - 1] : { systolic: 120, diastolic: 80 };
     setAuditSystolic(latestBp.systolic);
     setAuditDiastolic(latestBp.diastolic);
     
-    const latestGlucose = patient.glucoseHistory[patient.glucoseHistory.length - 1] || { level: 100, type: 'Fasting' };
+    const glucoseArr = patient.glucoseHistory || [];
+    const latestGlucose = glucoseArr.length > 0 ? glucoseArr[glucoseArr.length - 1] : { level: 100, type: 'Fasting' as any };
     setAuditGlucose(latestGlucose.level);
     setAuditGlucoseType(latestGlucose.type);
   };
@@ -190,8 +194,10 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
 
   const triagePatients = filteredPatients.filter(p => {
     const hasCriticalAlert = alerts.some(a => a.patientId === p.id && a.type === 'critical');
-    const latestBp = p.bpHistory[p.bpHistory.length - 1] || { systolic: 120, diastolic: 80 };
-    const latestGlucose = p.glucoseHistory[p.glucoseHistory.length - 1] || { level: 100, type: 'Fasting' };
+    const bpArr = p.bpHistory || [];
+    const latestBp = bpArr.length > 0 ? bpArr[bpArr.length - 1] : { systolic: 120, diastolic: 80 };
+    const glucoseArr = p.glucoseHistory || [];
+    const latestGlucose = glucoseArr.length > 0 ? glucoseArr[glucoseArr.length - 1] : { level: 100, type: 'Fasting' };
     const { strokeRisk, diabeticRisk } = evaluateNcdRisk(
       latestBp.systolic,
       latestBp.diastolic,
@@ -498,6 +504,20 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                     <span>•</span>
                     <span>Streak: <strong>{selectedPatient.streakDays} days</strong></span>
                   </div>
+                  {(selectedPatient.phone || selectedPatient.address) && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px', fontSize: '0.75rem' }}>
+                      {selectedPatient.phone && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-teal-light)' }}>
+                          <Phone size={12} /> <span>Phone: <strong>{selectedPatient.phone}</strong></span>
+                        </div>
+                      )}
+                      {selectedPatient.address && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'white' }}>
+                          <MapPin size={12} /> <span>Delivery Address: <strong>{selectedPatient.address}</strong></span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <button 
                   onClick={() => setSelectedPatient(null)}
@@ -509,8 +529,10 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
 
               {/* Patient Alerts Box */}
               {(() => {
-                const latestBp = selectedPatient.bpHistory[selectedPatient.bpHistory.length - 1] || { systolic: 120, diastolic: 80 };
-                const latestGlucose = selectedPatient.glucoseHistory[selectedPatient.glucoseHistory.length - 1] || { level: 100, type: 'Fasting' };
+                const bpArr = selectedPatient.bpHistory || [];
+                const latestBp = bpArr.length > 0 ? bpArr[bpArr.length - 1] : { systolic: 120, diastolic: 80 };
+                const glucoseArr = selectedPatient.glucoseHistory || [];
+                const latestGlucose = glucoseArr.length > 0 ? glucoseArr[glucoseArr.length - 1] : { level: 100, type: 'Fasting' };
                 const risk = evaluateNcdRisk(latestBp.systolic, latestBp.diastolic, latestGlucose.level, latestGlucose.type);
                 
                 return (
@@ -544,8 +566,8 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
               <div style={{ background: 'rgba(255,255,255,0.01)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.03)', padding: '12px' }}>
                 <h4 style={{ margin: '0 0 8px 0', fontSize: '0.75rem', color: 'white', fontWeight: 'bold' }}>Vitals Logs History</h4>
                 <div style={{ maxHeight: '100px', overflowY: 'auto', fontSize: '0.75rem' }}>
-                  {selectedPatient.bpHistory.map((bp, idx) => {
-                    const sugar = selectedPatient.glucoseHistory[idx] || { level: 100, type: 'Fasting' };
+                  {(selectedPatient.bpHistory || []).map((bp, idx) => {
+                    const sugar = (selectedPatient.glucoseHistory || [])[idx] || { level: 100, type: 'Fasting' };
                     return (
                       <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
                         <span style={{ color: 'var(--text-muted)' }}>{bp.date}</span>
@@ -558,11 +580,11 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
               </div>
 
               {/* Foot Scan History Soles contour mapping */}
-              {selectedPatient.footScanHistory.length > 0 && (
+              {selectedPatient.footScanHistory && selectedPatient.footScanHistory.length > 0 && (
                 <div style={{ padding: '12px', background: 'rgba(20, 184, 166, 0.03)', borderRadius: '10px', border: '1px solid rgba(20, 184, 166, 0.1)', display: 'flex', gap: '16px', alignItems: 'center' }}>
                   <div style={{ width: '60px', height: '80px', background: '#1c1c1e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
                     <div style={{ width: '30px', height: '60px', border: '1px dashed rgba(255,255,255,0.15)', borderRadius: '100px', margin: '10px auto', position: 'relative' }}>
-                      {selectedPatient.footScanHistory[selectedPatient.footScanHistory.length - 1].hotspots.map((spot, i) => (
+                      {(selectedPatient.footScanHistory[selectedPatient.footScanHistory.length - 1]?.hotspots || []).map((spot, i) => (
                         <div 
                           key={i} 
                           style={{ position: 'absolute', left: `${spot.x / 2}%`, top: `${spot.y / 2}%`, width: '4px', height: '4px', borderRadius: '50%', background: '#ef4444' }} 
@@ -573,8 +595,8 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                   <div>
                     <h5 style={{ margin: 0, fontSize: '0.75rem', color: 'white', fontWeight: 'bold' }}>Diabetic Foot Sole Scan (Latest)</h5>
                     <p style={{ margin: '4px 0 0 0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                      Risk Index: <strong>{selectedPatient.footScanHistory[selectedPatient.footScanHistory.length - 1].riskScore}%</strong> • 
-                      {selectedPatient.footScanHistory[selectedPatient.footScanHistory.length - 1].hasHotspots ? " Hotspots detected on Metatarsal head." : " No hotspots detected."}
+                      Risk Index: <strong>{selectedPatient.footScanHistory[selectedPatient.footScanHistory.length - 1]?.riskScore || 0}%</strong> • 
+                      {selectedPatient.footScanHistory[selectedPatient.footScanHistory.length - 1]?.hasHotspots ? " Hotspots detected on Metatarsal head." : " No hotspots detected."}
                     </p>
                     <button
                       onClick={() => handleNudge(selectedPatient.name, "foot sole scan shows early friction redness clusters. Please audit shoes.")}
@@ -596,7 +618,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                   
                   {/* Active Meds display */}
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                    {selectedPatient.activeMeds.map((med, i) => (
+                    {(selectedPatient.activeMeds || []).map((med, i) => (
                       <span key={i} style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '100px', color: 'white' }}>
                         {med}
                       </span>
@@ -832,7 +854,30 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                   <tr key={index}>
                     <td style={{ fontWeight: 'bold', color: 'white' }}>{order.id}</td>
                     <td>
-                      {order.patientName || "Chief Chinedu Eze"}
+                      <div>
+                        <strong>{order.patientName || "Chief Chinedu Eze"}</strong>
+                        {(() => {
+                          const pProfile = patients.find(p => p.id === order.patientId);
+                          if (pProfile) {
+                            return (
+                              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '2px', lineHeight: '1.2' }}>
+                                {pProfile.phone && <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>📞 {pProfile.phone}</div>}
+                                {pProfile.address && <div style={{ display: 'flex', alignItems: 'center', gap: '3px', wordBreak: 'break-word', maxWidth: '180px' }}>📍 {pProfile.address}</div>}
+                              </div>
+                            );
+                          }
+                          // Fallback mock details for mock patient
+                          if (!order.patientId) {
+                            return (
+                              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '2px', lineHeight: '1.2' }}>
+                                <div>📞 +234 803 456 7890</div>
+                                <div style={{ wordBreak: 'break-word', maxWidth: '180px' }}>📍 12 Link Rd, Wuse II, Abuja</div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
                     </td>
                     <td style={{ minWidth: '220px', padding: '12px 8px' }}>
                       {order.items.map((item, idx) => {

@@ -38,6 +38,8 @@ export const Auth: React.FC = () => {
   const [targetGlucose, setTargetGlucose] = useState("70-130 mg/dL");
   const [assignedClinicId, setAssignedClinicId] = useState('');
   const [assignedPharmacyId, setAssignedPharmacyId] = useState('');
+  const [patientPhone, setPatientPhone] = useState('');
+  const [patientAddress, setPatientAddress] = useState('');
 
   // Doctor/Pharmacist Registration Details
   const [onboardOption, setOnboardOption] = useState<'join' | 'create'>('join');
@@ -117,7 +119,9 @@ export const Auth: React.FC = () => {
               ? ["Metformin 500mg Daily"] 
               : ["Amlodipine 5mg Daily"],
             assignedClinicId: assignedClinicId || null,
-            assignedPharmacyId: assignedPharmacyId || null
+            assignedPharmacyId: assignedPharmacyId || null,
+            phone: patientPhone || undefined,
+            address: patientAddress || undefined
           };
           await savePatientProfile(profilePayload, user.id);
         } else if (role === 'doctor') {
@@ -397,6 +401,32 @@ export const Auth: React.FC = () => {
                           <option key={p.id} value={p.id}>{p.name}</option>
                         ))}
                       </select>
+                    </div>
+                  </div>
+
+                  {/* Phone & Address Details */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Phone Number (for Rider Delivery)</label>
+                      <input
+                        type="tel"
+                        value={patientPhone}
+                        onChange={(e) => setPatientPhone(e.target.value)}
+                        placeholder="e.g. +234 803 123 4567"
+                        required
+                        style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '0.8rem' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Delivery Address</label>
+                      <input
+                        type="text"
+                        value={patientAddress}
+                        onChange={(e) => setPatientAddress(e.target.value)}
+                        placeholder="e.g. 12 Link Rd, Wuse II"
+                        required
+                        style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '0.8rem' }}
+                      />
                     </div>
                   </div>
                 </div>
