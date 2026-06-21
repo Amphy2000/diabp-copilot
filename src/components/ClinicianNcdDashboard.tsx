@@ -14,7 +14,8 @@ import {
   X,
   ShieldCheck,
   Phone,
-  MapPin
+  MapPin,
+  Eye
 } from 'lucide-react';
 import { 
   auditNcdRegimen,
@@ -69,9 +70,9 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
     }
   }, [userRole, facilityId]);
 
-  // Search and Selected Patient State
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<PatientNcdProfile | null>(null);
+  const [viewingPrescriptionOrder, setViewingPrescriptionOrder] = useState<NcdRefillOrder | null>(null);
 
   // Pharmacist Checklist State
   const [checklist, setChecklist] = useState({
@@ -692,6 +693,39 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                       <div>
                         <strong>Verify Doctor\'s Prescription Signature</strong>
                         <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Audit PDF file metadata and doctor credentials.</span>
+                        {(() => {
+                          const pendingOrder = orders.find(o => o.patientId === selectedPatient.id && o.status === 'Pending Verification');
+                          if (pendingOrder && pendingOrder.prescriptionDetails) {
+                            const isBase64 = pendingOrder.prescriptionDetails.startsWith('data:');
+                            return (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setViewingPrescriptionOrder(pendingOrder);
+                                }}
+                                style={{
+                                  background: 'rgba(20, 184, 166, 0.15)',
+                                  border: '1px solid var(--color-teal-light)',
+                                  color: 'var(--color-teal-light)',
+                                  borderRadius: '4px',
+                                  padding: '2px 8px',
+                                  fontSize: '10px',
+                                  fontWeight: 'bold',
+                                  cursor: 'pointer',
+                                  marginTop: '6px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                <Eye size={10} /> {isBase64 ? 'View Uploaded Prescription' : 'View Manual Details'}
+                              </button>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                     </label>
 
@@ -905,14 +939,67 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                       {order.prescriptionRequired ? (
                         order.prescriptionUploaded ? (
                           order.prescriptionDetails ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                              <span className="order-rx-badge-pill valid" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.3)' }}>
-                                Details Provided
-                              </span>
-                              <div style={{ fontSize: '9px', color: 'var(--text-muted)', maxWidth: '140px', whiteSpace: 'normal', fontStyle: 'italic', lineHeight: '1.2' }}>
-                                "{order.prescriptionDetails}"
+                            order.prescriptionDetails.startsWith('data:') ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                                <span className="order-rx-badge-pill valid" style={{ background: 'rgba(20, 184, 166, 0.15)', color: 'var(--color-teal-light)', borderColor: 'rgba(20, 184, 166, 0.3)' }}>
+                                  File Uploaded
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const pat = patients.find(p => p.id === order.patientId);
+                                    if (pat) setSelectedPatient(pat);
+                                    setViewingPrescriptionOrder(order);
+                                  }}
+                                  style={{
+                                    background: 'rgba(56, 189, 248, 0.15)',
+                                    border: '1px solid #38bdf8',
+                                    color: '#38bdf8',
+                                    borderRadius: '4px',
+                                    padding: '2px 6px',
+                                    fontSize: '10px',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer',
+                                    marginTop: '4px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  <Eye size={10} /> View Rx File
+                                </button>
                               </div>
-                            </div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                                <span className="order-rx-badge-pill valid" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.3)' }}>
+                                  Details Provided
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const pat = patients.find(p => p.id === order.patientId);
+                                    if (pat) setSelectedPatient(pat);
+                                    setViewingPrescriptionOrder(order);
+                                  }}
+                                  style={{
+                                    background: 'rgba(255, 255, 255, 0.08)',
+                                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                                    color: 'white',
+                                    borderRadius: '4px',
+                                    padding: '2px 6px',
+                                    fontSize: '10px',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer',
+                                    marginTop: '4px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  <Eye size={10} /> Read Details
+                                </button>
+                              </div>
+                            )
                           ) : (
                             <span className="order-rx-badge-pill valid">
                               Uploaded (Eze_Rx.pdf)
@@ -1001,6 +1088,190 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
           </table>
         </div>
       </div>
+      
+      {/* Interactive Prescription Image / Details Verification Modal Overlay */}
+      {viewingPrescriptionOrder && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#111827',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '650px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', color: 'white' }}>
+                  Prescription Verification
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Order: <strong>{viewingPrescriptionOrder.id}</strong> • Patient: <strong>{viewingPrescriptionOrder.patientName}</strong>
+                </p>
+              </div>
+              <button
+                onClick={() => setViewingPrescriptionOrder(null)}
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '30px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{
+              padding: '20px',
+              overflowY: 'auto',
+              maxHeight: '65vh',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%'
+            }}>
+              {(() => {
+                const details = viewingPrescriptionOrder.prescriptionDetails || '';
+                if (details.startsWith('data:image/')) {
+                  return (
+                    <img 
+                      src={details} 
+                      alt="Doctor's Prescription" 
+                      style={{ 
+                        maxWidth: '100%', 
+                        maxHeight: '55vh', 
+                        borderRadius: '8px', 
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        objectFit: 'contain'
+                      }} 
+                    />
+                  );
+                } else if (details.startsWith('data:application/pdf;base64,')) {
+                  return (
+                    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <iframe 
+                        src={details} 
+                        title="Prescription PDF" 
+                        style={{ 
+                          width: '100%', 
+                          height: '450px', 
+                          border: 'none', 
+                          borderRadius: '8px', 
+                          background: 'white' 
+                        }} 
+                      />
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                        If PDF does not display, download files from patient registry profile.
+                      </p>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div style={{
+                      width: '100%',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '10px',
+                      padding: '16px',
+                      color: 'white',
+                      lineHeight: '1.5'
+                    }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '8px', marginBottom: '12px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        <FileText size={14} /> <span>PATIENT MANUALLY PROVIDED DETAILS</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.85rem', fontStyle: 'italic', color: '#e5e7eb', whiteSpace: 'pre-wrap' }}>
+                        "{details || "No details provided."}"
+                      </p>
+                    </div>
+                  );
+                }
+              })()}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '16px 20px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'rgba(0,0,0,0.2)',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '10px'
+            }}>
+              <button
+                onClick={() => setViewingPrescriptionOrder(null)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  background: 'transparent',
+                  color: 'white',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Close
+              </button>
+              {activeRole === 'pharmacy' && viewingPrescriptionOrder.status === 'Pending Verification' && (
+                <button
+                  onClick={() => {
+                    // Mark Rx Verified in checklist
+                    setChecklist(prev => ({ ...prev, rxVerified: true }));
+                    setViewingPrescriptionOrder(null);
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'var(--color-teal-light)',
+                    color: 'white',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <ShieldCheck size={14} /> Verify & Approve Signature
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

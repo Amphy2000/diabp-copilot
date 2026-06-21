@@ -23,7 +23,8 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
   const [selectedMeds, setSelectedMeds] = useState<string[]>(['bundle']);
   const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
   const [useManualRx, setUseManualRx] = useState(false);
-  const [prescriptionDetails, setPrescriptionDetails] = useState('');
+  const [manualRxDetails, setManualRxDetails] = useState('');
+  const [uploadedRxDetails, setUploadedRxDetails] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [orderNotification, setOrderNotification] = useState<string | null>(null);
@@ -33,6 +34,13 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setPrescriptionFile(file);
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setUploadedRxDetails(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+
       setIsUploading(true);
       setUploadProgress(10);
       
@@ -89,7 +97,7 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
 
     if (requiresRx) {
       if (useManualRx) {
-        if (!prescriptionDetails.trim()) {
+        if (!manualRxDetails.trim()) {
           alert("Please enter your prescription details (e.g. Doctor's name, prescription number or date) to verify drug dosing safety.");
           return;
         }
@@ -113,8 +121,8 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
       totalNaira: calculateTotal(),
       status: 'Pending Verification',
       prescriptionRequired: requiresRx,
-      prescriptionUploaded: useManualRx ? !!prescriptionDetails.trim() : !!prescriptionFile,
-      prescriptionDetails: useManualRx ? prescriptionDetails : undefined,
+      prescriptionUploaded: useManualRx ? !!manualRxDetails.trim() : !!prescriptionFile,
+      prescriptionDetails: useManualRx ? manualRxDetails : (uploadedRxDetails || undefined),
       pharmacyId: profile.assignedPharmacyId,
       patientId: profile.id,
       patientName: profile.name
@@ -125,7 +133,8 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
     
     // Clear form
     setPrescriptionFile(null);
-    setPrescriptionDetails('');
+    setManualRxDetails('');
+    setUploadedRxDetails('');
     setUseManualRx(false);
     setUploadProgress(0);
     setSelectedMeds(['bundle']);
@@ -360,8 +369,8 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
                       Enter Prescription Details
                     </p>
                     <textarea
-                      value={prescriptionDetails}
-                      onChange={(e) => setPrescriptionDetails(e.target.value)}
+                      value={manualRxDetails}
+                      onChange={(e) => setManualRxDetails(e.target.value)}
                       placeholder="e.g. Prescribed by Dr. Emeka, Abuja Heart Clinic on June 15. Metformin 500mg, Refill Code: RX-904"
                       style={{
                         width: '100%',
