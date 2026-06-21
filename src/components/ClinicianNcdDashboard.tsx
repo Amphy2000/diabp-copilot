@@ -323,7 +323,8 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '140px', overflowY: 'auto' }}>
               {triagePatients.map(p => {
-                const latestBp = p.bpHistory[p.bpHistory.length - 1] || { systolic: 120, diastolic: 80 };
+                const bpArr = p.bpHistory || [];
+                const latestBp = bpArr.length > 0 ? bpArr[bpArr.length - 1] : { systolic: 120, diastolic: 80 };
                 return (
                   <div 
                     key={p.id}
@@ -442,8 +443,10 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                   </tr>
                 ) : (
                   searchedPatients.map((p, idx) => {
-                    const latestBp = p.bpHistory[p.bpHistory.length - 1] || { systolic: 120, diastolic: 80 };
-                    const latestGlucose = p.glucoseHistory[p.glucoseHistory.length - 1] || { level: 100, type: 'Fasting' };
+                    const bpArr = p.bpHistory || [];
+                    const latestBp = bpArr.length > 0 ? bpArr[bpArr.length - 1] : { systolic: 120, diastolic: 80 };
+                    const glucoseArr = p.glucoseHistory || [];
+                    const latestGlucose = glucoseArr.length > 0 ? glucoseArr[glucoseArr.length - 1] : { level: 100, type: 'Fasting' };
                     return (
                       <tr 
                         key={idx} 
