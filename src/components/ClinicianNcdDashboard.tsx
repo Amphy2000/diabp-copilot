@@ -207,8 +207,8 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
     }
   };
 
-  const handleUpdateStatusAndClearAlert = async (orderId: string, status: NcdRefillOrder['status']) => {
-    onUpdateOrderStatus(orderId, status);
+  const handleUpdateStatusAndClearAlert = async (orderId: string, status: NcdRefillOrder['status'], finalPrice?: number) => {
+    onUpdateOrderStatus(orderId, status, finalPrice);
     
     // Auto-dismiss warning alerts if approved or delivered
     if (status === 'Approved' || status === 'Delivered') {
@@ -1242,21 +1242,46 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                           // PHARMACIST ACTIONS: Check verification checklists and fulfill delivery
                           <>
                             {order.status === 'Pending Verification' && (
-                              <button
-                                onClick={() => handleUpdateStatusAndClearAlert(order.id, 'Approved')}
-                                className="btn-action-table"
-                                disabled={!checklist.rxVerified || !checklist.nafdacAudit}
-                                style={{ 
-                                  opacity: (!checklist.rxVerified || !checklist.nafdacAudit) ? 0.5 : 1,
-                                  cursor: (!checklist.rxVerified || !checklist.nafdacAudit) ? 'not-allowed' : 'pointer'
-                                }}
-                                title={(!checklist.rxVerified || !checklist.nafdacAudit) 
-                                  ? "Please verify prescription signature and perform NAFDAC serial scan first in patient file" 
-                                  : "Approve medication release"
-                                }
-                              >
-                                Verify & Approve
-                              </button>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '2px 4px' }}>
+                                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>₦</span>
+                                  <input
+                                    type="number"
+                                    defaultValue={order.totalNaira}
+                                    id={`price-adjust-${order.id}`}
+                                    style={{
+                                      width: '65px',
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: 'white',
+                                      fontSize: '11px',
+                                      fontFamily: 'monospace',
+                                      textAlign: 'right',
+                                      outline: 'none'
+                                    }}
+                                    placeholder="Adjust"
+                                  />
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    const inputEl = document.getElementById(`price-adjust-${order.id}`) as HTMLInputElement;
+                                    const adjustedPrice = inputEl ? Number(inputEl.value) : order.totalNaira;
+                                    handleUpdateStatusAndClearAlert(order.id, 'Approved', adjustedPrice);
+                                  }}
+                                  className="btn-action-table"
+                                  disabled={!checklist.rxVerified || !checklist.nafdacAudit}
+                                  style={{ 
+                                    opacity: (!checklist.rxVerified || !checklist.nafdacAudit) ? 0.5 : 1,
+                                    cursor: (!checklist.rxVerified || !checklist.nafdacAudit) ? 'not-allowed' : 'pointer'
+                                  }}
+                                  title={(!checklist.rxVerified || !checklist.nafdacAudit) 
+                                    ? "Please verify prescription signature and perform NAFDAC serial scan first in patient file" 
+                                    : "Approve medication release"
+                                  }
+                                >
+                                  Verify & Approve
+                                </button>
+                              </div>
                             )}
                             {order.status === 'Approved' && (
                               <button
@@ -1367,60 +1392,87 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
               width: '100%'
             }}>
               {(() => {
-                const details = viewingPrescriptionOrder.prescriptionDetails || '';
-                if (details.startsWith('data:image/')) {
-                  return (
-                    <img 
-                      src={details} 
-                      alt="Doctor's Prescription" 
-                      style={{ 
-                        maxWidth: '100%', 
-                        maxHeight: '55vh', 
-                        borderRadius: '8px', 
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        objectFit: 'contain'
-                      }} 
-                    />
-                  );
-                } else if (details.startsWith('data:application/pdf;base64,')) {
-                  return (
-                    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <iframe 
-                        src={details} 
-                        title="Prescription PDF" 
-                        style={{ 
-                          width: '100%', 
-                          height: '450px', 
-                          border: 'none', 
-                          borderRadius: '8px', 
-                          background: 'white' 
-                        }} 
-                      />
-                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                        If PDF does not display, download files from patient registry profile.
-                      </p>
-                    </div>
-                  );
-                } else {
-                  return (
-                    <div style={{
-                      width: '100%',
-                      background: 'rgba(255, 255, 255, 0.02)',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
-                      borderRadius: '10px',
-                      padding: '16px',
-                      color: 'white',
-                      lineHeight: '1.5'
-                    }}>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '8px', marginBottom: '12px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        <FileText size={14} /> <span>PATIENT MANUALLY PROVIDED DETAILS</span>
+                const rawDetails = viewingPrescriptionOrder.prescriptionDetails || '';
+                const parts = rawDetails.split('|||');
+                const note = parts.length > 1 ? parts[0] : '';
+                const details = parts.length > 1 ? parts[1] : parts[0];
+
+                return (
+                  <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'center' }}>
+                    {note && (
+                      <div style={{
+                        width: '100%',
+                        background: 'rgba(251, 146, 60, 0.08)',
+                        border: '1px solid rgba(251, 146, 60, 0.2)',
+                        borderRadius: '8px',
+                        padding: '10px 14px',
+                        color: '#fb923c',
+                        fontSize: '11px',
+                        textAlign: 'left',
+                        marginBottom: '8px'
+                      }}>
+                        <strong>💡 Brand & Dosage Preference Note:</strong>
+                        <p style={{ margin: '4px 0 0 0', color: 'white', fontSize: '12px' }}>"{note}"</p>
                       </div>
-                      <p style={{ margin: 0, fontSize: '0.85rem', fontStyle: 'italic', color: '#e5e7eb', whiteSpace: 'pre-wrap' }}>
-                        "{details || "No details provided."}"
-                      </p>
-                    </div>
-                  );
-                }
+                    )}
+
+                    {(() => {
+                      if (details.startsWith('data:image/')) {
+                        return (
+                          <img 
+                            src={details} 
+                            alt="Doctor's Prescription" 
+                            style={{ 
+                              maxWidth: '100%', 
+                              maxHeight: '55vh', 
+                              borderRadius: '8px', 
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              objectFit: 'contain'
+                            }} 
+                          />
+                        );
+                      } else if (details.startsWith('data:application/pdf;base64,')) {
+                        return (
+                          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <iframe 
+                              src={details} 
+                              title="Prescription PDF" 
+                              style={{ 
+                                width: '100%', 
+                                height: '450px', 
+                                border: 'none', 
+                                borderRadius: '8px', 
+                                background: 'white' 
+                              }} 
+                            />
+                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                              If PDF does not display, download files from patient registry profile.
+                            </p>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div style={{
+                            width: '100%',
+                            background: 'rgba(255, 255, 255, 0.02)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            borderRadius: '10px',
+                            padding: '16px',
+                            color: 'white',
+                            lineHeight: '1.5'
+                          }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '8px', marginBottom: '12px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              <FileText size={14} /> <span>PATIENT MANUALLY PROVIDED DETAILS</span>
+                            </div>
+                            <p style={{ margin: 0, fontSize: '0.85rem', fontStyle: 'italic', color: '#e5e7eb', whiteSpace: 'pre-wrap' }}>
+                              "{details || "No details provided."}"
+                            </p>
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
+                );
               })()}
             </div>
 

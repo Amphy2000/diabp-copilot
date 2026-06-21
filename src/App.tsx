@@ -135,14 +135,14 @@ function App() {
     }
   };
 
-  const handleUpdateOrderStatus = async (orderId: string, status: NcdRefillOrder['status']) => {
+  const handleUpdateOrderStatus = async (orderId: string, status: NcdRefillOrder['status'], finalPrice?: number) => {
     setOrders(prevOrders => 
       prevOrders.map(order => 
-        order.id === orderId ? { ...order, status } : order
+        order.id === orderId ? { ...order, status, totalNaira: finalPrice !== undefined ? finalPrice : order.totalNaira } : order
       )
     );
     try {
-      await serviceUpdateStatus(orderId, status);
+      await serviceUpdateStatus(orderId, status, finalPrice);
     } catch (err) {
       console.error("Failed to update order status:", err);
     }

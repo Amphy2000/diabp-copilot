@@ -633,16 +633,20 @@ export async function placeRefillOrder(order: NcdRefillOrder): Promise<void> {
 /**
  * Updates status of an existing order
  */
-export async function updateOrderStatus(orderId: string, status: NcdRefillOrder['status']): Promise<void> {
+export async function updateOrderStatus(orderId: string, status: NcdRefillOrder['status'], finalPrice?: number): Promise<void> {
   const currentOrders = await getRefillOrders();
-  const updatedOrders = currentOrders.map(o => o.id === orderId ? { ...o, status } : o);
+  const updatedOrders = currentOrders.map(o => o.id === orderId ? { ...o, status, totalNaira: finalPrice !== undefined ? finalPrice : o.totalNaira } : o);
   saveLocal(ORDERS_KEY, updatedOrders);
 
   if (isSupabaseConfigured) {
     try {
+      const payload: any = { status };
+      if (finalPrice !== undefined) {
+        payload.total_naira = finalPrice;
+      }
       const { error } = await supabase
         .from('ncd_orders')
-        .update({ status })
+        .update(payload)
         .eq('order_number', orderId);
       if (error) throw error;
     } catch (err: any) {

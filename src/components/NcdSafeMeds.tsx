@@ -25,9 +25,23 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
   const [useManualRx, setUseManualRx] = useState(false);
   const [manualRxDetails, setManualRxDetails] = useState('');
   const [uploadedRxDetails, setUploadedRxDetails] = useState('');
+  const [brandPreference, setBrandPreference] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [orderNotification, setOrderNotification] = useState<string | null>(null);
+
+  const availableMeds = [
+    ...NCD_MEDICATIONS,
+    {
+      id: 'active-regimen',
+      name: 'My Prescribed Active Regimen (Custom Combo)',
+      description: profile.activeMeds && profile.activeMeds.length > 0
+        ? profile.activeMeds.join(' + ')
+        : 'Request a custom combination of your active medications.',
+      price: 0,
+      rxRequired: true
+    }
+  ];
 
   // Simulated prescription upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -68,6 +82,7 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
   // Find the selected pharmacy to read its pricing
   const assignedPharmacy = pharmacies.find(p => p.id === profile.assignedPharmacyId);
   const getMedPrice = (medId: string, basePrice: number) => {
+    if (medId === 'active-regimen') return 0;
     if (assignedPharmacy && assignedPharmacy.prices && assignedPharmacy.prices[medId] !== undefined) {
       return assignedPharmacy.prices[medId];
     }
@@ -76,7 +91,7 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
 
   const calculateTotal = () => {
     return selectedMeds.reduce((sum, medId) => {
-      const med = NCD_MEDICATIONS.find(m => m.id === medId);
+      const med = availableMeds.find(m => m.id === medId);
       const price = med ? getMedPrice(med.id, med.price) : 0;
       return sum + price;
     }, 0);
@@ -91,6 +106,7 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
     }
 
     const requiresRx = selectedMeds.some(medId => {
+      if (medId === 'active-regimen') return true;
       const med = NCD_MEDICATIONS.find(m => m.id === medId);
       return med?.rxRequired;
     });
@@ -109,10 +125,22 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
       }
     }
 
-    const itemNames = selectedMeds.map(medId => {
-      const med = NCD_MEDICATIONS.find(m => m.id === medId);
-      return med ? med.name : '';
+    const itemNames: string[] = [];
+    selectedMeds.forEach(medId => {
+      if (medId === 'active-regimen') {
+        if (profile.activeMeds && profile.activeMeds.length > 0) {
+          itemNames.push(...profile.activeMeds);
+        } else {
+          itemNames.push("My Custom Regimen Combo");
+        }
+      } else {
+        const med = NCD_MEDICATIONS.find(m => m.id === medId);
+        if (med) itemNames.push(med.name);
+      }
     });
+
+    const baseDetails = useManualRx ? manualRxDetails : (uploadedRxDetails || '');
+    const finalDetails = brandPreference ? `${brandPreference}|||${baseDetails}` : baseDetails;
 
     const newOrder: NcdRefillOrder = {
       id: `NCD-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -121,8 +149,8 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
       totalNaira: calculateTotal(),
       status: 'Pending Verification',
       prescriptionRequired: requiresRx,
-      prescriptionUploaded: useManualRx ? !!manualRxDetails.trim() : !!prescriptionFile,
-      prescriptionDetails: useManualRx ? manualRxDetails : (uploadedRxDetails || undefined),
+      prescriptionUploaded: useManualRx ? !!manualRxDetails.trim() : (!!prescriptionFile || !!uploadedRxDetails),
+      prescriptionDetails: finalDetails || undefined,
       pharmacyId: profile.assignedPharmacyId,
       patientId: profile.id,
       patientName: profile.name
@@ -135,6 +163,7 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
     setPrescriptionFile(null);
     setManualRxDetails('');
     setUploadedRxDetails('');
+    setBrandPreference('');
     setUseManualRx(false);
     setUploadProgress(0);
     setSelectedMeds(['bundle']);
@@ -196,7 +225,7 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
             </div>
 
             <div className="meds-row-layout">
-              {NCD_MEDICATIONS.map(med => {
+              {availableMeds.map(med => {
                 const isSelected = selectedMeds.includes(med.id);
                 return (
                   <div 
@@ -216,7 +245,11 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
                       <p className="meds-description">{med.description}</p>
                     </div>
                     <div className="meds-price-group">
-                      <div className="meds-price">₦{getMedPrice(med.id, med.price).toLocaleString()}</div>
+                      <div className="meds-price">
+                        {med.id === 'active-regimen' 
+                          ? 'Quote Needed' 
+                          : `₦${getMedPrice(med.id, med.price).toLocaleString()}`}
+                      </div>
                       <div className="meds-price-period">per month</div>
                     </div>
                   </div>
@@ -313,6 +346,35 @@ export const NcdSafeMeds: React.FC<NcdSafeMedsProps> = ({ orders, onPlaceOrder, 
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.75rem', fontSize: '1.1rem', fontWeight: '800', color: 'white' }}>
                 <span>Total Refill Cost:</span>
                 <span style={{ color: 'var(--color-teal-light)' }}>₦{calculateTotal().toLocaleString()}</span>
+              </div>
+
+              {selectedMeds.includes('active-regimen') && (
+                <p style={{ margin: '8px 0 0 0', fontSize: '10px', color: '#fb923c', fontStyle: 'italic', textAlign: 'left', lineHeight: '1.3' }}>
+                  * Custom active regimen selected. Fulfilling pharmacy will audit your prescription and update the final price during verification.
+                </p>
+              )}
+
+              {/* Special Instructions / Brand Preference */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '12px' }}>
+                <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 'bold', textAlign: 'left', textTransform: 'uppercase' }}>
+                  Brand & Dosage Preference Notes
+                </label>
+                <input
+                  type="text"
+                  value={brandPreference}
+                  onChange={(e) => setBrandPreference(e.target.value)}
+                  placeholder="e.g. Branded Glucophage, 1000mg dosage"
+                  style={{
+                    width: '100%',
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '6px',
+                    padding: '8px 10px',
+                    color: 'white',
+                    fontSize: '11px',
+                    outline: 'none'
+                  }}
+                />
               </div>
             </div>
 
