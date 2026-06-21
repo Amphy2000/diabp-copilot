@@ -301,13 +301,6 @@ export const Auth: React.FC = () => {
                   >
                     <Building size={12} /> Pharmacy
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setRole('admin')}
-                    style={{ flex: 1, padding: '10px 4px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: role === 'admin' ? '#14b8a6' : 'transparent', color: 'white', fontWeight: 'bold', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
-                  >
-                    <ShieldAlert size={12} /> Admin
-                  </button>
                 </div>
               </div>
 
