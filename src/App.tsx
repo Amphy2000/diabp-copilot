@@ -222,11 +222,6 @@ function App() {
               <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 DiaBP-Copilot
                 <span className="logo-badge">Nigeria Production</span>
-                {isSupabaseConfigured ? (
-                  <span className="logo-badge" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.3)' }}>✓ Supabase Sync</span>
-                ) : (
-                  <span className="logo-badge" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.3)' }}>⚠ Local Sandbox</span>
-                )}
               </h1>
               <p className="logo-subtitle">AI Diabetes & Hypertension Care Hub</p>
             </div>
