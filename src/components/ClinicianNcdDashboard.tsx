@@ -253,6 +253,9 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
           if (matchedBank) setBankCode(matchedBank.code);
           setAccountNumber(parts[2]);
         }
+        if (parts[3]) {
+          setPayoutEmail(parts[3]);
+        }
       } else {
         setTempSubaccountId('');
       }
@@ -356,7 +359,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
 
       const matchedBank = NIGERIAN_BANKS.find(b => b.code === bankCode);
       const bankName = matchedBank ? matchedBank.name : 'Unknown Bank';
-      const serializedValue = `${resultSubaccountId}|||${bankName}|||${accountNumber}`;
+      const serializedValue = `${resultSubaccountId}|||${bankName}|||${accountNumber}|||${email}`;
 
       setTempSubaccountId(resultSubaccountId);
       setCreateSubaccountSuccess(`Success! Registered Subaccount ID: ${resultSubaccountId}`);
@@ -391,7 +394,8 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
     if (valueToSave && payoutTab === 'automatic' && accountNumber) {
       const matchedBank = NIGERIAN_BANKS.find(b => b.code === bankCode);
       const bankName = matchedBank ? matchedBank.name : 'Unknown Bank';
-      valueToSave = `${valueToSave}|||${bankName}|||${accountNumber}`;
+      const email = payoutEmail.trim() || 'billing@diabp.com';
+      valueToSave = `${valueToSave}|||${bankName}|||${accountNumber}|||${email}`;
     }
 
     if (activeRole === 'clinic') {
