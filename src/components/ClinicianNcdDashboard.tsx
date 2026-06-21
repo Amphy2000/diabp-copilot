@@ -21,7 +21,9 @@ import {
   auditNcdRegimen,
   evaluateNcdRisk,
   NCD_MEDICATIONS,
-  getSystemAlerts
+  getSystemAlerts,
+  dismissSystemAlert,
+  dismissAlertsForPatient
 } from '../services/ncdService';
 import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy, NcdAlert } from '../services/ncdService';
 
@@ -187,8 +189,47 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
     setAuditGlucoseType(latestGlucose.type);
   };
 
-  const handleNudge = (patientName: string, issue: string) => {
+  const handleNudge = async (patientName: string, issue: string) => {
     alert(`WhatsApp Nudge Sent!\nTo: ${patientName}\nMessage: "Good day from your care team. We noticed your ${issue}. Please inspect your feet, log readings, and consult your pharmacist."`);
+    // Auto-dismiss critical alerts for this patient
+    const patient = patients.find(p => p.name === patientName);
+    if (patient) {
+      try {
+        await dismissAlertsForPatient(patient.id, 'critical');
+        const updated = await getSystemAlerts();
+        setAlerts(updated);
+      } catch (err) {
+        console.error("Failed to auto-dismiss alerts on nudge:", err);
+      }
+    }
+  };
+
+  const handleUpdateStatusAndClearAlert = async (orderId: string, status: NcdRefillOrder['status']) => {
+    onUpdateOrderStatus(orderId, status);
+    
+    // Auto-dismiss warning alerts if approved or delivered
+    if (status === 'Approved' || status === 'Delivered') {
+      const order = orders.find(o => o.id === orderId);
+      if (order?.patientId) {
+        try {
+          await dismissAlertsForPatient(order.patientId, 'warning');
+          const updated = await getSystemAlerts();
+          setAlerts(updated);
+        } catch (err) {
+          console.error("Failed to auto-dismiss alerts on status update:", err);
+        }
+      }
+    }
+  };
+
+  const handleDismissAlert = async (alertId: string) => {
+    try {
+      await dismissSystemAlert(alertId);
+      const updated = await getSystemAlerts();
+      setAlerts(updated);
+    } catch (err) {
+      console.error("Failed to dismiss alert:", err);
+    }
   };
 
   const handleToggleMed = (medName: string) => {
@@ -424,7 +465,29 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                   <div key={alertItem.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px', background: 'rgba(255,255,255,0.01)', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', borderLeft: `2px solid ${textColor}` }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontWeight: 'bold', color: 'white', textAlign: 'left' }}>{alertItem.title} ({alertItem.patientName})</span>
-                      <span style={{ fontSize: '8px', padding: '1px 4px', borderRadius: '3px', background: badgeColor, color: textColor, fontWeight: 'bold' }}>{alertItem.type}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '8px', padding: '1px 4px', borderRadius: '3px', background: badgeColor, color: textColor, fontWeight: 'bold' }}>{alertItem.type}</span>
+                        <button
+                          onClick={() => handleDismissAlert(alertItem.id)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer',
+                            padding: '2px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '4px',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = '#34d399'; e.currentTarget.style.background = 'rgba(52, 211, 153, 0.1)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}
+                          title="Mark alert as attended/resolved"
+                        >
+                          <CheckCircle size={12} />
+                        </button>
+                      </div>
                     </div>
                     <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '10px', lineHeight: '1.3', textAlign: 'left' }}>{alertItem.message}</p>
                     <span style={{ fontSize: '8px', color: 'var(--text-muted)', textAlign: 'right' }}>
@@ -1073,7 +1136,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                           <>
                             {order.status === 'Pending Verification' && (
                               <button
-                                onClick={() => onUpdateOrderStatus(order.id, 'Approved')}
+                                onClick={() => handleUpdateStatusAndClearAlert(order.id, 'Approved')}
                                 className="btn-action-table"
                                 disabled={!checklist.rxVerified || !checklist.nafdacAudit}
                                 style={{ 
@@ -1090,7 +1153,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                             )}
                             {order.status === 'Approved' && (
                               <button
-                                onClick={() => onUpdateOrderStatus(order.id, 'Out for Delivery')}
+                                onClick={() => handleUpdateStatusAndClearAlert(order.id, 'Out for Delivery')}
                                 className="btn-action-table"
                                 style={{ background: 'var(--color-blue)' }}
                               >
@@ -1099,7 +1162,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                             )}
                             {order.status === 'Out for Delivery' && (
                               <button
-                                onClick={() => onUpdateOrderStatus(order.id, 'Delivered')}
+                                onClick={() => handleUpdateStatusAndClearAlert(order.id, 'Delivered')}
                                 className="btn-action-table"
                                 style={{ background: 'var(--color-green)' }}
                               >

@@ -728,6 +728,44 @@ export async function createSystemAlert(
   }
 }
 
+export async function dismissSystemAlert(alertId: string): Promise<void> {
+  if (isSupabaseConfigured) {
+    try {
+      const { error } = await supabase
+        .from('ncd_alerts')
+        .delete()
+        .eq('id', alertId);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Failed to delete alert in Supabase:", err);
+    }
+  }
+  // Local storage fallback
+  const currentAlerts = loadLocal(ALERTS_KEY, INITIAL_NCD_ALERTS);
+  const updated = currentAlerts.filter((a: NcdAlert) => a.id !== alertId);
+  saveLocal(ALERTS_KEY, updated);
+}
+
+export async function dismissAlertsForPatient(patientId: string, type: NcdAlert['type']): Promise<void> {
+  if (isSupabaseConfigured) {
+    try {
+      const { error } = await supabase
+        .from('ncd_alerts')
+        .delete()
+        .eq('patient_id', patientId)
+        .eq('type', type);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Failed to delete alerts in Supabase:", err);
+    }
+  }
+  // Local storage fallback
+  const currentAlerts = loadLocal(ALERTS_KEY, INITIAL_NCD_ALERTS);
+  const updated = currentAlerts.filter((a: NcdAlert) => !(a.patientId === patientId && a.type === type));
+  saveLocal(ALERTS_KEY, updated);
+}
+
+
 // ==========================================
 // CLINICAL ANALYTIC METRICS
 // ==========================================
