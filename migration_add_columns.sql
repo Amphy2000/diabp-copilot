@@ -86,4 +86,9 @@ WHERE email = 'amphyfx@gmail.com' OR user_id IN (
   SELECT id FROM auth.users WHERE email = 'amphyfx@gmail.com'
 );
 
+-- 11. Promote amphy2000@gmail.com to Super Admin in user metadata
+UPDATE auth.users
+SET raw_user_meta_data = COALESCE(raw_user_meta_data, '{}'::jsonb) || '{"role": "admin"}'::jsonb
+WHERE email = 'amphy2000@gmail.com';
+
 
