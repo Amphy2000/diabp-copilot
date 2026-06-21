@@ -87,14 +87,60 @@ export const Auth: React.FC = () => {
           throw new Error("Please enter your full name.");
         }
 
+        // 1. Resolve clinic/pharmacy target ID before sign up
+        let targetClinicId = '';
+        let targetPharmacyId = '';
+        let facilityRole = '';
+
+        if (role === 'doctor') {
+          if (onboardOption === 'create') {
+            if (!newFacilityName.trim()) throw new Error("Clinic name is required.");
+            const newClinic = await registerClinic(newFacilityName, newFacilityAddress, newFacilityCity, newFacilityPhone);
+            if (!newClinic || !newClinic.id) {
+              throw new Error("Failed to register the new clinic. Please try again.");
+            }
+            targetClinicId = newClinic.id;
+            facilityRole = 'Admin';
+          } else {
+            targetClinicId = selectedFacilityId;
+            if (!targetClinicId) throw new Error("Please select a clinic to join.");
+            facilityRole = 'Doctor';
+          }
+        } else if (role === 'pharmacist') {
+          if (onboardOption === 'create') {
+            if (!newFacilityName.trim()) throw new Error("Pharmacy name is required.");
+            const newPharmacy = await registerPharmacy(newFacilityName, newFacilityAddress, newFacilityCity, newFacilityPhone);
+            if (!newPharmacy || !newPharmacy.id) {
+              throw new Error("Failed to register the new pharmacy. Please try again.");
+            }
+            targetPharmacyId = newPharmacy.id;
+            facilityRole = 'Owner';
+          } else {
+            targetPharmacyId = selectedFacilityId;
+            if (!targetPharmacyId) throw new Error("Please select a pharmacy to join.");
+            facilityRole = 'Staff';
+          }
+        }
+
+        // 2. Perform Supabase Sign Up with role and facility metadata
+        const userMetadata: any = {
+          role,
+          display_name: fullName
+        };
+        if (targetClinicId) {
+          userMetadata.clinic_id = targetClinicId;
+          userMetadata.facility_role = facilityRole;
+        }
+        if (targetPharmacyId) {
+          userMetadata.pharmacy_id = targetPharmacyId;
+          userMetadata.facility_role = facilityRole;
+        }
+
         const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            data: {
-              role,
-              display_name: fullName
-            }
+            data: userMetadata
           }
         });
 
@@ -102,7 +148,7 @@ export const Auth: React.FC = () => {
         const user = signUpData.user;
         if (!user) throw new Error("Onboarding registration failed. No user object returned.");
 
-        // Role-Specific Onboarding Mutations
+        // 3. Role-Specific Onboarding Mutations
         if (role === 'patient') {
           const profilePayload: PatientNcdProfile = {
             name: fullName,
@@ -125,29 +171,9 @@ export const Auth: React.FC = () => {
           };
           await savePatientProfile(profilePayload, user.id);
         } else if (role === 'doctor') {
-          let targetClinicId = selectedFacilityId;
-          if (onboardOption === 'create') {
-            if (!newFacilityName.trim()) throw new Error("Clinic name is required.");
-            const newClinic = await registerClinic(newFacilityName, newFacilityAddress, newFacilityCity, newFacilityPhone);
-            targetClinicId = newClinic.id;
-            if (!targetClinicId) throw new Error("Please select or create a clinic.");
-            await associateClinician(user.id, targetClinicId, 'Admin', email);
-          } else {
-            if (!targetClinicId) throw new Error("Please select or create a clinic.");
-            await associateClinician(user.id, targetClinicId, 'Doctor', email);
-          }
+          await associateClinician(user.id, targetClinicId, facilityRole as any, email);
         } else if (role === 'pharmacist') {
-          let targetPharmacyId = selectedFacilityId;
-          if (onboardOption === 'create') {
-            if (!newFacilityName.trim()) throw new Error("Pharmacy name is required.");
-            const newPharmacy = await registerPharmacy(newFacilityName, newFacilityAddress, newFacilityCity, newFacilityPhone);
-            targetPharmacyId = newPharmacy.id;
-            if (!targetPharmacyId) throw new Error("Please select or create a pharmacy.");
-            await associatePharmacist(user.id, targetPharmacyId, 'Owner', email);
-          } else {
-            if (!targetPharmacyId) throw new Error("Please select or create a pharmacy.");
-            await associatePharmacist(user.id, targetPharmacyId, 'Staff', email);
-          }
+          await associatePharmacist(user.id, targetPharmacyId, facilityRole as any, email);
         }
 
         // Complete authentication and sign-in directly

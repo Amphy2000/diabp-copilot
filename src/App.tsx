@@ -91,23 +91,33 @@ function App() {
           setPatientProfile(profile);
           setOrders(refillOrders);
         } else        if (role === 'doctor') {
-          let clinicId = clinicsList[0]?.id || '11111111-1111-1111-1111-111111111111';
+          let clinicId = session.user.user_metadata?.clinic_id || clinicsList[0]?.id || '11111111-1111-1111-1111-111111111111';
           let userRoleInFacility: 'admin' | 'staff' = 'staff';
           if (isSupabaseConfigured) {
             try {
-              const { data: clinician } = await supabase
+              const { data: clinician, error } = await supabase
                 .from('ncd_clinicians')
                 .select('clinic_id, role, email')
                 .eq('user_id', session.user.id)
                 .single();
+              if (error) throw error;
               if (clinician?.clinic_id) clinicId = clinician.clinic_id;
               if (clinician?.role === 'Admin' || !clinician?.role || session?.user?.email === 'amphyfx@gmail.com') {
                 userRoleInFacility = 'admin';
               }
-            } catch {}
+            } catch {
+              if (session.user.user_metadata?.clinic_id) {
+                clinicId = session.user.user_metadata.clinic_id;
+              }
+              const metaRole = session.user.user_metadata?.facility_role;
+              if (metaRole === 'Admin' || metaRole === 'Owner' || session?.user?.email === 'amphyfx@gmail.com') {
+                userRoleInFacility = 'admin';
+              }
+            }
           } else {
             const associations = JSON.parse(localStorage.getItem('diabp_mock_clinicians') || '[]');
             const assoc = associations.find((a: any) => a.user_id === session.user.id);
+            if (assoc?.clinic_id) clinicId = assoc.clinic_id;
             if (assoc?.role === 'Admin' || !assoc?.role || session?.user?.email === 'amphyfx@gmail.com') {
               userRoleInFacility = 'admin';
             }
@@ -119,23 +129,33 @@ function App() {
           setPatients(clinicPatients);
           setOrders(refillOrders);
         } else if (role === 'pharmacist') {
-          let pharmacyId = pharmaciesList[0]?.id || 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+          let pharmacyId = session.user.user_metadata?.pharmacy_id || pharmaciesList[0]?.id || 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
           let userRoleInFacility: 'admin' | 'staff' = 'staff';
           if (isSupabaseConfigured) {
             try {
-              const { data: pharmacist } = await supabase
+              const { data: pharmacist, error } = await supabase
                 .from('ncd_pharmacists')
                 .select('pharmacy_id, role, email')
                 .eq('user_id', session.user.id)
                 .single();
+              if (error) throw error;
               if (pharmacist?.pharmacy_id) pharmacyId = pharmacist.pharmacy_id;
               if (pharmacist?.role === 'Owner' || !pharmacist?.role || session?.user?.email === 'amphy2000@gmail.com') {
                 userRoleInFacility = 'admin';
               }
-            } catch {}
+            } catch {
+              if (session.user.user_metadata?.pharmacy_id) {
+                pharmacyId = session.user.user_metadata.pharmacy_id;
+              }
+              const metaRole = session.user.user_metadata?.facility_role;
+              if (metaRole === 'Owner' || metaRole === 'Admin' || session?.user?.email === 'amphy2000@gmail.com') {
+                userRoleInFacility = 'admin';
+              }
+            }
           } else {
             const associations = JSON.parse(localStorage.getItem('diabp_mock_pharmacists') || '[]');
             const assoc = associations.find((a: any) => a.user_id === session.user.id);
+            if (assoc?.pharmacy_id) pharmacyId = assoc.pharmacy_id;
             if (assoc?.role === 'Owner' || !assoc?.role || session?.user?.email === 'amphy2000@gmail.com') {
               userRoleInFacility = 'admin';
             }

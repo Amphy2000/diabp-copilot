@@ -1359,6 +1359,7 @@ export async function registerClinic(name: string, address: string, city: string
       };
     } catch (err) {
       console.error("Clinic registration failed:", err);
+      throw err;
     }
   }
   const newClinic: NcdClinic = { id: `clinic-${Math.random().toString(36).substr(2, 9)}`, name, address, city, contactPhone: phone };
@@ -1389,6 +1390,7 @@ export async function registerPharmacy(name: string, address: string, city: stri
       };
     } catch (err) {
       console.error("Pharmacy registration failed:", err);
+      throw err;
     }
   }
   const newPharmacy: NcdPharmacy = { 
@@ -1430,9 +1432,11 @@ export async function updatePharmacyPrices(pharmacyId: string, prices: { [medId:
 export async function associateClinician(userId: string, clinicId: string, role: 'Doctor' | 'Nurse' | 'Admin', email?: string): Promise<void> {
   if (isSupabaseConfigured) {
     try {
-      await supabase.from('ncd_clinicians').insert([{ user_id: userId, clinic_id: clinicId, role, email }]);
+      const { error } = await supabase.from('ncd_clinicians').insert([{ user_id: userId, clinic_id: clinicId, role, email }]);
+      if (error) throw error;
     } catch (err) {
       console.error("Clinician association failed:", err);
+      throw err;
     }
   } else {
     const associations = JSON.parse(localStorage.getItem('diabp_mock_clinicians') || '[]');
@@ -1444,9 +1448,11 @@ export async function associateClinician(userId: string, clinicId: string, role:
 export async function associatePharmacist(userId: string, pharmacyId: string, role: 'Owner' | 'Staff' = 'Owner', email?: string): Promise<void> {
   if (isSupabaseConfigured) {
     try {
-      await supabase.from('ncd_pharmacists').insert([{ user_id: userId, pharmacy_id: pharmacyId, role, email }]);
+      const { error } = await supabase.from('ncd_pharmacists').insert([{ user_id: userId, pharmacy_id: pharmacyId, role, email }]);
+      if (error) throw error;
     } catch (err) {
       console.error("Pharmacist association failed:", err);
+      throw err;
     }
   } else {
     const associations = JSON.parse(localStorage.getItem('diabp_mock_pharmacists') || '[]');
@@ -1536,7 +1542,10 @@ export async function addFacilityStaff(
       options: {
         data: {
           role: facilityType === 'clinic' ? 'doctor' : 'pharmacist',
-          full_name: fullName
+          full_name: fullName,
+          clinic_id: facilityType === 'clinic' ? facilityId : undefined,
+          pharmacy_id: facilityType === 'pharmacy' ? facilityId : undefined,
+          facility_role: role
         }
       }
     });
