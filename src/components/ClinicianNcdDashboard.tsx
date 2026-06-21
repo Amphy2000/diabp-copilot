@@ -17,7 +17,8 @@ import {
   MapPin,
   Eye,
   ShoppingBag,
-  Lock
+  Lock,
+  CreditCard
 } from 'lucide-react';
 import { 
   auditNcdRegimen,
