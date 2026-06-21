@@ -17,7 +17,8 @@ import {
   getClinics,
   getPharmacies,
   getPatientsForClinic,
-  getPatientsForPharmacy
+  getPatientsForPharmacy,
+  updatePharmacyPrices
 } from './services/ncdService';
 import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy } from './services/ncdService';
 import { PatientNcdDashboard } from './components/PatientNcdDashboard';
@@ -153,6 +154,16 @@ function App() {
       await servicePlaceOrder(newOrder);
     } catch (err) {
       console.error("Failed to place refill order:", err);
+    }
+  };
+
+  const handleUpdatePharmacyPrices = async (pharmacyId: string, prices: { [medId: string]: number }) => {
+    try {
+      await updatePharmacyPrices(pharmacyId, prices);
+      const pharmaciesList = await getPharmacies();
+      setPharmacies(pharmaciesList);
+    } catch (err) {
+      console.error("Failed to update pharmacy prices:", err);
     }
   };
 
@@ -305,6 +316,7 @@ function App() {
               pharmacies={pharmacies}
               userRole={userRole}
               facilityId={userFacilityId}
+              onUpdatePharmacyPrices={handleUpdatePharmacyPrices}
             />
           </div>
         )}

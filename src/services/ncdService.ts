@@ -1286,6 +1286,27 @@ export async function registerPharmacy(name: string, address: string, city: stri
   return newPharmacy;
 }
 
+export async function updatePharmacyPrices(pharmacyId: string, prices: { [medId: string]: number }): Promise<void> {
+  if (isSupabaseConfigured) {
+    try {
+      const { error } = await supabase
+        .from('ncd_pharmacies')
+        .update({ prices })
+        .eq('id', pharmacyId);
+      if (error) throw error;
+      return;
+    } catch (err) {
+      console.error("Failed to update pharmacy prices in Supabase:", err);
+    }
+  }
+  // Local storage fallback
+  const localPharmacies = loadLocal("diabp_pharmacies", MOCK_PHARMACIES);
+  const updated = localPharmacies.map((p: NcdPharmacy) => 
+    p.id === pharmacyId ? { ...p, prices } : p
+  );
+  saveLocal("diabp_pharmacies", updated);
+}
+
 export async function associateClinician(userId: string, clinicId: string, role: 'Doctor' | 'Nurse'): Promise<void> {
   if (isSupabaseConfigured) {
     try {

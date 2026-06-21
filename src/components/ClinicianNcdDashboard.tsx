@@ -37,6 +37,7 @@ interface ClinicianNcdDashboardProps {
   pharmacies: NcdPharmacy[];
   userRole?: 'doctor' | 'pharmacist' | null;
   facilityId?: string | null;
+  onUpdatePharmacyPrices?: (pharmacyId: string, prices: { [medId: string]: number }) => void;
 }
 
 export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({ 
@@ -46,7 +47,8 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   clinics,
   pharmacies,
   userRole,
-  facilityId
+  facilityId,
+  onUpdatePharmacyPrices
 }) => {
   // Multi-Tenant Simulator State
   const [activeRole, setActiveRole] = useState<'clinic' | 'pharmacy'>(
@@ -73,6 +75,8 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<PatientNcdProfile | null>(null);
   const [viewingPrescriptionOrder, setViewingPrescriptionOrder] = useState<NcdRefillOrder | null>(null);
+  const [editingPrices, setEditingPrices] = useState(false);
+  const [tempPrices, setTempPrices] = useState<{ [medId: string]: number }>({});
 
   // Pharmacist Checklist State
   const [checklist, setChecklist] = useState({
@@ -93,6 +97,14 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
       bundlePackaged: false
     });
   }, [selectedPatient]);
+
+  // Load current prices for active pharmacy into temp editing state
+  const activePharmacy = pharmacies.find(p => p.id === activePharmacyId);
+  useEffect(() => {
+    if (editingPrices && activePharmacy) {
+      setTempPrices(activePharmacy.prices || {});
+    }
+  }, [editingPrices, activePharmacyId, pharmacies, activePharmacy]);
 
   // System Alerts state & Automation Toggle
   const [alerts, setAlerts] = useState<NcdAlert[]>([]);
@@ -292,6 +304,28 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                   }
                 </span>
               </div>
+            )}
+            {activeRole === 'pharmacy' && (
+              <button
+                type="button"
+                onClick={() => setEditingPrices(true)}
+                style={{
+                  background: 'rgba(20, 184, 166, 0.15)',
+                  border: '1px solid var(--color-teal-light)',
+                  color: 'white',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  fontSize: '0.7rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                ⚙️ Manage Pricing
+              </button>
             )}
           </div>
         </div>
@@ -1268,6 +1302,181 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                   <ShieldCheck size={14} /> Verify & Approve Signature
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Interactive Pharmacy Pricing Editor Modal Overlay */}
+      {editingPrices && activePharmacy && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#111827',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '550px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', color: 'white' }}>
+                  Manage Pharmacy Pricing
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Pharmacy: <strong>{activePharmacy.name}</strong> ({activePharmacy.city})
+                </p>
+              </div>
+              <button
+                onClick={() => setEditingPrices(false)}
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '30px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{
+              padding: '20px',
+              overflowY: 'auto',
+              maxHeight: '60vh',
+              display: 'flex',
+              flexDirection: 'column',
+              width: '100%',
+              gap: '12px'
+            }}>
+              <p style={{ margin: '0 0 8px 0', fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.4', textAlign: 'left' }}>
+                Customize pricing for your pharmacy. These overrides will apply to any patient who selects <strong>{activePharmacy.name}</strong> as their preferred refill partner.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {NCD_MEDICATIONS.map(med => {
+                  const currentPrice = tempPrices[med.id] !== undefined ? tempPrices[med.id] : med.price;
+                  return (
+                    <div 
+                      key={med.id} 
+                      style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        padding: '12px', 
+                        background: 'rgba(255,255,255,0.02)',
+                        border: '1px solid rgba(255,255,255,0.04)',
+                        borderRadius: '10px',
+                        gap: '16px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                        <span style={{ fontSize: '0.8rem', color: 'white', fontWeight: 'bold', textAlign: 'left' }}>{med.name}</span>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'left', lineHeight: '1.25' }}>{med.description}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', shrink: 0 }}>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 'bold' }}>₦</span>
+                        <input
+                          type="number"
+                          value={currentPrice}
+                          onChange={(e) => {
+                            const val = Math.max(0, Number(e.target.value));
+                            setTempPrices(prev => ({ ...prev, [med.id]: val }));
+                          }}
+                          style={{
+                            width: '90px',
+                            background: 'rgba(0,0,0,0.3)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '6px',
+                            padding: '6px 8px',
+                            color: 'white',
+                            fontSize: '0.75rem',
+                            textAlign: 'right',
+                            outline: 'none',
+                            fontFamily: 'monospace'
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '16px 20px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'rgba(0,0,0,0.2)',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '10px'
+            }}>
+              <button
+                onClick={() => setEditingPrices(false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  background: 'transparent',
+                  color: 'white',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (onUpdatePharmacyPrices) {
+                    await onUpdatePharmacyPrices(activePharmacy.id, tempPrices);
+                  }
+                  setEditingPrices(false);
+                }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'var(--color-teal-light)',
+                  color: 'white',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Save Pricing
+              </button>
             </div>
           </div>
         </div>
