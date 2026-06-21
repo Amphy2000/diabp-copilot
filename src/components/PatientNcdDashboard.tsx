@@ -10,25 +10,29 @@ import {
   Plus,
   Compass,
   Phone,
-  MapPin
+  MapPin,
+  ShoppingBag
 } from 'lucide-react';
 import { 
   evaluateNcdRisk, 
   analyzeFootImage,
   logVitalsEntry,
   logFootScanRecord,
-  getSystemAlerts
+  getSystemAlerts,
+  getRefillTracker
 } from '../services/ncdService';
-import type { PatientNcdProfile, FootScanRecord, NcdClinic, NcdPharmacy, NcdAlert } from '../services/ncdService';
+import type { PatientNcdProfile, FootScanRecord, NcdClinic, NcdPharmacy, NcdAlert, NcdRefillOrder } from '../services/ncdService';
 
 interface PatientNcdDashboardProps {
   profile: PatientNcdProfile;
   onUpdateProfile: (updated: PatientNcdProfile) => void;
   clinics: NcdClinic[];
   pharmacies: NcdPharmacy[];
+  orders: NcdRefillOrder[];
+  onNavigateToRefill: () => void;
 }
 
-export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profile, onUpdateProfile, clinics, pharmacies }) => {
+export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profile, onUpdateProfile, clinics, pharmacies, orders, onNavigateToRefill }) => {
   // Input fields
   const [systolic, setSystolic] = useState<number>(140);
   const [diastolic, setDiastolic] = useState<number>(90);
@@ -214,6 +218,111 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
           {logMessage}
         </div>
       )}
+
+      {/* Refill Supply Tracker Card */}
+      {(() => {
+        const tracker = getRefillTracker(profile.id || 'mock-patient-default', orders);
+        const percentRemaining = Math.min(100, Math.round((tracker.daysRemaining / 30) * 100));
+        const colorClass = tracker.status === 'Overdue' ? '#f87171' : tracker.status === 'Low Supply' ? '#fb923c' : 'var(--color-teal-light)';
+        
+        return (
+          <div className="glass-panel" style={{
+            background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 0.5) 100%)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            padding: '20px',
+            borderRadius: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '16px',
+            marginBottom: '16px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: '250px' }}>
+              {/* Circular conic progress indicator */}
+              <div style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '50%',
+                background: `conic-gradient(${colorClass} ${percentRemaining}%, rgba(255,255,255,0.06) ${percentRemaining}% 100%)`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 0 15px rgba(0,0,0,0.3)',
+                position: 'relative',
+                flexShrink: 0
+              }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  background: '#0d131f',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'column'
+                }}>
+                  <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'white' }}>{tracker.daysRemaining}</span>
+                  <span style={{ fontSize: '7px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>days</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  💊 SafeMeds Refill Adherence Tracker
+                </h4>
+                {tracker.lastRefillDate ? (
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    Last filled on <strong>{tracker.lastRefillDate}</strong>. Next refill due by <strong>{tracker.nextRefillDate}</strong>.
+                  </p>
+                ) : (
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    No orders recorded. Start your monthly care program by ordering your first refill bundle.
+                  </p>
+                )}
+                <span style={{ 
+                  fontSize: '9px', 
+                  background: tracker.status === 'Overdue' ? 'rgba(239, 68, 68, 0.15)' : tracker.status === 'Low Supply' ? 'rgba(251, 146, 60, 0.15)' : 'rgba(20, 184, 166, 0.15)', 
+                  color: colorClass, 
+                  padding: '2px 8px', 
+                  borderRadius: '100px', 
+                  fontWeight: 'bold', 
+                  display: 'inline-flex',
+                  width: 'fit-content',
+                  marginTop: '2px'
+                }}>
+                  {tracker.status === 'Overdue' ? '⚠️ SUPPLY OVERDUE (Adherence at risk)' : 
+                   tracker.status === 'Low Supply' ? '⚠️ SUPPLY RUNNING LOW' : '✓ SUPPLY ACTIVE'}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {tracker.status !== 'Active Supply' && (
+                <button
+                  onClick={onNavigateToRefill}
+                  style={{
+                    background: 'var(--color-teal-light)',
+                    border: 'none',
+                    color: 'white',
+                    padding: '10px 16px',
+                    borderRadius: '8px',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 4px 6px -1px rgba(20, 184, 166, 0.2)'
+                  }}
+                >
+                  <ShoppingBag size={14} /> Request Refill Now
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Grid: Left Vitals Log & Right AI Foot Scanner */}
       <div className="dashboard-grid">

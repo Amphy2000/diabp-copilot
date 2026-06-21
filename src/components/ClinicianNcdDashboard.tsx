@@ -15,7 +15,8 @@ import {
   ShieldCheck,
   Phone,
   MapPin,
-  Eye
+  Eye,
+  ShoppingBag
 } from 'lucide-react';
 import { 
   auditNcdRegimen,
@@ -23,7 +24,8 @@ import {
   NCD_MEDICATIONS,
   getSystemAlerts,
   dismissSystemAlert,
-  dismissAlertsForPatient
+  dismissAlertsForPatient,
+  getRefillTracker
 } from '../services/ncdService';
 import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy, NcdAlert } from '../services/ncdService';
 
@@ -191,11 +193,12 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
 
   const handleNudge = async (patientName: string, issue: string) => {
     alert(`WhatsApp Nudge Sent!\nTo: ${patientName}\nMessage: "Good day from your care team. We noticed your ${issue}. Please inspect your feet, log readings, and consult your pharmacist."`);
-    // Auto-dismiss critical alerts for this patient
+    // Auto-dismiss critical & info alerts for this patient
     const patient = patients.find(p => p.name === patientName);
     if (patient) {
       try {
         await dismissAlertsForPatient(patient.id, 'critical');
+        await dismissAlertsForPatient(patient.id, 'info');
         const updated = await getSystemAlerts();
         setAlerts(updated);
       } catch (err) {
@@ -490,6 +493,29 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                       </div>
                     </div>
                     <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '10px', lineHeight: '1.3', textAlign: 'left' }}>{alertItem.message}</p>
+                    {alertItem.title === 'Refill Reminder Alert' && (
+                      <button
+                        onClick={() => handleNudge(alertItem.patientName || 'Patient', 'chronic medication supply is running low. Please check your refill tracker and place an order.')}
+                        style={{
+                          alignSelf: 'flex-start',
+                          background: 'rgba(20, 184, 166, 0.15)',
+                          border: '1px solid var(--color-teal-light)',
+                          color: 'var(--color-teal-light)',
+                          borderRadius: '4px',
+                          padding: '2px 8px',
+                          fontSize: '9px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          marginTop: '4px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <MessageSquare size={10} /> Send Refill WhatsApp Reminder
+                      </button>
+                    )}
                     <span style={{ fontSize: '8px', color: 'var(--text-muted)', textAlign: 'right' }}>
                       {new Date(alertItem.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
@@ -533,13 +559,14 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                   <th style={{ padding: '10px 8px' }}>Patient Name</th>
                   <th style={{ padding: '10px 8px' }}>Age</th>
                   <th style={{ padding: '10px 8px' }}>Baseline Vitals</th>
+                  <th style={{ padding: '10px 8px', textAlign: 'center' }}>Refill Status</th>
                   <th style={{ padding: '10px 8px', textAlign: 'center' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {searchedPatients.length === 0 ? (
                   <tr>
-                    <td colSpan={4} style={{ padding: '30px 10px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <td colSpan={5} style={{ padding: '30px 10px', textAlign: 'center', color: 'var(--text-muted)' }}>
                       No patients assigned to this facility match your search.
                     </td>
                   </tr>
@@ -563,6 +590,35 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                         <td style={{ padding: '12px 8px' }}>{p.age}</td>
                         <td style={{ padding: '12px 8px' }}>
                           <span style={{ color: '#60a5fa' }}>{latestBp.systolic}/{latestBp.diastolic}</span> | <span style={{ color: '#fb923c' }}>{latestGlucose.level} mg/dL</span>
+                        </td>
+                        <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                          {(() => {
+                            const tracker = getRefillTracker(p.id || 'mock-patient-default', orders);
+                            let color = 'var(--color-teal-light)';
+                            let bg = 'rgba(20, 184, 166, 0.1)';
+                            if (tracker.status === 'Overdue') {
+                              color = '#f87171';
+                              bg = 'rgba(239, 68, 68, 0.12)';
+                            } else if (tracker.status === 'Low Supply') {
+                              color = '#fb923c';
+                              bg = 'rgba(251, 146, 60, 0.12)';
+                            }
+                            return (
+                              <span style={{
+                                fontSize: '10px',
+                                color,
+                                background: bg,
+                                padding: '3px 8px',
+                                borderRadius: '4px',
+                                fontWeight: 'bold',
+                                border: '1px solid rgba(255,255,255,0.02)',
+                                display: 'inline-block',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {tracker.status === 'No Refill Logged' ? 'No Order' : `${tracker.daysRemaining} days left`}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td style={{ padding: '12px 8px', textAlign: 'center' }}>
                           <button
@@ -880,6 +936,57 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Refill Adherence Tracker Panel */}
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ShoppingBag size={14} className="text-teal-400" /> SafeMeds Refill Adherence
+                </h4>
+                {(() => {
+                  const tracker = getRefillTracker(selectedPatient.id || 'mock-patient-default', orders);
+                  const activePharmacyName = pharmacies.find(ph => ph.id === selectedPatient.assignedPharmacyId)?.name || 'H-Medix Pharmacy Wuse II';
+                  
+                  return (
+                    <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '10px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Medication Supply Remaining:</span>
+                        <span style={{ fontWeight: 'bold', color: tracker.status === 'Overdue' ? '#f87171' : tracker.status === 'Low Supply' ? '#fb923c' : 'var(--color-teal-light)' }}>
+                          {tracker.daysRemaining} days ({tracker.status})
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Assigned Pharmacy Partner:</span>
+                        <span style={{ fontWeight: 'bold', color: 'white' }}>{activePharmacyName}</span>
+                      </div>
+                      
+                      {tracker.status !== 'Active Supply' && (
+                        <button
+                          type="button"
+                          onClick={() => handleNudge(selectedPatient.name, `refill is due (only ${tracker.daysRemaining} days left). Please order from ${activePharmacyName}`)}
+                          style={{
+                            background: 'rgba(20, 184, 166, 0.12)',
+                            border: '1px solid var(--color-teal-light)',
+                            color: 'var(--color-teal-light)',
+                            borderRadius: '6px',
+                            padding: '6px 12px',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            marginTop: '4px',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <MessageSquare size={12} /> Send Refill WhatsApp Reminder
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
 
             </div>
           )}

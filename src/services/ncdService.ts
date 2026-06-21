@@ -653,6 +653,11 @@ export async function updateOrderStatus(orderId: string, status: NcdRefillOrder[
 }
 
 export async function getSystemAlerts(): Promise<NcdAlert[]> {
+  // Trigger background check for low refill supplies in a non-blocking way
+  setTimeout(() => {
+    runRefillTrackerAutomation().catch(err => console.error("Refill automation failed:", err));
+  }, 100);
+
   if (isSupabaseConfigured) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -1371,4 +1376,135 @@ export async function associatePharmacist(userId: string, pharmacyId: string): P
     associations.push({ user_id: userId, pharmacy_id: pharmacyId });
     localStorage.setItem('diabp_mock_pharmacists', JSON.stringify(associations));
   }
+}
+
+export interface RefillTrackerInfo {
+  lastRefillDate: string | null;
+  daysRemaining: number;
+  nextRefillDate: string | null;
+  status: 'No Refill Logged' | 'Overdue' | 'Low Supply' | 'Active Supply';
+  latestOrderId?: string;
+}
+
+export function getRefillTracker(patientId: string, patientOrders: NcdRefillOrder[]): RefillTrackerInfo {
+  const relevantOrders = patientOrders.filter(o => 
+    o.patientId === patientId && 
+    (o.status === 'Delivered' || o.status === 'Approved' || o.status === 'Out for Delivery')
+  );
+  
+  if (relevantOrders.length === 0) {
+    return {
+      lastRefillDate: null,
+      daysRemaining: 0,
+      nextRefillDate: null,
+      status: 'No Refill Logged'
+    };
+  }
+  
+  // Sort by date (newest first)
+  const sorted = [...relevantOrders].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const latestOrder = sorted[0];
+  const lastDate = new Date(latestOrder.date);
+  
+  const nextDate = new Date(lastDate);
+  nextDate.setDate(lastDate.getDate() + 30);
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const nextDateClear = new Date(nextDate);
+  nextDateClear.setHours(0, 0, 0, 0);
+  
+  const diffTime = nextDateClear.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  return {
+    lastRefillDate: latestOrder.date,
+    daysRemaining: Math.max(0, diffDays),
+    nextRefillDate: nextDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    status: diffDays <= 0 ? 'Overdue' : diffDays <= 7 ? 'Low Supply' : 'Active Supply',
+    latestOrderId: latestOrder.id
+  };
+}
+
+export async function runRefillTrackerAutomation(): Promise<void> {
+  const currentOrders = await getRefillOrders();
+  const currentAlerts = await getSystemAlertsOnly(); // Query alerts without infinite recursion
+  
+  let patientsList: PatientNcdProfile[] = [];
+  if (isSupabaseConfigured) {
+    try {
+      const { data } = await supabase.from('ncd_profiles').select('*');
+      if (data) {
+        patientsList = data.map(p => ({
+          id: p.id,
+          name: p.name,
+          age: p.age,
+          weight: p.weight,
+          conditions: p.conditions,
+          baselineBp: p.baseline_bp,
+          targetGlucoseRange: p.target_glucose_range,
+          streakDays: p.streak_days,
+          activeMeds: p.active_meds,
+          assignedClinicId: p.assigned_clinic_id,
+          assignedPharmacyId: p.assigned_pharmacy_id,
+          phone: p.phone,
+          address: p.address,
+          bpHistory: [],
+          glucoseHistory: [],
+          footScanHistory: []
+        }));
+      }
+    } catch {}
+  }
+  
+  if (patientsList.length === 0) {
+    const allProfiles = loadLocal('diabp_profiles', {});
+    patientsList = Object.values(allProfiles);
+    if (patientsList.length === 0) {
+      patientsList = [{ ...INITIAL_NCD_PATIENT, id: 'mock-patient-default' }];
+    }
+  }
+
+  const allPharmacies = await getPharmacies();
+
+  for (const patient of patientsList) {
+    const pId = patient.id || 'mock-patient-default';
+    const tracker = getRefillTracker(pId, currentOrders);
+    
+    if (tracker.status === 'Low Supply' || tracker.status === 'Overdue') {
+      const alreadyAlerted = currentAlerts.some(a => 
+        a.patientId === pId && 
+        a.title === 'Refill Reminder Alert' &&
+        (new Date().getTime() - new Date(a.createdAt).getTime()) < 15 * 24 * 60 * 60 * 1000
+      );
+      
+      if (!alreadyAlerted) {
+        const pharmName = allPharmacies.find(ph => ph.id === patient.assignedPharmacyId)?.name || 'H-Medix Pharmacy Wuse II';
+        const message = `Automated nudge dispatched: Patient's chronic supply is running low (${tracker.daysRemaining} days left). Assigned refill partner: ${pharmName}.`;
+        
+        await createSystemAlert(pId, 'Refill Reminder Alert', message, 'info');
+      }
+    }
+  }
+}
+
+// Internal alerts query helper to bypass automated cron recursions
+async function getSystemAlertsOnly(): Promise<NcdAlert[]> {
+  if (isSupabaseConfigured) {
+    try {
+      const { data } = await supabase.from('ncd_alerts').select('*, ncd_profiles(name)').order('created_at', { ascending: false });
+      if (data) {
+        return data.map(a => ({
+          id: a.id,
+          patientId: a.patient_id,
+          patientName: (a.ncd_profiles as any)?.name || "Unknown Patient",
+          title: a.title,
+          message: a.message,
+          type: a.type as any,
+          createdAt: a.created_at
+        }));
+      }
+    } catch {}
+  }
+  return loadLocal(ALERTS_KEY, INITIAL_NCD_ALERTS);
 }

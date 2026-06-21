@@ -285,6 +285,8 @@ function App() {
                 onUpdateProfile={handleUpdateProfile} 
                 clinics={clinics}
                 pharmacies={pharmacies}
+                orders={orders}
+                onNavigateToRefill={() => setPatientTab('refills')}
               />
             )}
             
