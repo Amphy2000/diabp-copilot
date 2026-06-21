@@ -30,6 +30,29 @@ import {
   getRefillTracker
 } from '../services/ncdService';
 import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy, NcdAlert } from '../services/ncdService';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
+
+const NIGERIAN_BANKS = [
+  { code: '044', name: 'Access Bank' },
+  { code: '058', name: 'GTBank' },
+  { code: '057', name: 'Zenith Bank' },
+  { code: '033', name: 'United Bank for Africa (UBA)' },
+  { code: '011', name: 'First Bank of Nigeria' },
+  { code: '232', name: 'Sterling Bank' },
+  { code: '070', name: 'Fidelity Bank' },
+  { code: '030', name: 'Heritage Bank' },
+  { code: '082', name: 'Keystone Bank' },
+  { code: '076', name: 'Polaris Bank' },
+  { code: '221', name: 'Stanbic IBTC Bank' },
+  { code: '068', name: 'Standard Chartered Bank' },
+  { code: '215', name: 'Unity Bank' },
+  { code: '035', name: 'Wema Bank' },
+  { code: '050', name: 'Ecobank' },
+  { code: '214', name: 'First City Monument Bank (FCMB)' },
+  { code: '101', name: 'Providus Bank' },
+  { code: '305', name: 'Union Bank' }
+];
+
 
 const getRiskClass = (risk: 'Low' | 'Medium' | 'High' | 'Emergency') => {
   return risk.toLowerCase();
@@ -71,6 +94,9 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
     userRole === 'pharmacist' && facilityId ? facilityId : (pharmacies[0]?.id || null)
   );
 
+  const activeClinic = clinics.find(c => c.id === activeClinicId);
+  const activePharmacy = pharmacies.find(p => p.id === activePharmacyId);
+
   // Sync state if user logs in/changes facility dynamically
   useEffect(() => {
     if (userRole === 'doctor' && facilityId) {
@@ -100,6 +126,13 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   // Payout / Subaccount states
   const [editingPayout, setEditingPayout] = useState(false);
   const [tempSubaccountId, setTempSubaccountId] = useState('');
+  const [payoutTab, setPayoutTab] = useState<'manual' | 'automatic'>('automatic');
+  const [bankCode, setBankCode] = useState('044');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [payoutEmail, setPayoutEmail] = useState('');
+  const [isCreatingSubaccount, setIsCreatingSubaccount] = useState(false);
+  const [createSubaccountError, setCreateSubaccountError] = useState('');
+  const [createSubaccountSuccess, setCreateSubaccountSuccess] = useState('');
 
   const handleUpgradeFacility = (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,14 +227,95 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   // Load current subaccount ID when opening payout modal
   useEffect(() => {
     if (editingPayout) {
+      setCreateSubaccountError('');
+      setCreateSubaccountSuccess('');
+      setAccountNumber('');
+      
+      const activeFacilityName = activeRole === 'clinic' ? activeClinic?.name : activePharmacy?.name;
+      const defaultEmail = activeFacilityName 
+        ? `${activeFacilityName.toLowerCase().replace(/[^a-z0-9]/g, '')}@diabp-partner.com` 
+        : 'billing@diabp.com';
+      setPayoutEmail(defaultEmail);
+
       if (activeRole === 'clinic') {
         setTempSubaccountId(activeClinic?.subaccountId || '');
       } else {
-        const activePharmacy = pharmacies.find(p => p.id === activePharmacyId);
         setTempSubaccountId(activePharmacy?.subaccountId || '');
       }
     }
-  }, [editingPayout, activeRole, activeClinicId, activePharmacyId, clinics, pharmacies]);
+  }, [editingPayout, activeRole, activeClinicId, activePharmacyId, clinics, pharmacies, activeClinic, activePharmacy]);
+
+  const handleCreateSubaccount = async () => {
+    if (!accountNumber || accountNumber.length < 10) {
+      setCreateSubaccountError("Please enter a valid 10-digit account number.");
+      return;
+    }
+
+    setIsCreatingSubaccount(true);
+    setCreateSubaccountError('');
+    setCreateSubaccountSuccess('');
+
+    const facilityName = activeRole === 'clinic' ? activeClinic?.name : activePharmacy?.name;
+    const businessName = facilityName || (activeRole === 'clinic' ? 'DiaBP Clinic' : 'DiaBP Pharmacy');
+    const email = payoutEmail.trim() || 'billing@diabp.com';
+
+    try {
+      let resultSubaccountId = '';
+
+      if (isSupabaseConfigured) {
+        const { data, error } = await supabase.functions.invoke('create-subaccount', {
+          body: {
+            account_bank: bankCode,
+            account_number: accountNumber,
+            business_name: businessName,
+            business_email: email
+          }
+        });
+
+        if (error) {
+          throw new Error(error.message || 'Failed to communicate with subaccount creation service.');
+        }
+
+        if (data?.status === 'error' || data?.error) {
+          throw new Error(data.message || data.error || 'Flutterwave subaccount creation failed.');
+        }
+
+        if (!data?.data?.subaccount_id) {
+          throw new Error('No subaccount ID returned from registration.');
+        }
+
+        resultSubaccountId = data.data.subaccount_id;
+      } else {
+        // Mock subaccount creation for local playground testing
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        resultSubaccountId = `RS_MOCK_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+      }
+
+      setTempSubaccountId(resultSubaccountId);
+      setCreateSubaccountSuccess(`Success! Registered Subaccount ID: ${resultSubaccountId}`);
+      
+      // Save it to database immediately
+      if (activeRole === 'clinic') {
+        if (activeClinic && onUpdateClinic) {
+          await onUpdateClinic({
+            ...activeClinic,
+            subaccountId: resultSubaccountId
+          });
+        }
+      } else {
+        if (activePharmacy && onUpdatePharmacy) {
+          await onUpdatePharmacy({
+            ...activePharmacy,
+            subaccountId: resultSubaccountId
+          });
+        }
+      }
+    } catch (err: any) {
+      setCreateSubaccountError(err.message || 'An error occurred during subaccount generation.');
+    } finally {
+      setIsCreatingSubaccount(false);
+    }
+  };
 
   const handleSavePayout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,7 +327,6 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
         });
       }
     } else {
-      const activePharmacy = pharmacies.find(p => p.id === activePharmacyId);
       if (activePharmacy && onUpdatePharmacy) {
         await onUpdatePharmacy({
           ...activePharmacy,
@@ -262,7 +375,6 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   }, [selectedPatient]);
 
   // Load current prices for active pharmacy into temp editing state
-  const activePharmacy = pharmacies.find(p => p.id === activePharmacyId);
   useEffect(() => {
     if (editingPrices && activePharmacy) {
       setTempPrices(activePharmacy.prices || {});
@@ -427,8 +539,6 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
     return hasCriticalAlert || strokeRisk === 'High' || strokeRisk === 'Emergency' || diabeticRisk === 'High' || diabeticRisk === 'Emergency';
   });
 
-  const activeClinic = clinics.find(c => c.id === activeClinicId);
-  
   const isFacilityPremium = activeRole === 'clinic' 
     ? (activeClinic?.isPremium || false) 
     : (activePharmacy?.isPremium || false);
@@ -2824,37 +2934,203 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
               </button>
             </div>
 
+            {/* Tab Selector */}
+            <div style={{
+              display: 'flex',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'rgba(0, 0, 0, 0.2)'
+            }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setPayoutTab('automatic');
+                  setCreateSubaccountError('');
+                  setCreateSubaccountSuccess('');
+                }}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: payoutTab === 'automatic' ? 'rgba(255,255,255,0.04)' : 'transparent',
+                  border: 'none',
+                  borderBottom: payoutTab === 'automatic' ? '2px solid var(--color-teal-light)' : '2px solid transparent',
+                  color: payoutTab === 'automatic' ? 'white' : 'var(--text-secondary)',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                ⚡ Automatic Generation
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPayoutTab('manual');
+                  setCreateSubaccountError('');
+                  setCreateSubaccountSuccess('');
+                }}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: payoutTab === 'manual' ? 'rgba(255,255,255,0.04)' : 'transparent',
+                  border: 'none',
+                  borderBottom: payoutTab === 'manual' ? '2px solid var(--color-teal-light)' : '2px solid transparent',
+                  color: payoutTab === 'manual' ? 'white' : 'var(--text-secondary)',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                ✏️ Manual Subaccount ID
+              </button>
+            </div>
+
             {/* Modal Form */}
             <form onSubmit={handleSavePayout} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{
-                fontSize: '0.7rem',
-                color: '#60a5fa',
-                background: 'rgba(59, 130, 246, 0.06)',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                border: '1px solid rgba(59, 130, 246, 0.15)',
-                lineHeight: '1.4'
-              }}>
-                ℹ️ <strong>Flutterwave Split Payments:</strong> Input your subaccount ID below to receive your payout directly from Flutterwave when patients process refills. If left blank, settlements default to the primary system account.
-              </div>
+              
+              {payoutTab === 'automatic' ? (
+                <>
+                  <div style={{
+                    fontSize: '0.7rem',
+                    color: '#10b981',
+                    background: 'rgba(16, 185, 129, 0.06)',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(16, 185, 129, 0.15)',
+                    lineHeight: '1.4'
+                  }}>
+                    💡 <strong>Automatic Payout setup:</strong> Simply choose your bank, enter your account number, and we will programmatically register your settlement channel on Flutterwave. 0% manual merchant setup required!
+                  </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
-                  Flutterwave Subaccount ID
-                </label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. RS_D3E2F4..."
-                  value={tempSubaccountId}
-                  onChange={(e) => setTempSubaccountId(e.target.value)}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '8px', padding: '10px 12px', color: 'white', fontSize: '0.8rem', outline: 'none'
-                  }}
-                />
-              </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                      Select Bank
+                    </label>
+                    <select
+                      value={bankCode}
+                      onChange={(e) => setBankCode(e.target.value)}
+                      style={{
+                        background: '#1f2937', border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px', padding: '10px 12px', color: 'white', fontSize: '0.8rem', outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {NIGERIAN_BANKS.map(bank => (
+                        <option key={bank.code} value={bank.code}>{bank.name}</option>
+                      ))}
+                    </select>
+                  </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                      Bank Account Number (10 Digits)
+                    </label>
+                    <input 
+                      type="text"
+                      maxLength={10}
+                      placeholder="e.g. 0123456789"
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ''))}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px', padding: '10px 12px', color: 'white', fontSize: '0.8rem', outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                      Payout Notification Email
+                    </label>
+                    <input 
+                      type="email"
+                      placeholder="billing@yourfacility.com"
+                      value={payoutEmail}
+                      onChange={(e) => setPayoutEmail(e.target.value)}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px', padding: '10px 12px', color: 'white', fontSize: '0.8rem', outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  {createSubaccountError && (
+                    <div style={{ color: '#ef4444', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                      ❌ {createSubaccountError}
+                    </div>
+                  )}
+
+                  {createSubaccountSuccess && (
+                    <div style={{ color: '#10b981', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                      ✓ {createSubaccountSuccess}
+                    </div>
+                  )}
+
+                  {tempSubaccountId && (
+                    <div style={{ 
+                      fontSize: '0.7rem', color: 'var(--text-secondary)',
+                      background: 'rgba(255,255,255,0.02)', padding: '8px 10px', borderRadius: '6px',
+                      border: '1px dashed rgba(255,255,255,0.1)'
+                    }}>
+                      Current Assigned ID: <code style={{ color: '#60a5fa' }}>{tempSubaccountId}</code>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={isCreatingSubaccount || accountNumber.length < 10}
+                    onClick={handleCreateSubaccount}
+                    style={{
+                      background: 'var(--color-teal-light)', border: 'none', color: 'white',
+                      borderRadius: '8px', padding: '10px 16px', fontSize: '0.75rem', fontWeight: 'bold', 
+                      cursor: accountNumber.length < 10 || isCreatingSubaccount ? 'not-allowed' : 'pointer',
+                      opacity: accountNumber.length < 10 || isCreatingSubaccount ? 0.6 : 1,
+                      display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px'
+                    }}
+                  >
+                    {isCreatingSubaccount ? (
+                      <>
+                        <svg style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite', display: 'inline-block', verticalAlign: 'middle' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Registering Bank...
+                      </>
+                    ) : 'Register Account & Generate Payouts'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div style={{
+                    fontSize: '0.7rem',
+                    color: '#60a5fa',
+                    background: 'rgba(59, 130, 246, 0.06)',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(59, 130, 246, 0.15)',
+                    lineHeight: '1.4'
+                  }}>
+                    ℹ️ <strong>Manual Flutterwave Subaccount:</strong> If you already have an existing Flutterwave Subaccount ID (e.g. <code>RS_C8A8E89B...</code>), paste it below to link your settlement bank instantly.
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                      Flutterwave Subaccount ID
+                    </label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. RS_D3E2F4..."
+                      value={tempSubaccountId}
+                      onChange={(e) => setTempSubaccountId(e.target.value)}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px', padding: '10px 12px', color: 'white', fontSize: '0.8rem', outline: 'none'
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '12px' }}>
                 <button
                   type="button"
                   onClick={() => setEditingPayout(false)}
@@ -2872,7 +3148,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                     borderRadius: '8px', padding: '8px 16px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer'
                   }}
                 >
-                  Save Settings
+                  Confirm & Save
                 </button>
               </div>
             </form>
