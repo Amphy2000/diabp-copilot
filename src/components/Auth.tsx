@@ -11,7 +11,7 @@ import {
   INITIAL_NCD_PATIENT
 } from '../services/ncdService';
 import type { NcdClinic, NcdPharmacy, PatientNcdProfile } from '../services/ncdService';
-import { Activity, Loader2, AlertCircle, Sparkles, Building, User, Users } from 'lucide-react';
+import { Activity, Loader2, AlertCircle, Sparkles, Building, User, Users, ShieldAlert } from 'lucide-react';
 
 export const Auth: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -21,7 +21,7 @@ export const Auth: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   
   // Registration Role Selection
-  const [role, setRole] = useState<'patient' | 'doctor' | 'pharmacist'>('patient');
+  const [role, setRole] = useState<'patient' | 'doctor' | 'pharmacist' | 'admin'>('patient');
   
   // Basic Info
   const [fullName, setFullName] = useState('');
@@ -277,23 +277,30 @@ export const Auth: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setRole('patient')}
-                    style={{ flex: 1, padding: '10px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: role === 'patient' ? '#14b8a6' : 'transparent', color: 'white', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                    style={{ flex: 1, padding: '10px 4px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: role === 'patient' ? '#14b8a6' : 'transparent', color: 'white', fontWeight: 'bold', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                   >
-                    <User size={14} /> Patient
+                    <User size={12} /> Patient
                   </button>
                   <button
                     type="button"
                     onClick={() => setRole('doctor')}
-                    style={{ flex: 1, padding: '10px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: role === 'doctor' ? '#14b8a6' : 'transparent', color: 'white', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                    style={{ flex: 1, padding: '10px 4px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: role === 'doctor' ? '#14b8a6' : 'transparent', color: 'white', fontWeight: 'bold', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                   >
-                    <Users size={14} /> Doctor/MD
+                    <Users size={12} /> Doctor
                   </button>
                   <button
                     type="button"
                     onClick={() => setRole('pharmacist')}
-                    style={{ flex: 1, padding: '10px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: role === 'pharmacist' ? '#14b8a6' : 'transparent', color: 'white', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                    style={{ flex: 1, padding: '10px 4px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: role === 'pharmacist' ? '#14b8a6' : 'transparent', color: 'white', fontWeight: 'bold', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                   >
-                    <Building size={14} /> Pharmacy
+                    <Building size={12} /> Pharmacy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRole('admin')}
+                    style={{ flex: 1, padding: '10px 4px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: role === 'admin' ? '#14b8a6' : 'transparent', color: 'white', fontWeight: 'bold', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                  >
+                    <ShieldAlert size={12} /> Admin
                   </button>
                 </div>
               </div>

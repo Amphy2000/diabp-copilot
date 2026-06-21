@@ -166,6 +166,53 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
     currentGlucose.type as any
   );
 
+  // Stabilization and improvement analytics
+  const bpHistory = profile.bpHistory || [];
+  let bpStabilizationText = "Log vitals daily to see stabilization trends.";
+  let bpStabPercent = 0;
+  if (bpHistory.length >= 2) {
+    const initialSystolic = bpHistory[0].systolic;
+    const latestSystolic = bpHistory[bpHistory.length - 1].systolic;
+    if (initialSystolic > latestSystolic) {
+      bpStabPercent = Math.round(((initialSystolic - latestSystolic) / initialSystolic) * 100);
+      bpStabilizationText = `BP stabilized by ${bpStabPercent}% (Systolic reduced from ${initialSystolic} to ${latestSystolic} mmHg)`;
+    } else if (initialSystolic === latestSystolic) {
+      bpStabilizationText = `BP stabilized & consistent at ${latestSystolic} mmHg`;
+    } else {
+      bpStabilizationText = `BP fluctuations monitored. Current: ${latestSystolic} mmHg (Baseline: ${initialSystolic} mmHg)`;
+    }
+  }
+
+  const glucoseHistory = profile.glucoseHistory || [];
+  let glucoseStabilizationText = "Log glucose to track stabilization trends.";
+  let glucoseStabPercent = 0;
+  if (glucoseHistory.length >= 2) {
+    const initialGluc = glucoseHistory[0].level;
+    const latestGluc = glucoseHistory[glucoseHistory.length - 1].level;
+    if (initialGluc > latestGluc) {
+      glucoseStabPercent = Math.round(((initialGluc - latestGluc) / initialGluc) * 100);
+      glucoseStabilizationText = `Glucose levels improved by ${glucoseStabPercent}% (from ${initialGluc} to ${latestGluc} mg/dL)`;
+    } else if (initialGluc === latestGluc) {
+      glucoseStabilizationText = `Glucose stable at ${latestGluc} mg/dL`;
+    } else {
+      glucoseStabilizationText = `Glucose levels fluctuate. Current: ${latestGluc} mg/dL (Baseline: ${initialGluc} mg/dL)`;
+    }
+  }
+
+  const streakDays = profile.streakDays || 0;
+  let streakMilestoneText = "";
+  if (streakDays >= 30) {
+    streakMilestoneText = "🏆 Champion of Health (30-day streak landmark reached!)";
+  } else if (streakDays >= 14) {
+    streakMilestoneText = "🛡️ Habits Master (14-day streak achieved!)";
+  } else if (streakDays >= 7) {
+    streakMilestoneText = "🔥 Weekly Warrior (7-day care routine maintained!)";
+  } else if (streakDays >= 3) {
+    streakMilestoneText = "🌱 Seedling (3-day vitals streak reached!)";
+  } else {
+    streakMilestoneText = `🚀 Care Starter (${streakDays} days active. Log daily to reach 3-day milestone!)`;
+  }
+
   // Handle logging a new BP / Glucose reading
   const handleLogVitals = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -444,6 +491,67 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
           </div>
         );
       })()}
+
+      {/* "How My Life Is Improving" Health Milestone Panel */}
+      <div className="glass-panel" style={{
+        background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.08) 0%, rgba(59, 130, 246, 0.05) 100%)',
+        border: '1px solid rgba(20, 184, 166, 0.15)',
+        padding: '24px',
+        borderRadius: '16px',
+        marginBottom: '16px',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        {/* Decorative background element */}
+        <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '100px', height: '100px', borderRadius: '50%', background: 'rgba(20, 184, 166, 0.1)', filter: 'blur(30px)' }}></div>
+        
+        <h3 style={{ margin: '0 0 16px 0', fontSize: '0.95rem', color: 'white', fontWeight: 800, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '1.2rem' }}>✨</span> How My Life Is Improving
+        </h3>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+          
+          {/* BP Stabilization Card */}
+          <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.04)', padding: '16px', borderRadius: '12px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Heart className="w-5 h-5 text-red-400" />
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>BP Stabilization</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white', marginTop: '4px', lineHeight: '1.3' }}>
+                {bpStabilizationText}
+              </div>
+            </div>
+          </div>
+
+          {/* Glucose Stabilization Card */}
+          <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.04)', padding: '16px', borderRadius: '12px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(249, 115, 22, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Activity className="w-5 h-5 text-orange-400" />
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Glucose Stabilization</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white', marginTop: '4px', lineHeight: '1.3' }}>
+                {glucoseStabilizationText}
+              </div>
+            </div>
+          </div>
+
+          {/* Adherence Streak Milestones */}
+          <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.04)', padding: '16px', borderRadius: '12px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(20, 184, 166, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <ShieldCheck className="w-5 h-5 text-teal-400" />
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Streak Milestone</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white', marginTop: '4px', lineHeight: '1.3' }}>
+                {streakMilestoneText}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
 
       {/* Grid: Left Vitals Log & Right AI Foot Scanner */}
       <div className="dashboard-grid">

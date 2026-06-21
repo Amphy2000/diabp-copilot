@@ -91,6 +91,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   const [activeRole, setActiveRole] = useState<'clinic' | 'pharmacy'>(
     userRole === 'pharmacist' ? 'pharmacy' : 'clinic'
   );
+  const [workspaceRole, setWorkspaceRole] = useState<'admin' | 'staff'>('admin');
   const [activeClinicId, setActiveClinicId] = useState<string | null>(
     userRole === 'doctor' && facilityId ? facilityId : (clinics[0]?.id || null)
   );
@@ -622,6 +623,10 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
     ? (activeClinic?.isPremium || false) 
     : (activePharmacy?.isPremium || false);
 
+  const completedOrdersList = filteredOrders.filter(o => o.status === 'Delivered' || o.status === 'Out for Delivery');
+  const totalRevenue = completedOrdersList.reduce((acc, curr) => acc + (curr.totalNaira || 0), 0);
+  const activePatientsCount = filteredPatients.length;
+
   return (
     <div className="space-y-6 animate-fade-in" style={{ paddingBottom: '30px' }}>
       
@@ -703,8 +708,21 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                 </span>
               </div>
             )}
+
+            {/* Facility Workspace Role Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 10px', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', fontSize: '0.75rem', color: 'white', fontWeight: 'bold' }}>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Workspace Role:</span>
+              <select
+                value={workspaceRole}
+                onChange={(e) => setWorkspaceRole(e.target.value as 'admin' | 'staff')}
+                style={{ background: '#1c1c1e', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                <option value="admin">Owner/Admin</option>
+                <option value="staff">Staff/Dispenser</option>
+              </select>
+            </div>
             
-            {activeRole === 'pharmacy' && (
+            {workspaceRole === 'admin' && activeRole === 'pharmacy' && (
               <button
                 type="button"
                 onClick={() => {
@@ -734,7 +752,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
               </button>
             )}
 
-            {!isFacilityPremium && (
+            {workspaceRole === 'admin' && !isFacilityPremium && (
               <button
                 type="button"
                 onClick={() => {
@@ -760,26 +778,28 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={() => setEditingPayout(true)}
-              style={{
-                background: 'rgba(59, 130, 246, 0.15)',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
-                color: 'white',
-                borderRadius: '8px',
-                padding: '8px 12px',
-                fontSize: '0.7rem',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              💳 Payout Settings
-            </button>
+            {workspaceRole === 'admin' && (
+              <button
+                type="button"
+                onClick={() => setEditingPayout(true)}
+                style={{
+                  background: 'rgba(59, 130, 246, 0.15)',
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  color: 'white',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  fontSize: '0.7rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                💳 Payout Settings
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -833,6 +853,71 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
           </button>
         </div>
       )}
+
+      {/* Facility Revenue Analytics Card */}
+      <div className="glass-panel" style={{ padding: '20px', marginBottom: '16px', background: 'rgba(13, 17, 23, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+        <h3 style={{ margin: '0 0 16px 0', fontSize: '0.85rem', color: 'white', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <CreditCard className="w-4 h-4 text-teal-400" />
+          {activeRole === 'clinic' ? 'Clinic Financial & Patient Analytics' : 'Pharmacy Revenue & Fulfillment Analytics'}
+        </h3>
+
+        {workspaceRole === 'admin' ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+            <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '12px', textAlign: 'left' }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Total Refills Revenue</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--color-teal-light)', marginTop: '4px' }}>
+                ₦{totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '2px' }}>Gross refills processed</div>
+            </div>
+
+            <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '12px', textAlign: 'left' }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Net Payout (95%)</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#38bdf8', marginTop: '4px' }}>
+                ₦{(totalRevenue * 0.95).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '2px' }}>Settled to bank account</div>
+            </div>
+
+            <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '12px', textAlign: 'left' }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Platform Commission (5%)</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#f87171', marginTop: '4px' }}>
+                ₦{(totalRevenue * 0.05).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '2px' }}>DiaBP system split commission</div>
+            </div>
+
+            <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '12px', textAlign: 'left' }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Active Patients</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#eab308', marginTop: '4px' }}>
+                {activePatientsCount}
+              </div>
+              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '2px' }}>Currently assigned and managed</div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ 
+            background: 'rgba(255, 255, 255, 0.01)', 
+            border: '1px solid rgba(255,255,255,0.03)', 
+            padding: '24px', 
+            borderRadius: '12px', 
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}>
+            <Lock className="w-8 h-8 text-red-400" style={{ opacity: 0.8 }} />
+            <h4 style={{ margin: 0, fontSize: '0.85rem', color: '#f87171', fontWeight: 'bold' }}>
+              Financial Revenue Analytics Locked
+            </h4>
+            <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-secondary)', maxWidth: '380px' }}>
+              Financial reporting, commission splits, and settlement details are only accessible to the Owner or designated Admin role. Contact your facility manager to adjust permissions.
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Triage & Automation Control Center */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', marginBottom: '8px' }}>

@@ -26,13 +26,14 @@ import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy } from '
 import { PatientNcdDashboard } from './components/PatientNcdDashboard';
 import { NcdSafeMeds } from './components/NcdSafeMeds';
 import { ClinicianNcdDashboard } from './components/ClinicianNcdDashboard';
+import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { Auth } from './components/Auth';
 import { supabase, isSupabaseConfigured } from './services/supabase';
 
 function App() {
   // Authentication State
   const [session, setSession] = useState<any>(null);
-  const [userRole, setUserRole] = useState<'patient' | 'doctor' | 'pharmacist' | null>(null);
+  const [userRole, setUserRole] = useState<'patient' | 'doctor' | 'pharmacist' | 'admin' | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
   const [userFacilityId, setUserFacilityId] = useState<string | null>(null);
 
@@ -134,6 +135,18 @@ function App() {
       await savePatientProfile(updated);
     } catch (err) {
       console.error("Failed to save patient profile:", err);
+    }
+  };
+
+  const handleUpdatePatientProfile = async (updated: PatientNcdProfile) => {
+    try {
+      await savePatientProfile(updated);
+      setPatients(prev => prev.map(p => p.id === updated.id ? updated : p));
+      if (patientProfile && patientProfile.id === updated.id) {
+        setPatientProfile(updated);
+      }
+    } catch (err) {
+      console.error("Failed to update patient profile from admin:", err);
     }
   };
 
@@ -314,6 +327,19 @@ function App() {
               />
             )}
 
+          </div>
+        ) : userRole === 'admin' ? (
+          // ================= SUPER ADMIN VIEW =================
+          <div className="space-y-6">
+            <SuperAdminDashboard 
+              patients={patients}
+              clinics={clinics}
+              pharmacies={pharmacies}
+              orders={orders}
+              onUpdateClinic={handleUpdateClinic}
+              onUpdatePharmacy={handleUpdatePharmacy}
+              onUpdatePatientProfile={handleUpdatePatientProfile}
+            />
           </div>
         ) : (
           // ================= CLINICIAN / PHARMACIST VIEW =================
