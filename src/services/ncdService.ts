@@ -76,6 +76,37 @@ export interface NcdPharmacy {
   prices?: { [medId: string]: number };
 }
 
+export interface NcdAlert {
+  id: string;
+  patientId: string;
+  patientName?: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'critical' | 'success';
+  createdAt: string;
+}
+
+export const INITIAL_NCD_ALERTS: NcdAlert[] = [
+  {
+    id: "alert-1",
+    patientId: "4cf427cf-0ec4-4fde-a623-76b9f148e8d4",
+    patientName: "Chief Chinedu Eze",
+    title: "SMS Dose Reminder Sent",
+    message: "Nudge dispatched: 'Dear Chief Eze, please log your blood pressure today to continue your 8-day streak.'",
+    type: "info",
+    createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString()
+  },
+  {
+    id: "alert-2",
+    patientId: "4cf427cf-0ec4-4fde-a623-76b9f148e8d4",
+    patientName: "Chief Chinedu Eze",
+    title: "System Refill Check",
+    message: "Auto-audit: Patient has logged 8 stable days. Prescription Refill eligibility is active.",
+    type: "success",
+    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+  }
+];
+
 // Initial fallback mock datasets representing Chief Chinedu Eze
 export const INITIAL_NCD_PATIENT: PatientNcdProfile = {
   name: "Chief Chinedu Eze",
@@ -187,6 +218,7 @@ export const NCD_MEDICATIONS = [
 
 const PROFILE_KEY = "diabp_patient_profile";
 const ORDERS_KEY = "diabp_refill_orders";
+const ALERTS_KEY = "diabp_system_alerts";
 
 function isValidUuid(id: any): boolean {
   if (typeof id !== 'string') return false;
@@ -406,6 +438,29 @@ export async function logVitalsEntry(
   
   await savePatientProfile(profile);
 
+  // Trigger automated system alert notifications based on vital risk logs
+  const { strokeRisk, diabeticRisk, bpWarning, glucoseWarning } = evaluateNcdRisk(systolic, diastolic, glucose, glucoseType);
+  const patientId = profile.id || '4cf427cf-0ec4-4fde-a623-76b9f148e8d4';
+  
+  if (strokeRisk === 'Emergency' || strokeRisk === 'High' || diabeticRisk === 'Emergency' || diabeticRisk === 'High') {
+    const riskType = (strokeRisk === 'Emergency' || strokeRisk === 'High') ? 'Blood Pressure' : 'Blood Sugar';
+    const warningMsg = (strokeRisk === 'Emergency' || strokeRisk === 'High') ? bpWarning : glucoseWarning;
+    
+    await createSystemAlert(
+      patientId,
+      `Critical ${riskType} Logged`,
+      `Vitals warning: ${systolic}/${diastolic} mmHg, Glucose ${glucose} mg/dL. SMS alert nudged to patient. Clinical team notified.`,
+      'critical'
+    );
+  } else {
+    await createSystemAlert(
+      patientId,
+      'Stable Vitals Logged',
+      `Vitals logged within safe limits: ${systolic}/${diastolic} mmHg, Glucose ${glucose} mg/dL. Streak is now ${profile.streakDays} days!`,
+      'success'
+    );
+  }
+
   if (isSupabaseConfigured) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -498,9 +553,49 @@ export async function getRefillOrders(): Promise<NcdRefillOrder[]> {
  * Places a new Refill Order
  */
 export async function placeRefillOrder(order: NcdRefillOrder): Promise<void> {
+  // 1. Run Auto-Approval Rule Engine
+  const patientId = order.patientId || '4cf427cf-0ec4-4fde-a623-76b9f148e8d4';
+  const profile = await getPatientProfile(patientId);
+  const bpHistory = profile.bpHistory || [];
+  const glucoseHistory = profile.glucoseHistory || [];
+  
+  const latestBp = bpHistory[bpHistory.length - 1] || { systolic: 120, diastolic: 80 };
+  const latestGlucose = glucoseHistory[glucoseHistory.length - 1] || { level: 100, type: 'Fasting' };
+  
+  const { strokeRisk, diabeticRisk } = evaluateNcdRisk(
+    latestBp.systolic,
+    latestBp.diastolic,
+    latestGlucose.level,
+    latestGlucose.type as any
+  );
+  
+  const isStable = (strokeRisk !== 'High' && strokeRisk !== 'Emergency' && diabeticRisk !== 'High' && diabeticRisk !== 'Emergency');
+  const hasPrescription = order.prescriptionUploaded;
+  
+  let finalStatus: NcdRefillOrder['status'] = 'Pending Verification';
+  let logTitle = "Refill Held for Review";
+  let logMsg = `Refill ${order.id} placed. Held for clinician audit: latest vitals (${latestBp.systolic}/${latestBp.diastolic} mmHg) are outside safe target bounds.`;
+  let logType: NcdAlert['type'] = 'warning';
+  
+  const isAutoRefillEnabled = localStorage.getItem('diabp_auto_refill_automation') !== 'false';
+
+  if (isAutoRefillEnabled && isStable && hasPrescription) {
+    finalStatus = 'Approved';
+    logTitle = "Refill Auto-Approved";
+    logMsg = `Refill ${order.id} auto-approved. Vitals stable (${latestBp.systolic}/${latestBp.diastolic} mmHg). Dispatching SMS notification.`;
+    logType = 'success';
+  } else if (!hasPrescription) {
+    logMsg = `Refill ${order.id} held. Missing verified prescription documents or details.`;
+  }
+  
+  order.status = finalStatus;
+
+  // 2. Save locally and log alert
   const currentOrders = await getRefillOrders();
   const updatedOrders = [order, ...currentOrders];
   saveLocal(ORDERS_KEY, updatedOrders);
+
+  await createSystemAlert(patientId, logTitle, logMsg, logType);
 
   if (isSupabaseConfigured) {
     try {
@@ -545,6 +640,82 @@ export async function updateOrderStatus(orderId: string, status: NcdRefillOrder[
     } catch (err: any) {
       console.error("Supabase order status update failed:", err);
       alert("Supabase status update failed: " + (err.message || JSON.stringify(err)));
+    }
+  }
+}
+
+export async function getSystemAlerts(): Promise<NcdAlert[]> {
+  if (isSupabaseConfigured) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      let query = supabase.from('ncd_alerts').select('*, ncd_profiles(name)');
+      if (user) {
+        const role = user.user_metadata?.role;
+        if (role === 'patient') {
+          query = query.eq('patient_id', user.id);
+        }
+      }
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (error) {
+        if (error.code === '42P01') return loadLocal(ALERTS_KEY, INITIAL_NCD_ALERTS);
+        throw error;
+      }
+      if (data) {
+        return data.map(a => ({
+          id: a.id,
+          patientId: a.patient_id,
+          patientName: (a.ncd_profiles as any)?.name || "Unknown Patient",
+          title: a.title,
+          message: a.message,
+          type: a.type as any,
+          createdAt: a.created_at
+        }));
+      }
+    } catch (err) {
+      console.error("Supabase alerts load failed, using local storage:", err);
+    }
+  }
+  return loadLocal(ALERTS_KEY, INITIAL_NCD_ALERTS);
+}
+
+export async function createSystemAlert(
+  patientId: string,
+  title: string,
+  message: string,
+  type: NcdAlert['type']
+): Promise<void> {
+  const currentAlerts = await getSystemAlerts();
+  
+  let patientName = "Chief Chinedu Eze";
+  try {
+    const profile = await getPatientProfile(patientId);
+    if (profile?.name) patientName = profile.name;
+  } catch {}
+
+  const newAlert: NcdAlert = {
+    id: `alert-${Math.random().toString(36).substr(2, 9)}`,
+    patientId,
+    patientName,
+    title,
+    message,
+    type,
+    createdAt: new Date().toISOString()
+  };
+
+  const updatedAlerts = [newAlert, ...currentAlerts];
+  saveLocal(ALERTS_KEY, updatedAlerts);
+
+  if (isSupabaseConfigured) {
+    try {
+      const { error } = await supabase.from('ncd_alerts').insert([{
+        patient_id: patientId,
+        title,
+        message,
+        type
+      }]);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Supabase alert insertion failed:", err);
     }
   }
 }

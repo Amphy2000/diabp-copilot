@@ -17,9 +17,10 @@ import {
 import { 
   auditNcdRegimen,
   evaluateNcdRisk,
-  NCD_MEDICATIONS
+  NCD_MEDICATIONS,
+  getSystemAlerts
 } from '../services/ncdService';
-import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy } from '../services/ncdService';
+import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy, NcdAlert } from '../services/ncdService';
 
 interface ClinicianNcdDashboardProps {
   orders: NcdRefillOrder[];
@@ -85,6 +86,25 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
       bundlePackaged: false
     });
   }, [selectedPatient]);
+
+  // System Alerts state & Automation Toggle
+  const [alerts, setAlerts] = useState<NcdAlert[]>([]);
+  const [autoRefillEnabled, setAutoRefillEnabled] = useState<boolean>(
+    localStorage.getItem('diabp_auto_refill_automation') !== 'false'
+  );
+
+  useEffect(() => {
+    getSystemAlerts().then(setAlerts);
+    const interval = setInterval(() => {
+      getSystemAlerts().then(setAlerts);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [patients, orders]);
+
+  const handleToggleAutoRefill = (val: boolean) => {
+    setAutoRefillEnabled(val);
+    localStorage.setItem('diabp_auto_refill_automation', String(val));
+  };
 
   // Auditor form states (linked to selected patient when opened)
   const [auditAge, setAuditAge] = useState<number>(50);
@@ -157,9 +177,18 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
     patientMeds
   );
 
-  const getRiskClass = (risk: 'Low' | 'Medium' | 'High' | 'Emergency') => {
-    return risk.toLowerCase();
-  };
+  const triagePatients = filteredPatients.filter(p => {
+    const hasCriticalAlert = alerts.some(a => a.patientId === p.id && a.type === 'critical');
+    const latestBp = p.bpHistory[p.bpHistory.length - 1] || { systolic: 120, diastolic: 80 };
+    const latestGlucose = p.glucoseHistory[p.glucoseHistory.length - 1] || { level: 100, type: 'Fasting' };
+    const { strokeRisk, diabeticRisk } = evaluateNcdRisk(
+      latestBp.systolic,
+      latestBp.diastolic,
+      latestGlucose.level,
+      latestGlucose.type as any
+    );
+    return hasCriticalAlert || strokeRisk === 'High' || strokeRisk === 'Emergency' || diabeticRisk === 'High' || diabeticRisk === 'Emergency';
+  });
 
   return (
     <div className="space-y-6 animate-fade-in" style={{ paddingBottom: '30px' }}>
@@ -244,6 +273,113 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
             )}
           </div>
         </div>
+      </div>
+
+      {/* Triage & Automation Control Center */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', marginBottom: '8px' }}>
+        
+        {/* Triage & Auto-Refill Panel */}
+        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h4 style={{ margin: 0, fontSize: '0.85rem', color: '#f87171', fontWeight: 800, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <ShieldAlert className="w-4 h-4 text-red-400 animate-pulse" /> Critical Triage Queue
+            </h4>
+            
+            {/* Auto-Refill Automation Switch */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '4px 8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ fontSize: '10px', fontWeight: 'bold', color: autoRefillEnabled ? 'var(--color-teal-light)' : 'var(--text-muted)' }}>
+                {autoRefillEnabled ? '🤖 Auto-Refill: ON' : '🤖 Auto-Refill: OFF'}
+              </span>
+              <input
+                type="checkbox"
+                checked={autoRefillEnabled}
+                onChange={(e) => handleToggleAutoRefill(e.target.checked)}
+                style={{ cursor: 'pointer', accentColor: 'var(--color-teal-light)' }}
+              />
+            </div>
+          </div>
+
+          {triagePatients.length === 0 ? (
+            <div style={{ padding: '20px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', borderRadius: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
+              ✓ All patient vitals are stable. No triage actions required.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '140px', overflowY: 'auto' }}>
+              {triagePatients.map(p => {
+                const latestBp = p.bpHistory[p.bpHistory.length - 1] || { systolic: 120, diastolic: 80 };
+                return (
+                  <div 
+                    key={p.id}
+                    onClick={() => handleOpenPatientFile(p)}
+                    style={{ 
+                      padding: '8px 10px', 
+                      background: 'rgba(239, 68, 68, 0.05)', 
+                      border: '1px solid rgba(239, 68, 68, 0.15)', 
+                      borderRadius: '8px', 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="triage-queue-item"
+                  >
+                    <div>
+                      <div style={{ fontWeight: 'bold', color: 'white', fontSize: '12px', textAlign: 'left' }}>{p.name}</div>
+                      <div style={{ fontSize: '10px', color: '#f87171', marginTop: '2px', textAlign: 'left' }}>
+                        Critical BP: {latestBp.systolic}/{latestBp.diastolic} mmHg
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '10px', color: 'var(--color-teal-light)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                      Review File <ArrowRight size={10} />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Live System Automation activity feed */}
+        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <h4 style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-teal-light)', fontWeight: 800, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Activity className="w-4 h-4 text-teal-400" /> System Automation & Reminders Log
+          </h4>
+
+          {alerts.length === 0 ? (
+            <div style={{ padding: '20px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', borderRadius: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
+              No automation actions logged.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '140px', overflowY: 'auto', paddingRight: '4px' }}>
+              {alerts.slice(0, 10).map(alertItem => {
+                let badgeColor = 'rgba(56, 189, 248, 0.12)';
+                let textColor = '#38bdf8';
+                if (alertItem.type === 'critical') {
+                  badgeColor = 'rgba(239, 68, 68, 0.12)';
+                  textColor = '#f87171';
+                } else if (alertItem.type === 'success') {
+                  badgeColor = 'rgba(16, 185, 129, 0.12)';
+                  textColor = '#34d399';
+                }
+
+                return (
+                  <div key={alertItem.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px', background: 'rgba(255,255,255,0.01)', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', borderLeft: `2px solid ${textColor}` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 'bold', color: 'white', textAlign: 'left' }}>{alertItem.title} ({alertItem.patientName})</span>
+                      <span style={{ fontSize: '8px', padding: '1px 4px', borderRadius: '3px', background: badgeColor, color: textColor, fontWeight: 'bold' }}>{alertItem.type}</span>
+                    </div>
+                    <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '10px', lineHeight: '1.3', textAlign: 'left' }}>{alertItem.message}</p>
+                    <span style={{ fontSize: '8px', color: 'var(--text-muted)', textAlign: 'right' }}>
+                      {new Date(alertItem.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
       </div>
 
       {/* 2. Grid Layout: Left Registry Directory & Right Auditing Detail File */}

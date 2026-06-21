@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Heart, 
   Activity, 
@@ -14,9 +14,10 @@ import {
   evaluateNcdRisk, 
   analyzeFootImage,
   logVitalsEntry,
-  logFootScanRecord
+  logFootScanRecord,
+  getSystemAlerts
 } from '../services/ncdService';
-import type { PatientNcdProfile, FootScanRecord, NcdClinic, NcdPharmacy } from '../services/ncdService';
+import type { PatientNcdProfile, FootScanRecord, NcdClinic, NcdPharmacy, NcdAlert } from '../services/ncdService';
 
 interface PatientNcdDashboardProps {
   profile: PatientNcdProfile;
@@ -32,6 +33,13 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
   const [glucose, setGlucose] = useState<number>(130);
   const [glucoseType, setGlucoseType] = useState<'Fasting' | 'Post-Meal'>('Fasting');
   const [logMessage, setLogMessage] = useState<string | null>(null);
+
+  // System Notifications
+  const [alerts, setAlerts] = useState<NcdAlert[]>([]);
+  
+  useEffect(() => {
+    getSystemAlerts().then(setAlerts);
+  }, [profile]);
 
   // Foot scanner simulation states
   const [scanning, setScanning] = useState<boolean>(false);
@@ -185,6 +193,61 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
               </p>
             </div>
 
+          </div>
+
+          {/* System Notifications & Automated Alerts Log */}
+          <div className="glass-panel" style={{ background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.4) 100%)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="card-header-divider" style={{ marginBottom: '12px' }}>
+              <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Activity className="card-title-icon text-teal-400 animate-pulse" />
+                Live Care Reminders & System Alerts
+              </h3>
+            </div>
+
+            {alerts.length === 0 ? (
+              <p className="scan-status-info" style={{ textAlign: 'center', padding: '1.5rem 0' }}>No active notifications.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '180px', overflowY: 'auto', paddingRight: '4px' }}>
+                {alerts.map((alertItem) => {
+                  let badgeColor = 'rgba(56, 189, 248, 0.15)';
+                  let textColor = '#38bdf8';
+                  if (alertItem.type === 'critical') {
+                    badgeColor = 'rgba(239, 68, 68, 0.15)';
+                    textColor = '#f87171';
+                  } else if (alertItem.type === 'success') {
+                    badgeColor = 'rgba(16, 185, 129, 0.15)';
+                    textColor = '#34d399';
+                  }
+                  
+                  return (
+                    <div 
+                      key={alertItem.id} 
+                      style={{ 
+                        padding: '10px 12px', 
+                        background: 'rgba(255,255,255,0.02)', 
+                        borderRadius: '8px', 
+                        borderLeft: `3px solid ${textColor}`, 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '4px',
+                        fontSize: '12px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 'bold', color: 'white', textAlign: 'left' }}>{alertItem.title}</span>
+                        <span style={{ fontSize: '9px', padding: '2px 6px', borderRadius: '4px', background: badgeColor, color: textColor, fontWeight: 'bold', textTransform: 'uppercase' }}>
+                          {alertItem.type}
+                        </span>
+                      </div>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '11px', lineHeight: '1.35', margin: '0', textAlign: 'left' }}>{alertItem.message}</p>
+                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', textAlign: 'right' }}>
+                        {new Date(alertItem.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Vitals Logger Form */}

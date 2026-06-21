@@ -18,3 +18,13 @@ ADD COLUMN IF NOT EXISTS pharmacy_id UUID REFERENCES ncd_pharmacies(id) ON DELET
 
 ALTER TABLE ncd_orders 
 ADD COLUMN IF NOT EXISTS prescription_details TEXT DEFAULT NULL;
+
+-- 4. Create System Alerts Table
+CREATE TABLE IF NOT EXISTS ncd_alerts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_id UUID REFERENCES ncd_profiles(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  type TEXT NOT NULL, -- 'info', 'warning', 'critical', 'success'
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
