@@ -419,6 +419,7 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
         const hasLoggedVitals = (profile.bpHistory || []).length > 5;
         const hasCareTeam = !!profile.assignedClinicId || !!profile.assignedPharmacyId;
         const hasFootScan = (profile.footScanHistory || []).length > 1;
+        const hasOrder = orders.length > 0;
 
         const envWhatsappNumber = import.meta.env.VITE_WHATSAPP_NUMBER || '+1 415 523 8886';
         const envWhatsappKeyword = import.meta.env.VITE_WHATSAPP_KEYWORD || 'join bet-sense';
@@ -465,6 +466,15 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
             isCompleted: hasFootScan,
             actionLabel: 'Open Foot Scanner',
             actionClick: () => scrollToSection('foot-scanner')
+          },
+          {
+            id: 'refill',
+            title: 'Order First Refill',
+            description: 'Request your first monthly chronic care medication bundle delivered directly to your door.',
+            instructions: 'Navigate to the SafeMeds Refills tab above to place your delivery order.',
+            isCompleted: hasOrder,
+            actionLabel: 'Go to Refills Shop',
+            actionClick: onNavigateToRefill
           }
         ];
 
@@ -539,7 +549,7 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
             {!collapsedOnboarding && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
                 {onboardingSteps.map((step, idx) => {
-                  const IconComponent = step.id === 'phone' ? Phone : step.id === 'vitals' ? Activity : step.id === 'team' ? Compass : Camera;
+                  const IconComponent = step.id === 'phone' ? Phone : step.id === 'vitals' ? Activity : step.id === 'team' ? Compass : step.id === 'refill' ? ShoppingBag : Camera;
                   return (
                     <div
                       key={step.id}
