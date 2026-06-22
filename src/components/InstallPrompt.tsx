@@ -26,15 +26,12 @@ export const InstallPrompt: React.FC = () => {
       return;
     }
 
-    if (ios) {
-      setShowPrompt(true);
-      return;
-    }
+    // Show the banner by default if not installed
+    setShowPrompt(true);
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setShowPrompt(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -105,7 +102,9 @@ export const InstallPrompt: React.FC = () => {
           <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', lineHeight: '1.4' }}>
             {isIOS 
               ? "To install on your iPhone, tap the Share button (square with arrow up) in Safari and select 'Add to Home Screen'."
-              : "Add DiaBP-Copilot to your home screen for quick health tracking, faster loading times, and offline access."
+              : deferredPrompt
+                ? "Add DiaBP-Copilot to your home screen for quick health tracking, faster loading times, and offline access."
+                : "To install, tap your browser menu (the three dots ⋮ in Chrome) and select 'Install app' or 'Add to Home Screen'."
             }
           </p>
         </div>
