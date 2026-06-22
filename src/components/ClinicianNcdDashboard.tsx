@@ -114,7 +114,7 @@ const pitchSlides = [
     subtitle: "Engaging patients where they already are",
     bullets: [
       "💬 98% of patients already use WhatsApp daily. No app download is required.",
-      "⚡ Self-onboard in 60 seconds by texting 'join bet-sense' to +1 415 523 8886.",
+      "⚡ Patients self-onboard in 60 seconds by messaging our WhatsApp Care Line.",
       "📈 Automated nudge schedules check in on patients when they forget to track."
     ]
   },

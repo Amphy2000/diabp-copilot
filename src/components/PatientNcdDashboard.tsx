@@ -661,6 +661,7 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
         const hasLoggedVitals = (profile.bpHistory || []).length > 5;
         const hasCareTeam = !!profile.assignedClinicId || !!profile.assignedPharmacyId;
         const hasFootScan = (profile.footScanHistory || []).length > 1;
+        const hasOrder = orders.length > 0;
         const envWhatsappNumber = import.meta.env.VITE_WHATSAPP_NUMBER || '+1 415 523 8886';
         const envWhatsappKeyword = import.meta.env.VITE_WHATSAPP_KEYWORD || 'join bet-sense';
         const waCleanNumber = envWhatsappNumber.replace(/\s+/g, '').replace(/[^\d+]/g, '');

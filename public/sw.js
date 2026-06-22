@@ -44,6 +44,7 @@ self.addEventListener('fetch', (event) => {
 });
 
 // State for background reminders (held in service worker memory)
+let userRole = null;
 let reminderConfig = {
   enabled: false,
   reminderTime: '08:00',
@@ -54,7 +55,7 @@ let reminderConfig = {
 
 // Background reminder check interval (runs in the Service Worker thread)
 setInterval(() => {
-  if (!reminderConfig.enabled) return;
+  if (!reminderConfig.enabled || userRole !== 'patient') return;
 
   const now = new Date();
   const currentHours = String(now.getHours()).padStart(2, '0');
@@ -109,6 +110,43 @@ self.addEventListener('message', (event) => {
     self.registration.showNotification(title, options);
   }
 
+  else if (event.data.type === 'SYNC_USER_ROLE') {
+    userRole = event.data.payload.role;
+  }
+
+  else if (event.data.type === 'DISPATCH_SYSTEM_BROADCAST') {
+    const { title, body, target } = event.data.payload;
+    
+    // Check role mapping
+    const isClinician = ['doctor', 'pharmacist', 'admin'].includes(userRole);
+    const roleMatches = 
+      target === 'all' ||
+      (target === 'clinicians' && isClinician) ||
+      (target === 'patients' && userRole === 'patient');
+
+    if (roleMatches) {
+      const options = {
+        body,
+        icon: '/favicon.svg',
+        badge: '/favicon.svg',
+        vibrate: [200, 100, 200],
+        tag: 'diabp-copilot-system-broadcast',
+        data: { target }
+      };
+      self.registration.showNotification(title, options);
+    }
+
+    // Broadcast message to all open tabs
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      clientList.forEach((client) => {
+        client.postMessage({
+          type: 'SYSTEM_BROADCAST_BROADCAST',
+          payload: event.data.payload
+        });
+      });
+    });
+  }
+
   else if (event.data.type === 'SYNC_REMINDER_SETTINGS') {
     const { enabled, reminderTime, streakDays, hasLoggedToday } = event.data.payload;
     reminderConfig.enabled = enabled;
@@ -123,18 +161,21 @@ self.addEventListener('message', (event) => {
     // Update reminder state locally in Service Worker immediately so we do not notify them again today
     reminderConfig.hasLoggedToday = true;
 
-    // 1. Instantly display clinician push notification
-    const title = `🚨 Vitals Logged: ${patientName}`;
-    const body = `BP: ${systolic}/${diastolic} mmHg | Glucose: ${glucose > 0 ? `${glucose} mg/dL (${glucoseType})` : 'N/A'}. Streak: ${streakDays} days!`;
-    const options = {
-      body,
-      icon: '/favicon.svg',
-      badge: '/favicon.svg',
-      vibrate: [200, 100, 200],
-      tag: `vitals-log-${patientId}`,
-      data: { patientId }
-    };
-    self.registration.showNotification(title, options);
+    // 1. Display clinician push notification ONLY if current role is clinician
+    const isClinician = ['doctor', 'pharmacist', 'admin'].includes(userRole);
+    if (isClinician) {
+      const title = `🚨 Vitals Logged: ${patientName}`;
+      const body = `BP: ${systolic}/${diastolic} mmHg | Glucose: ${glucose > 0 ? `${glucose} mg/dL (${glucoseType})` : 'N/A'}. Streak: ${streakDays} days!`;
+      const options = {
+        body,
+        icon: '/favicon.svg',
+        badge: '/favicon.svg',
+        vibrate: [200, 100, 200],
+        tag: `vitals-log-${patientId}`,
+        data: { patientId }
+      };
+      self.registration.showNotification(title, options);
+    }
 
     // 2. Broadcast this log to all open window tabs (clients)
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {

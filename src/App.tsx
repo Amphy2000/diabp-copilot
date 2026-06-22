@@ -6,7 +6,8 @@ import {
   Activity, 
   ShoppingBag,
   Compass,
-  LogOut
+  LogOut,
+  Bell
 } from 'lucide-react';
 import { 
   getPatientProfile,
@@ -55,6 +56,7 @@ function App() {
   // Navigation State
   const [patientTab, setPatientTab] = useState<'dashboard' | 'refills'>('dashboard');
   const [loading, setLoading] = useState(false);
+  const [globalToasts, setGlobalToasts] = useState<any[]>([]);
   const [showSkipLoading, setShowSkipLoading] = useState(false);
 
   useEffect(() => {
@@ -324,7 +326,28 @@ function App() {
     }
   }, []);
 
-  // Listen to BroadcastChannel and Service Worker messages for real-time vitals updates
+  // Synchronize userRole to service worker dynamically
+  useEffect(() => {
+    const syncRole = () => {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SYNC_USER_ROLE',
+          payload: { role: userRole }
+        });
+      }
+    };
+
+    syncRole();
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', syncRole);
+      return () => {
+        navigator.serviceWorker.removeEventListener('controllerchange', syncRole);
+      };
+    }
+  }, [userRole]);
+
+  // Listen to BroadcastChannel and Service Worker messages for real-time updates & system broadcasts
   useEffect(() => {
     const handleVitalsLogged = (payload: any) => {
       const { patientId, patientName, systolic, diastolic, glucose, glucoseType, streakDays } = payload;
@@ -356,8 +379,8 @@ function App() {
       });
 
       // Trigger browser push notification if logged-in user is a clinician/admin
-      const role = session?.user?.user_metadata?.role;
-      if (role === 'doctor' || role === 'pharmacist' || role === 'admin') {
+      const isClinician = userRole === 'doctor' || userRole === 'pharmacist' || userRole === 'admin';
+      if (isClinician) {
         const title = `🚨 Vitals Logged: ${patientName}`;
         const body = `BP: ${systolic}/${diastolic} mmHg | Glucose: ${glucose > 0 ? `${glucose} mg/dL (${glucoseType})` : 'N/A'}. Streak: ${streakDays} days!`;
         
@@ -376,18 +399,82 @@ function App() {
       }
     };
 
+    const handleSystemBroadcast = (payload: any) => {
+      const { title, body, target } = payload;
+      
+      // Target matching filter
+      const isClinician = userRole === 'doctor' || userRole === 'pharmacist' || userRole === 'admin';
+      const roleMatches =
+        target === 'all' ||
+        (target === 'clinicians' && isClinician) ||
+        (target === 'patients' && userRole === 'patient');
+
+      if (!roleMatches) return;
+
+      // Play audio chime/beep (synthesized double-tone C5 -> E5)
+      try {
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+        gainNode.gain.setValueAtTime(0.06, audioCtx.currentTime);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.12);
+        
+        setTimeout(() => {
+          const audioCtx2 = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const osc2 = audioCtx2.createOscillator();
+          const gain2 = audioCtx2.createGain();
+          osc2.connect(gain2);
+          gain2.connect(audioCtx2.destination);
+          osc2.type = 'sine';
+          osc2.frequency.setValueAtTime(659.25, audioCtx2.currentTime); // E5
+          gain2.gain.setValueAtTime(0.06, audioCtx2.currentTime);
+          osc2.start();
+          osc2.stop(audioCtx2.currentTime + 0.2);
+        }, 150);
+      } catch (e) {
+        console.warn("Melodic chime sound failed:", e);
+      }
+
+      // Add to in-app global toasts
+      const toastId = `toast-${Date.now()}-${Math.random()}`;
+      setGlobalToasts(prev => {
+        if (prev.some(t => t.title === title && t.body === body && Date.now() - t.time < 2000)) {
+          return prev;
+        }
+        return [...prev, { id: toastId, title, body, time: Date.now() }];
+      });
+
+      // Auto dismiss after 10 seconds
+      setTimeout(() => {
+        setGlobalToasts(prev => prev.filter(t => t.id !== toastId));
+      }, 10000);
+    };
+
     // 1. BroadcastChannel Listener
     const channel = new BroadcastChannel('diabp-copilot-channel');
     channel.onmessage = (event) => {
-      if (event.data && event.data.type === 'VITALS_LOGGED') {
-        handleVitalsLogged(event.data.payload);
+      if (event.data) {
+        if (event.data.type === 'VITALS_LOGGED') {
+          handleVitalsLogged(event.data.payload);
+        } else if (event.data.type === 'SYSTEM_BROADCAST') {
+          handleSystemBroadcast(event.data.payload);
+        }
       }
     };
 
-    // 2. Service Worker Message Listener (Handles updates when tabs are in background/inactive)
+    // 2. Service Worker Message Listener
     const handleSWMessage = (event: MessageEvent) => {
-      if (event.data && event.data.type === 'VITALS_LOGGED_BROADCAST') {
-        handleVitalsLogged(event.data.payload);
+      if (event.data) {
+        if (event.data.type === 'VITALS_LOGGED_BROADCAST') {
+          handleVitalsLogged(event.data.payload);
+        } else if (event.data.type === 'SYSTEM_BROADCAST_BROADCAST') {
+          handleSystemBroadcast(event.data.payload);
+        }
       }
     };
 
@@ -401,7 +488,7 @@ function App() {
         navigator.serviceWorker.removeEventListener('message', handleSWMessage);
       }
     };
-  }, [session]);
+  }, [session, userRole]);
 
   const handleUpdateProfile = async (updated: PatientNcdProfile) => {
     setPatientProfile(updated);
@@ -808,6 +895,85 @@ function App() {
           userRole={userRole}
           userFacilityId={userFacilityId}
         />
+      )}
+
+      {/* Global in-app toast notification system */}
+      {globalToasts.length > 0 && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '24px',
+          zIndex: 100000,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          width: '100%',
+          maxWidth: '380px',
+          pointerEvents: 'none'
+        }}>
+          {globalToasts.map((toast) => (
+            <div 
+              key={toast.id}
+              style={{
+                background: 'linear-gradient(135deg, #1e1b4b 0%, #0f0c29 100%)',
+                border: '1px solid rgba(139, 92, 246, 0.4)',
+                borderRadius: '12px',
+                padding: '16px',
+                boxShadow: '0 10px 25px -5px rgba(139, 92, 246, 0.25)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                pointerEvents: 'auto',
+                position: 'relative'
+              }}
+            >
+              {/* Close Button */}
+              <button
+                onClick={() => setGlobalToasts(prev => prev.filter(t => t.id !== toast.id))}
+                style={{
+                  position: 'absolute',
+                  top: '12px',
+                  right: '12px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  padding: '4px'
+                }}
+              >
+                ✕
+              </button>
+
+              {/* Toast Header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Bell size={14} style={{ color: 'var(--color-teal-light)' }} />
+                <span style={{ 
+                  fontSize: '0.7rem', 
+                  fontWeight: 'bold', 
+                  textTransform: 'uppercase', 
+                  color: 'var(--color-teal-light)',
+                  letterSpacing: '0.05em'
+                }}>
+                  📢 System Notice
+                </span>
+                <span style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.4)', marginLeft: 'auto', marginRight: '14px' }}>
+                  just now
+                </span>
+              </div>
+
+              {/* Toast Body */}
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>
+                  {toast.title}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.7)', marginTop: '4px', lineHeight: '1.4' }}>
+                  {toast.body}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
     </div>

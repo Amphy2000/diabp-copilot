@@ -155,10 +155,105 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   onDeletePatient,
   onDeleteOrder
 }) => {
-  const [activeTab, setActiveTab] = useState<'facilities' | 'patients' | 'audits' | 'pitchdeck'>('facilities');
+  const [activeTab, setActiveTab] = useState<'facilities' | 'patients' | 'audits' | 'pitchdeck' | 'broadcast'>('facilities');
   const [pitchSlide, setPitchSlide] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  // Broadcast Hub state variables
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastBody, setBroadcastBody] = useState('');
+  const [broadcastTarget, setBroadcastTarget] = useState<'all' | 'clinicians' | 'patients'>('all');
+  const [broadcastStatus, setBroadcastStatus] = useState<string | null>(null);
+
+  const handleDispatchBroadcast = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!broadcastTitle.trim() || !broadcastBody.trim()) return;
+
+    // Post to Service Worker to broadcast system-wide notifications
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'DISPATCH_SYSTEM_BROADCAST',
+        payload: {
+          title: broadcastTitle.trim(),
+          body: broadcastBody.trim(),
+          target: broadcastTarget
+        }
+      });
+    }
+
+    // Post to BroadcastChannel as fallback for active browser tabs
+    const channel = new BroadcastChannel('diabp-copilot-channel');
+    channel.postMessage({
+      type: 'SYSTEM_BROADCAST',
+      payload: {
+        title: broadcastTitle.trim(),
+        body: broadcastBody.trim(),
+        target: broadcastTarget
+      }
+    });
+    channel.close();
+
+    setBroadcastStatus("🚀 Custom push broadcast dispatched successfully!");
+    setBroadcastTitle("");
+    setBroadcastBody("");
+    setTimeout(() => setBroadcastStatus(null), 4000);
+  };
+
+  const handleSendTestClinicianAlert = () => {
+    // Post to Service Worker and BroadcastChannel to trigger simulated clinician vitals log
+    const payload = {
+      patientId: 'simulated-test-patient-id',
+      patientName: 'Simulated Test Patient',
+      systolic: 178,
+      diastolic: 106,
+      glucose: 250,
+      glucoseType: 'Post-Meal' as const,
+      streakDays: 14
+    };
+
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'PATIENT_LOGGED_VITALS',
+        payload
+      });
+    }
+
+    const channel = new BroadcastChannel('diabp-copilot-channel');
+    channel.postMessage({
+      type: 'VITALS_LOGGED',
+      payload
+    });
+    channel.close();
+
+    setBroadcastStatus("🚨 Sent test clinician alert (High risk vitals: 178/106 mmHg, 250 mg/dL)!");
+    setTimeout(() => setBroadcastStatus(null), 4000);
+  };
+
+  const handleSendTestPatientReminder = () => {
+    const payload = {
+      title: "⏰ Daily Health Check-in (Test)",
+      body: "Time to log your blood pressure and glucose readings to keep your 15-day care streak active!",
+      target: 'patients' as const
+    };
+
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'DISPATCH_SYSTEM_BROADCAST',
+        payload
+      });
+    }
+
+    const channel = new BroadcastChannel('diabp-copilot-channel');
+    channel.postMessage({
+      type: 'SYSTEM_BROADCAST',
+      payload
+    });
+    channel.close();
+
+    setBroadcastStatus("⏰ Sent test patient daily reminder push notification!");
+    setTimeout(() => setBroadcastStatus(null), 4000);
+  };
 
   const [commissionRate, setCommissionRate] = useState<number>(() => {
     const stored = localStorage.getItem('diabp_system_commission_rate');
@@ -508,9 +603,16 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
           >
             📢 Pitch Deck & Promo
           </button>
+          <button
+            onClick={() => setActiveTab('broadcast')}
+            className={`tab-btn ${activeTab === 'broadcast' ? 'active' : ''}`}
+            style={{ fontSize: '0.75rem', padding: '8px 16px' }}
+          >
+            📢 Broadcast Hub
+          </button>
         </div>
 
-        {activeTab !== 'pitchdeck' && (
+        {activeTab !== 'pitchdeck' && activeTab !== 'broadcast' && (
           <div style={{ position: 'relative', width: '220px' }}>
             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input 
@@ -1162,6 +1264,221 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               </div>
             </div>
 
+          </div>
+
+        </div>
+      )}
+
+      {activeTab === 'broadcast' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', alignItems: 'start' }}>
+          
+          {/* Left Column: Custom Broadcast Composer */}
+          <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                📢 Custom Push Message Composer
+              </h4>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                Dispatch a real-time system-wide push notification to active or offline users.
+              </p>
+            </div>
+
+            {broadcastStatus && (
+              <div style={{
+                background: 'rgba(20, 184, 166, 0.12)',
+                border: '1px solid rgba(20, 184, 166, 0.3)',
+                borderRadius: '8px',
+                padding: '12px',
+                color: 'var(--color-teal-light)',
+                fontSize: '0.75rem',
+                fontWeight: 'bold'
+              }}>
+                {broadcastStatus}
+              </div>
+            )}
+
+            <form onSubmit={handleDispatchBroadcast} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                  Target Audience
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {(['all', 'clinicians', 'patients'] as const).map((tgt) => (
+                    <button
+                      key={tgt}
+                      type="button"
+                      onClick={() => setBroadcastTarget(tgt)}
+                      style={{
+                        flex: 1,
+                        background: broadcastTarget === tgt ? 'rgba(20, 184, 166, 0.2)' : 'rgba(255,255,255,0.03)',
+                        border: broadcastTarget === tgt ? '1px solid rgba(20, 184, 166, 0.5)' : '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        color: broadcastTarget === tgt ? 'white' : 'var(--text-secondary)',
+                        fontSize: '0.7rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        textTransform: 'capitalize'
+                      }}
+                    >
+                      {tgt === 'all' ? '🌐 Everyone' : tgt === 'clinicians' ? '🥼 Clinicians Only' : '👤 Patients Only'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label htmlFor="broadcast-title" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                  Notification Title
+                </label>
+                <input
+                  id="broadcast-title"
+                  type="text"
+                  placeholder="e.g., Scheduled Maintenance Nudge"
+                  value={broadcastTitle}
+                  onChange={(e) => setBroadcastTitle(e.target.value)}
+                  required
+                  style={{
+                    padding: '10px 12px',
+                    background: 'rgba(0,0,0,0.2)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '8px',
+                    color: 'white',
+                    fontSize: '0.75rem',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label htmlFor="broadcast-body" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                  Notification Message Body
+                </label>
+                <textarea
+                  id="broadcast-body"
+                  rows={4}
+                  placeholder="Type the message contents here... e.g., Reminder: Vitals registry server will undergo a 10 min upgrade at 11 PM."
+                  value={broadcastBody}
+                  onChange={(e) => setBroadcastBody(e.target.value)}
+                  required
+                  style={{
+                    padding: '10px 12px',
+                    background: 'rgba(0,0,0,0.2)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '8px',
+                    color: 'white',
+                    fontSize: '0.75rem',
+                    outline: 'none',
+                    resize: 'none'
+                  }}
+                />
+              </div>
+
+              <button
+                type="submit"
+                style={{
+                  background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
+                  border: 'none',
+                  color: 'white',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 12px rgba(20, 184, 166, 0.25)',
+                  marginTop: '8px'
+                }}
+              >
+                🚀 Dispatch Custom Push Notification
+              </button>
+            </form>
+          </div>
+
+          {/* Right Column: QA Alert Simulation Suite */}
+          <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                🛠️ QA Alert Simulation Suite
+              </h4>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                Simulate production alert events instantly to test notification logic.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{
+                background: 'rgba(255,255,255,0.01)',
+                border: '1px solid rgba(255,255,255,0.04)',
+                borderRadius: '10px',
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'white', display: 'block' }}>
+                  🥼 Clinician Alert Simulation
+                </span>
+                <p style={{ margin: 0, fontSize: '0.65rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                  Simulates a patient logging critical, high-risk vitals via WhatsApp. This will immediately trigger the clinician's audible alarm chime and slide-in toast notification, as well as a native OS notification.
+                </p>
+                <button
+                  onClick={handleSendTestClinicianAlert}
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.12)',
+                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                    color: '#f87171',
+                    borderRadius: '8px',
+                    padding: '10px',
+                    fontSize: '0.7rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    textAlign: 'center'
+                  }}
+                >
+                  🚨 Trigger Test Clinician Vitals Alarm
+                </button>
+              </div>
+
+              <div style={{
+                background: 'rgba(255,255,255,0.01)',
+                border: '1px solid rgba(255,255,255,0.04)',
+                borderRadius: '10px',
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'white', display: 'block' }}>
+                  👤 Patient Check-in Simulation
+                </span>
+                <p style={{ margin: 0, fontSize: '0.65rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                  Simulates the daily NCD tracking reminder nudge sent to patients who forgot to submit readings. This tests the Service Worker interval routine.
+                </p>
+                <button
+                  onClick={handleSendTestPatientReminder}
+                  style={{
+                    background: 'rgba(59, 130, 246, 0.12)',
+                    border: '1px solid rgba(59, 130, 246, 0.25)',
+                    color: '#60a5fa',
+                    borderRadius: '8px',
+                    padding: '10px',
+                    fontSize: '0.7rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    textAlign: 'center'
+                  }}
+                >
+                  ⏰ Trigger Test Patient Daily Nudge
+                </button>
+              </div>
+            </div>
           </div>
 
         </div>
