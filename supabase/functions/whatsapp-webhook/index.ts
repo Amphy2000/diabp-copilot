@@ -149,18 +149,40 @@ serve(async (req) => {
 
     // C. Check Global Menu Command
     if (lower === "menu" || lower === "hello" || lower === "hi") {
-      await saveSession("idle", {});
       if (patient) {
+        await saveSession("idle", {});
         replyText = `Hello ${patient.name}! Welcome back to DiaBP Safe-Meds Assistant.\n\nMain Menu:\n\n*1.* Log Daily Vitals 📈\n*2.* Confirm Monthly Refill 💊\n*3.* Get Health PDF Report 📄\n\nReply with the option number (1, 2 or 3) to choose. Or visit our app at https://diabp-copilot.vercel.app to view your dashboard.`;
+      } else if (sessionState === "clinician_dashboard") {
+        replyText = `Hello! You are registered as a Care Clinician (Doctor/Nurse).\n\nPlease log in to your web dashboard at https://diabp-copilot.vercel.app to manage your registry and patients.`;
+      } else if (sessionState === "pharmacist_dashboard") {
+        replyText = `Hello! You are registered as a Community Pharmacy Partner.\n\nPlease log in to your web dashboard at https://diabp-copilot.vercel.app to view and fulfill monthly refill orders.`;
       } else {
-        await saveSession("onboard_name", {});
-        replyText = `Welcome to DiaBP! I noticed this phone number is not registered in our care network yet. Let's get you set up!\n\nWhat is your full name?`;
+        await saveSession("onboard_role", {});
+        replyText = `Welcome to DiaBP! Let's get you set up. Are you a:\n\n*1.* Patient 🩺\n*2.* Doctor/Clinician 🥼\n*3.* Pharmacist/Pharmacy 💊\n\nReply with the option number (1, 2 or 3) to choose.`;
       }
     }
     // D. Flow State Machine Logic
     else if (!patient) {
-      // Onboarding State Machine for Unregistered Patients
+      // Onboarding State Machine for Unregistered Patients, Doctors, and Pharmacists
       switch (sessionState) {
+        case "onboard_role":
+          if (messageText === "1" || lower.includes("patient")) {
+            tempData.role = "patient";
+            await saveSession("onboard_name", tempData);
+            replyText = "Great! What is your full name?";
+          } else if (messageText === "2" || lower.includes("doctor") || lower.includes("clinician")) {
+            tempData.role = "doctor";
+            await saveSession("onboard_doc_name", tempData);
+            replyText = "Welcome Doctor! What is your full name?";
+          } else if (messageText === "3" || lower.includes("pharmacist") || lower.includes("pharmacy")) {
+            tempData.role = "pharmacist";
+            await saveSession("onboard_pharm_name", tempData);
+            replyText = "Welcome Pharmacy Partner! What is your full name?";
+          } else {
+            replyText = "Please choose a valid option:\n\n*1.* Patient 🩺\n*2.* Doctor/Clinician 🥼\n*3.* Pharmacist/Pharmacy 💊\n\nReply with 1, 2, or 3:";
+          }
+          break;
+
         case "onboard_name":
           tempData.name = messageText;
           await saveSession("onboard_age", tempData);
@@ -246,9 +268,180 @@ serve(async (req) => {
           }
           break;
 
+        // --- CLINICIAN (DOCTOR) ONBOARDING STATE MACHINE ---
+        case "onboard_doc_name":
+          tempData.name = messageText;
+          await saveSession("onboard_doc_clinic", tempData);
+          replyText = `Nice to meet you, *${messageText}*!\n\nWhat is the name of your Clinic or Hospital?`;
+          break;
+
+        case "onboard_doc_clinic":
+          tempData.clinic_name = messageText;
+          await saveSession("onboard_doc_email", tempData);
+          replyText = `Excellent! Please enter your email address. This will be your username to log in to the doctor dashboard:`;
+          break;
+
+        case "onboard_doc_email":
+          const docEmailInput = messageText.trim();
+          if (docEmailInput.includes("@") && docEmailInput.includes(".")) {
+            tempData.email = docEmailInput;
+            await saveSession("onboard_doc_phone", tempData);
+            replyText = `Almost done! What is your 11-digit mobile contact number (e.g. 08012345678)?`;
+          } else {
+            replyText = "Invalid email format. Please enter a valid email address:";
+          }
+          break;
+
+        case "onboard_doc_phone":
+          try {
+            // 1. Create Clinic in database
+            const clinicId = crypto.randomUUID();
+            const { error: clinicErr } = await supabase.from("ncd_clinics").insert([{
+              id: clinicId,
+              name: tempData.clinic_name,
+              address: "Not set yet",
+              city: "Abuja",
+              contact_phone: messageText,
+              is_premium: false
+            }]);
+
+            if (clinicErr) throw clinicErr;
+
+            let authUserId = crypto.randomUUID();
+            
+            // 2. Create Auth User
+            try {
+              const { data: authData, error: authCreateErr } = await supabase.auth.admin.createUser({
+                email: tempData.email,
+                password: messageText, // Temporary password is their phone number
+                email_confirm: true,
+                user_metadata: { 
+                  role: "doctor",
+                  clinic_id: clinicId,
+                  facility_role: "Admin",
+                  display_name: tempData.name
+                }
+              });
+
+              if (authCreateErr) {
+                console.error("[WhatsApp Webhook] Supabase Auth clinician creation error:", authCreateErr.message);
+              } else if (authData?.user?.id) {
+                authUserId = authData.user.id;
+              }
+            } catch (authErr) {
+              console.warn("[WhatsApp Webhook] Auth user create skipped:", authErr.message);
+            }
+
+            // 3. Create Clinician record in database
+            const { error: clinicianErr } = await supabase.from("ncd_clinicians").insert([{
+              user_id: authUserId,
+              clinic_id: clinicId,
+              role: "Admin",
+              email: tempData.email
+            }]);
+
+            if (clinicianErr) throw clinicianErr;
+
+            const registeredEmail = tempData.email;
+            await saveSession("clinician_dashboard", { email: registeredEmail });
+
+            replyText = `✓ Onboarding completed successfully! Your clinic is registered.\n\nClinic: *${tempData.clinic_name}*\nUsername: *${registeredEmail}*\nTemporary Password: *${messageText}*\n\nPlease visit https://diabp-copilot.vercel.app to log in as a Doctor and manage your clinical dashboard.`;
+          } catch (err) {
+            console.error("[WhatsApp Webhook] Doctor onboarding failed:", err);
+            replyText = "Error saving your clinic registry details. Please try again or type *Menu* to restart.";
+            await saveSession("idle", {});
+          }
+          break;
+
+        // --- PHARMACIST ONBOARDING STATE MACHINE ---
+        case "onboard_pharm_name":
+          tempData.name = messageText;
+          await saveSession("onboard_pharm_facility", tempData);
+          replyText = `Nice to meet you, *${messageText}*!\n\nWhat is the name of your Pharmacy?`;
+          break;
+
+        case "onboard_pharm_facility":
+          tempData.pharm_name = messageText;
+          await saveSession("onboard_pharm_email", tempData);
+          replyText = `Excellent! Please enter your email address. This will be your username to log in to the pharmacist dashboard:`;
+          break;
+
+        case "onboard_pharm_email":
+          const pharmEmailInput = messageText.trim();
+          if (pharmEmailInput.includes("@") && pharmEmailInput.includes(".")) {
+            tempData.email = pharmEmailInput;
+            await saveSession("onboard_pharm_phone", tempData);
+            replyText = `Almost done! What is your 11-digit mobile contact number (e.g. 08012345678)?`;
+          } else {
+            replyText = "Invalid email format. Please enter a valid email address:";
+          }
+          break;
+
+        case "onboard_pharm_phone":
+          try {
+            // 1. Create Pharmacy in database
+            const pharmacyId = crypto.randomUUID();
+            const { error: pharmacyErr } = await supabase.from("ncd_pharmacies").insert([{
+              id: pharmacyId,
+              name: tempData.pharm_name,
+              address: "Not set yet",
+              city: "Abuja",
+              contact_phone: messageText,
+              is_verified: true,
+              is_premium: false
+            }]);
+
+            if (pharmacyErr) throw pharmacyErr;
+
+            let authUserId = crypto.randomUUID();
+
+            // 2. Create Auth User
+            try {
+              const { data: authData, error: authCreateErr } = await supabase.auth.admin.createUser({
+                email: tempData.email,
+                password: messageText, // Temporary password is their phone number
+                email_confirm: true,
+                user_metadata: { 
+                  role: "pharmacist",
+                  pharmacy_id: pharmacyId,
+                  facility_role: "Owner",
+                  display_name: tempData.name
+                }
+              });
+
+              if (authCreateErr) {
+                console.error("[WhatsApp Webhook] Supabase Auth pharmacist creation error:", authCreateErr.message);
+              } else if (authData?.user?.id) {
+                authUserId = authData.user.id;
+              }
+            } catch (authErr) {
+              console.warn("[WhatsApp Webhook] Auth user create skipped:", authErr.message);
+            }
+
+            // 3. Create Pharmacist record in database
+            const { error: pharmacistErr } = await supabase.from("ncd_pharmacists").insert([{
+              user_id: authUserId,
+              pharmacy_id: pharmacyId,
+              role: "Owner",
+              email: tempData.email
+            }]);
+
+            if (pharmacistErr) throw pharmacistErr;
+
+            const registeredEmail = tempData.email;
+            await saveSession("pharmacist_dashboard", { email: registeredEmail });
+
+            replyText = `✓ Onboarding completed successfully! Your pharmacy is registered.\n\nPharmacy: *${tempData.pharm_name}*\nUsername: *${registeredEmail}*\nTemporary Password: *${messageText}*\n\nPlease visit https://diabp-copilot.vercel.app to log in as a Pharmacist and manage your pharmacy dashboard.`;
+          } catch (err) {
+            console.error("[WhatsApp Webhook] Pharmacist onboarding failed:", err);
+            replyText = "Error saving your pharmacy registry details. Please try again or type *Menu* to restart.";
+            await saveSession("idle", {});
+          }
+          break;
+
         default:
-          await saveSession("onboard_name", {});
-          replyText = `Welcome to DiaBP! I noticed this phone number is not registered in our care network yet. Let's get you set up!\n\nWhat is your full name?`;
+          await saveSession("onboard_role", {});
+          replyText = `Welcome to DiaBP! Let's get you set up. Are you a:\n\n*1.* Patient 🩺\n*2.* Doctor/Clinician 🥼\n*3.* Pharmacist/Pharmacy 💊\n\nReply with the option number (1, 2 or 3) to choose.`;
           break;
       }
     } else {
