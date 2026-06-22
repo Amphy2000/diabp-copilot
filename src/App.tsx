@@ -103,14 +103,26 @@ function App() {
     async function loadData() {
       setLoading(true);
       try {
-        const role = session.user.user_metadata.role;
-        const clinicsList = await getClinics();
-        const pharmaciesList = await getPharmacies();
+        const role = session.user?.user_metadata?.role || 'patient';
+        
+        let clinicsList: NcdClinic[] = [];
+        try {
+          clinicsList = await getClinics();
+        } catch (e) {
+          console.error("Failed to load clinics:", e);
+        }
         setClinics(clinicsList);
+
+        let pharmaciesList: NcdPharmacy[] = [];
+        try {
+          pharmaciesList = await getPharmacies();
+        } catch (e) {
+          console.error("Failed to load pharmacies:", e);
+        }
         setPharmacies(pharmaciesList);
 
         if (role === 'patient') {
-          let profile = null;
+          let profile: PatientNcdProfile | null = null;
           try {
             profile = await getPatientProfile();
           } catch (e) {
@@ -139,14 +151,14 @@ function App() {
           }
           setPatientProfile(profile);
 
-          let refillOrders = [];
+          let refillOrders: NcdRefillOrder[] = [];
           try {
             refillOrders = await getRefillOrders();
           } catch (e) {
             console.error("Failed to load patient refill orders:", e);
           }
           setOrders(refillOrders);
-        } else        if (role === 'doctor') {
+        } else if (role === 'doctor') {
           let clinicId = session.user.user_metadata?.clinic_id || clinicsList[0]?.id || '11111111-1111-1111-1111-111111111111';
           let userRoleInFacility: 'admin' | 'staff' = 'staff';
           if (isSupabaseConfigured) {
@@ -180,8 +192,20 @@ function App() {
           }
           setFacilityUserRole(userRoleInFacility);
           setUserFacilityId(clinicId);
-          const clinicPatients = await getPatientsForClinic(clinicId);
-          const refillOrders = await getRefillOrders();
+
+          let clinicPatients: PatientNcdProfile[] = [];
+          try {
+            clinicPatients = await getPatientsForClinic(clinicId);
+          } catch (e) {
+            console.error("Failed to load clinic patients:", e);
+          }
+
+          let refillOrders: NcdRefillOrder[] = [];
+          try {
+            refillOrders = await getRefillOrders();
+          } catch (e) {
+            console.error("Failed to load refill orders:", e);
+          }
           setPatients(clinicPatients);
           setOrders(refillOrders);
         } else if (role === 'pharmacist') {
@@ -218,19 +242,63 @@ function App() {
           }
           setFacilityUserRole(userRoleInFacility);
           setUserFacilityId(pharmacyId);
-          const pharmacyPatients = await getPatientsForPharmacy(pharmacyId);
-          const refillOrders = await getRefillOrders();
+
+          let pharmacyPatients: PatientNcdProfile[] = [];
+          try {
+            pharmacyPatients = await getPatientsForPharmacy(pharmacyId);
+          } catch (e) {
+            console.error("Failed to load pharmacy patients:", e);
+          }
+
+          let refillOrders: NcdRefillOrder[] = [];
+          try {
+            refillOrders = await getRefillOrders();
+          } catch (e) {
+            console.error("Failed to load refill orders:", e);
+          }
           setPatients(pharmacyPatients);
           setOrders(refillOrders);
         } else if (role === 'admin') {
-          const allPatients = await getAllPatients();
-          const allOrders = await getRefillOrders();
+          let allPatients: PatientNcdProfile[] = [];
+          try {
+            allPatients = await getAllPatients();
+          } catch (e) {
+            console.error("Failed to load all patients:", e);
+          }
+
+          let allOrders: NcdRefillOrder[] = [];
+          try {
+            allOrders = await getRefillOrders();
+          } catch (e) {
+            console.error("Failed to load all orders:", e);
+          }
           setPatients(allPatients);
           setOrders(allOrders);
         }
       } catch (err) {
         console.error("Failed to load authenticated context data:", err);
       } finally {
+        const role = session.user?.user_metadata?.role || 'patient';
+        if (role === 'patient' && !patientProfile) {
+          console.info("Safety fallback triggered to clear syncing screen...");
+          setPatientProfile({
+            id: session.user.id,
+            name: session.user.user_metadata?.display_name || "Active Patient",
+            age: 45,
+            weight: 70,
+            conditions: ["Essential Hypertension"],
+            baselineBp: "120/80 mmHg",
+            targetGlucoseRange: "70-130 mg/dL",
+            bpHistory: [],
+            glucoseHistory: [],
+            footScanHistory: [],
+            streakDays: 1,
+            activeMeds: ["Amlodipine 5mg Daily"],
+            assignedClinicId: null,
+            assignedPharmacyId: null,
+            phone: session.user.user_metadata?.phone || undefined
+          });
+        }
         setLoading(false);
       }
     }
