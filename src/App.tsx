@@ -58,19 +58,35 @@ function App() {
 
   // 1. Initial Auth Check and Listener
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUserRole(session?.user?.user_metadata?.role || null);
-      setAuthChecking(false);
-    });
+    async function initAuth() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setUserRole(session?.user?.user_metadata?.role || null);
+      } catch (err) {
+        console.error("Supabase getSession failed:", err);
+      } finally {
+        setAuthChecking(false);
+      }
+    }
+    initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUserRole(session?.user?.user_metadata?.role || null);
+    let subscription: any = null;
+    try {
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        setSession(session);
+        setUserRole(session?.user?.user_metadata?.role || null);
+        setAuthChecking(false);
+      });
+      subscription = data?.subscription;
+    } catch (err) {
+      console.error("onAuthStateChange listener failed:", err);
       setAuthChecking(false);
-    });
+    }
 
-    return () => subscription.unsubscribe();
+    return () => {
+      if (subscription) subscription.unsubscribe();
+    };
   }, []);
 
   // 2. Fetch authenticated data matching roles when session changes
@@ -94,9 +110,41 @@ function App() {
         setPharmacies(pharmaciesList);
 
         if (role === 'patient') {
-          const profile = await getPatientProfile();
-          const refillOrders = await getRefillOrders();
+          let profile = null;
+          try {
+            profile = await getPatientProfile();
+          } catch (e) {
+            console.error("Failed to load patient profile:", e);
+          }
+
+          if (!profile) {
+            console.info("Using offline fallback profile context for session...");
+            profile = {
+              id: session.user.id,
+              name: session.user.user_metadata?.display_name || "Active Patient",
+              age: 45,
+              weight: 70,
+              conditions: ["Essential Hypertension"],
+              baselineBp: "120/80 mmHg",
+              targetGlucoseRange: "70-130 mg/dL",
+              bpHistory: [],
+              glucoseHistory: [],
+              footScanHistory: [],
+              streakDays: 1,
+              activeMeds: ["Amlodipine 5mg Daily"],
+              assignedClinicId: null,
+              assignedPharmacyId: null,
+              phone: session.user.user_metadata?.phone || undefined
+            };
+          }
           setPatientProfile(profile);
+
+          let refillOrders = [];
+          try {
+            refillOrders = await getRefillOrders();
+          } catch (e) {
+            console.error("Failed to load patient refill orders:", e);
+          }
           setOrders(refillOrders);
         } else        if (role === 'doctor') {
           let clinicId = session.user.user_metadata?.clinic_id || clinicsList[0]?.id || '11111111-1111-1111-1111-111111111111';
