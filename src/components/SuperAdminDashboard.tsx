@@ -226,6 +226,18 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     });
     channel.close();
 
+    // Also send an in-app visible broadcast so admin sees confirmation immediately
+    const previewChannel = new BroadcastChannel('diabp-copilot-channel');
+    previewChannel.postMessage({
+      type: 'SYSTEM_BROADCAST',
+      payload: {
+        title: '🚨 TEST: Vitals Alert Sent',
+        body: 'Simulated high-risk vitals (178/106 mmHg, 250 mg/dL) dispatched to all clinician dashboards.',
+        target: 'all'
+      }
+    });
+    previewChannel.close();
+
     setBroadcastStatus("🚨 Sent test clinician alert (High risk vitals: 178/106 mmHg, 250 mg/dL)!");
     setTimeout(() => setBroadcastStatus(null), 4000);
   };
@@ -250,6 +262,18 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       payload
     });
     channel.close();
+
+    // Confirm admin sees it immediately via a separate 'all' broadcast
+    const previewChannel = new BroadcastChannel('diabp-copilot-channel');
+    previewChannel.postMessage({
+      type: 'SYSTEM_BROADCAST',
+      payload: {
+        title: '⏰ TEST: Patient Reminder Sent',
+        body: 'Daily health check-in reminder dispatched to all patient dashboards and devices.',
+        target: 'all'
+      }
+    });
+    previewChannel.close();
 
     setBroadcastStatus("⏰ Sent test patient daily reminder push notification!");
     setTimeout(() => setBroadcastStatus(null), 4000);
@@ -574,7 +598,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
       {/* 3. Section Control Tabs & Search */}
       <div className="glass-panel" style={{ padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' as any, flexShrink: 0, maxWidth: '100%', paddingBottom: '4px' }}>
           <button
             onClick={() => setActiveTab('facilities')}
             className={`tab-btn ${activeTab === 'facilities' ? 'active' : ''}`}

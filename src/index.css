@@ -195,6 +195,8 @@ body {
   align-items: center;
   gap: 8px;
   transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tab-btn:hover {

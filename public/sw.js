@@ -117,12 +117,14 @@ self.addEventListener('message', (event) => {
   else if (event.data.type === 'DISPATCH_SYSTEM_BROADCAST') {
     const { title, body, target } = event.data.payload;
     
-    // Check role mapping
-    const isClinician = ['doctor', 'pharmacist', 'admin'].includes(userRole);
+    // When userRole is null (not yet synced), allow all to ensure delivery
+    const isClinician = userRole === null || ['doctor', 'pharmacist', 'admin'].includes(userRole);
+    const isPatient = userRole === null || userRole === 'patient';
     const roleMatches = 
+      userRole === null ||
       target === 'all' ||
       (target === 'clinicians' && isClinician) ||
-      (target === 'patients' && userRole === 'patient');
+      (target === 'patients' && isPatient);
 
     if (roleMatches) {
       const options = {
@@ -161,8 +163,8 @@ self.addEventListener('message', (event) => {
     // Update reminder state locally in Service Worker immediately so we do not notify them again today
     reminderConfig.hasLoggedToday = true;
 
-    // 1. Display clinician push notification ONLY if current role is clinician
-    const isClinician = ['doctor', 'pharmacist', 'admin'].includes(userRole);
+    // 1. Display clinician push notification — allow if role is clinician OR not yet synced (null)
+    const isClinician = userRole === null || ['doctor', 'pharmacist', 'admin'].includes(userRole);
     if (isClinician) {
       const title = `🚨 Vitals Logged: ${patientName}`;
       const body = `BP: ${systolic}/${diastolic} mmHg | Glucose: ${glucose > 0 ? `${glucose} mg/dL (${glucoseType})` : 'N/A'}. Streak: ${streakDays} days!`;

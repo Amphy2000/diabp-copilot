@@ -673,9 +673,9 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
             id: 'phone',
             title: 'Link WhatsApp Bot',
             description: 'Connect your phone to receive daily dose nudges and log vitals via text message.',
-            instructions: `Connect your account by sending a message to our WhatsApp Care Line at ${envWhatsappNumber}.`,
+            instructions: `Click the button below to open WhatsApp and connect to your personal care assistant in one tap.`,
             isCompleted: hasPhone,
-            actionLabel: 'Link WhatsApp Now',
+            actionLabel: '💬 Open WhatsApp & Connect',
             actionUrl: actionUrl
           },
           {

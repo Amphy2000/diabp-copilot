@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   ShieldCheck, 
   Users, 
@@ -102,6 +102,9 @@ function App() {
       if (subscription) subscription.unsubscribe();
     };
   }, []);
+
+  // Ref to the latest loadData so visibilitychange can call it without stale closures
+  const loadDataRef = useRef<(() => Promise<void>) | null>(null);
 
   // 2. Fetch authenticated data matching roles when session changes
   useEffect(() => {
@@ -316,8 +319,20 @@ function App() {
         setLoading(false);
       }
     }
+    loadDataRef.current = loadData;
     loadData();
   }, [session]);
+
+  // Re-fetch profile whenever user returns to the tab (handles mobile background sync lag)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && loadDataRef.current) {
+        loadDataRef.current();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
 
   // Request Notification permission on mount
   useEffect(() => {
@@ -384,6 +399,7 @@ function App() {
         const title = `🚨 Vitals Logged: ${patientName}`;
         const body = `BP: ${systolic}/${diastolic} mmHg | Glucose: ${glucose > 0 ? `${glucose} mg/dL (${glucoseType})` : 'N/A'}. Streak: ${streakDays} days!`;
         
+        // Native push via SW
         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
           navigator.serviceWorker.controller.postMessage({
             type: 'SHOW_NOTIFICATION',
@@ -396,6 +412,14 @@ function App() {
             icon: '/favicon.svg'
           });
         }
+
+        // In-app global toast fallback (always shows, even if OS push is blocked)
+        const toastId = `vitals-${Date.now()}-${Math.random()}`;
+        setGlobalToasts(prev => {
+          if (prev.some(t => t.patientId === patientId && t.systolic === systolic)) return prev;
+          return [...prev, { id: toastId, title, body, patientId, systolic, time: Date.now(), type: 'vitals' }];
+        });
+        setTimeout(() => setGlobalToasts(prev => prev.filter(t => t.id !== toastId)), 10000);
       }
     };
 
