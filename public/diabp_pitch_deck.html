@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DiaBP-Copilot | Clinic & Pharmacy Pitch Presentation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --teal: #14b8a6;
+      --teal-light: #2dd4bf;
+      --dark-card: rgba(17, 24, 39, 0.75);
+      --border: rgba(255, 255, 255, 0.08);
+      --text-primary: #f3f4f6;
+      --text-secondary: #9ca3af;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-primary);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow-x: hidden;
+    }
+
+    header {
+      padding: 24px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      background: rgba(9, 13, 22, 0.5);
+      backdrop-filter: blur(12px);
+      z-index: 10;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-icon {
+      background: linear-gradient(135deg, var(--teal) 0%, #0d9488 100%);
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 1.1rem;
+      color: black;
+      box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+    }
+
+    .logo-text {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      font-size: 1.25rem;
+      letter-spacing: -0.03em;
+      background: linear-gradient(to right, #ffffff, #a3e635);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .print-btn {
+      background: rgba(20, 184, 166, 0.15);
+      border: 1px solid rgba(20, 184, 166, 0.3);
+      color: var(--teal-light);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .print-btn:hover {
+      background: rgba(20, 184, 166, 0.25);
+      transform: translateY(-1px);
+    }
+
+    /* Main Slideshow Viewport */
+    .slideshow-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      position: relative;
+    }
+
+    .slide {
+      display: none;
+      width: 100%;
+      max-width: 900px;
+      background: var(--dark-card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 48px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(20px);
+      position: relative;
+      animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .slide.active {
+      display: block;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(20px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .slide-num {
+      position: absolute;
+      top: 32px;
+      right: 48px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      color: var(--teal-light);
+      background: rgba(20, 184, 166, 0.1);
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+
+    .slide-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 2.2rem;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #ffffff 0%, #d1d5db 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .slide-subtitle {
+      font-size: 1.1rem;
+      color: var(--teal-light);
+      font-weight: 600;
+      margin-bottom: 32px;
+    }
+
+    /* Grid Layouts inside slides */
+    .slide-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 32px;
+      align-items: center;
+    }
+
+    .slide-grid.equal {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .slide-bullets {
+      list-style-type: none;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .slide-bullets li {
+      font-size: 1rem;
+      line-height: 1.6;
+      color: #e5e7eb;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .bullet-icon {
+      color: var(--teal);
+      font-weight: bold;
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+
+    /* Key visual metrics/highlights */
+    .visual-panel {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      text-align: left;
+    }
+
+    .stat-box {
+      border-left: 4px solid var(--teal);
+      padding-left: 16px;
+    }
+
+    .stat-val {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.75rem;
+      font-weight: 900;
+      color: white;
+    }
+
+    .stat-lbl {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* Navigation Footer */
+    .nav-footer {
+      padding: 24px 40px;
+      border-top: 1px solid var(--border);
+      background: rgba(9, 13, 22, 0.4);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .indicators {
+      display: flex;
+      gap: 8px;
+    }
+
+    .ind-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.15);
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .ind-dot.active {
+      background: var(--teal);
+      box-shadow: 0 0 8px var(--teal);
+    }
+
+    .nav-buttons {
+      display: flex;
+      gap: 12px;
+    }
+
+    .nav-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .nav-btn:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .nav-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .nav-btn.primary {
+      background: linear-gradient(135deg, var(--teal) 0%, #0d9488 100%);
+      color: black;
+      border: none;
+    }
+
+    .nav-btn.primary:hover {
+      box-shadow: 0 0 16px rgba(20, 184, 166, 0.4);
+    }
+
+    /* Print/PDF Export Stylesheet */
+    @media print {
+      body {
+        background: white !important;
+        color: black !important;
+      }
+      
+      header, .nav-footer, .print-btn {
+        display: none !important;
+      }
+
+      .slideshow-container {
+        padding: 0 !important;
+      }
+
+      .slide {
+        display: block !important;
+        page-break-after: always;
+        max-width: 100% !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 40px !important;
+        color: black !important;
+      }
+
+      .slide-title {
+        color: black !important;
+        background: none !important;
+        -webkit-text-fill-color: initial !important;
+      }
+
+      .slide-subtitle {
+        color: #0d9488 !important;
+      }
+
+      .bullet-icon {
+        color: #0d9488 !important;
+      }
+
+      .slide-bullets li, .stat-lbl, .stat-val {
+        color: black !important;
+      }
+
+      .visual-panel {
+        background: #f3f4f6 !important;
+        border: 1px solid #e5e7eb !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top bar -->
+  <header>
+    <div class="logo-container">
+      <div class="logo-icon">🥼</div>
+      <div class="logo-title-group">
+        <div class="logo-text">DiaBP-Copilot</div>
+      </div>
+    </div>
+    <div>
+      <button class="print-btn" onclick="window.print()">📥 Export as PDF / Print Slides</button>
+    </div>
+  </header>
+
+  <!-- Main Slide Viewport -->
+  <div class="slideshow-container">
+
+    <!-- Slide 1 -->
+    <div class="slide active">
+      <div class="slide-num">01 / 10</div>
+      <h2 class="slide-title">DiaBP-Copilot</h2>
+      <p class="slide-subtitle">Unifying Chronic NCD Care in Nigeria</p>
+      <div class="slide-grid">
+        <ul class="slide-bullets">
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>The Hospital-to-Pharmacy Bridge:</strong> Integrates clinicians, patients, and local community pharmacies into a single treatment loop.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Zero App Friction:</strong> Patients use WhatsApp to log daily blood pressure and blood sugar. No training, download, or smartphones required.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>AI-Assisted Oversight:</strong> Features early diabetic neuropathy screening and automated clinical triage priorities.</div>
+          </li>
+        </ul>
+        <div class="visual-panel">
+          <div class="stat-box">
+            <div class="stat-val">100%</div>
+            <div class="stat-lbl">Patient Onboarding Rate via Existing WhatsApp Accounts</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val">diabpcopilot.com</div>
+            <div class="stat-lbl">White-Labeled Facility Domain</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 2 -->
+    <div class="slide">
+      <div class="slide-num">02 / 10</div>
+      <h2 class="slide-title">The Chronic Care Crisis</h2>
+      <p class="slide-subtitle">Why Silent NCDs cost Nigerian Facilities & Patients</p>
+      <div class="slide-grid">
+        <ul class="slide-bullets">
+          <li>
+            <span class="bullet-icon">!</span>
+            <div><strong>Invisible Data:</strong> Patients log vitals on paper, or not at all. Clinicians can only react when emergencies occur.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">!</span>
+            <div><strong>Medication Default:</strong> Over 65% of patients miss chronic medication refills due to fragmented procurement and financial hurdles.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">!</span>
+            <div><strong>Escalating Costs:</strong> Avoidable amputations, strokes, and kidney failures deplete family resources and overwhelm clinic beds.</div>
+          </li>
+        </ul>
+        <div class="visual-panel">
+          <div class="stat-box">
+            <div class="stat-val">Less than 35%</div>
+            <div class="stat-lbl">Average Medication Adherence in Standard Patient Cohorts</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val">₦120,000+</div>
+            <div class="stat-lbl">Average Cost of Single Hypertension Emergency Admission</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 3 -->
+    <div class="slide">
+      <div class="slide-num">03 / 10</div>
+      <h2 class="slide-title">The Solution: DiaBP-Copilot</h2>
+      <p class="slide-subtitle">A Frictionless Ecosystem built for Nigeria</p>
+      <div class="slide-grid">
+        <ul class="slide-bullets">
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Unified Database:</strong> One central directory connecting doctors, clinic staff, community pharmacies, and patients.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Immediate Onboarding:</strong> Onboard a patient in 60 seconds. They simply text a keyword to our care line to connect.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Operational Clarity:</strong> Restores clear visibility. Triage lists separate stable patients from those needing immediate care.</div>
+          </li>
+        </ul>
+        <div class="visual-panel" style="background: rgba(20, 184, 166, 0.05); border-color: rgba(20, 184, 166, 0.2);">
+          <div style="font-size: 0.8rem; font-weight: bold; color: var(--teal-light); text-transform: uppercase;">Core Workflow</div>
+          <p style="font-size: 0.72rem; color: #d1d5db; line-height: 1.5; margin-top: 4px;">
+            Patient logs BP/Glucose on WhatsApp ➔ Data instant-syncs to Clinic ➔ High-risk readings trigger alert ➔ Refills routed automatically to preferred Pharmacy.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 4 -->
+    <div class="slide">
+      <div class="slide-num">04 / 10</div>
+      <h2 class="slide-title">Zero-Install Patient App</h2>
+      <p class="slide-subtitle">Leveraging the app they already use daily</p>
+      <div class="slide-grid">
+        <ul class="slide-bullets">
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Log Readings via Chat:</strong> Patients reply to the WhatsApp bot with their vitals (e.g. "135/85" or "110 Fasting").</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Smart Streak Rewards:</strong> Encourages daily logging through interactive streak counters and progress checks.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Adherence Notifications:</strong> Automated prompts trigger when readings are missed, reducing defaults.</div>
+          </li>
+        </ul>
+        <div class="visual-panel">
+          <div class="stat-box">
+            <div class="stat-val">98%</div>
+            <div class="stat-lbl">Active Chat Open Rate (Compared to <15% for Native App Push Notifications)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 5 -->
+    <div class="slide">
+      <div class="slide-num">05 / 10</div>
+      <h2 class="slide-title">The Clinician Dashboard</h2>
+      <p class="slide-subtitle">Organized oversight without administrative burden</p>
+      <div class="slide-grid">
+        <ul class="slide-bullets">
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Automatic Triaging:</strong> Algorithmic color-coding flags stable vs. critical trends instantly, cutting down chat fatigue.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Care Team Notice Board:</strong> Collapsible notice space for shift handovers, memo postings, and local shortages.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>SMS Nudges:</strong> Text recommendations directly from the workspace to prompt actions or check-ins.</div>
+          </li>
+        </ul>
+        <div class="visual-panel">
+          <div class="stat-box">
+            <div class="stat-val">0 min</div>
+            <div class="stat-lbl">Manual data entry for clinic staff (Patient enters it on WhatsApp)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 6 -->
+    <div class="slide">
+      <div class="slide-num">06 / 10</div>
+      <h2 class="slide-title">SafeMeds Automated Refills</h2>
+      <p class="slide-subtitle">Retaining pharmacy revenue and patient health</p>
+      <div class="slide-grid">
+        <ul class="slide-bullets">
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Refill Countdown:</strong> Tracks patient prescription cycles and flags upcoming drug depletion dates.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Direct Approvals:</strong> Patient approves medication refills with a simple menu selection on WhatsApp.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Pharmacy Dispatch:</strong> Fulfillments dispatch straight to community pharmacies for local pick-up or home delivery.</div>
+          </li>
+        </ul>
+        <div class="visual-panel">
+          <div class="stat-box">
+            <div class="stat-val">> 90%</div>
+            <div class="stat-lbl">Projected Patient Retention for Participating Refill Pharmacies</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 7 -->
+    <div class="slide">
+      <div class="slide-num">07 / 10</div>
+      <h2 class="slide-title">AI Diabetic Foot Screening</h2>
+      <p class="slide-subtitle">Early hotspot detection preventing amputation</p>
+      <div class="slide-grid">
+        <ul class="slide-bullets">
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Computer-Vision Analysis:</strong> Patient snaps a foot sole photo on WhatsApp. AI analyzes it for high-friction hotspots.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Self-Calibrating Engine:</strong> Compensaes for variable lighting and dark skin tones automatically, reducing false flags.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Clinical Referrals:</strong> High-risk profiles flag the clinician immediately to trigger active podiatry consults.</div>
+          </li>
+        </ul>
+        <div class="visual-panel">
+          <div class="stat-box">
+            <div class="stat-val">Outlier Ratio > 26%</div>
+            <div class="stat-lbl">Identifies hidden inflammation zones before visible ulcers form</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 8 -->
+    <div class="slide">
+      <div class="slide-num">08 / 10</div>
+      <h2 class="slide-title">B2B Monetization & splits</h2>
+      <p class="slide-subtitle">Aligning profits with patient outcomes</p>
+      <div class="slide-grid">
+        <ul class="slide-bullets">
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Paystack Split Integration:</strong> Collects subscriptions and monthly drug fees securely online.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>95% Instantly to You:</strong> Instant split routes 95% of transaction value straight to the facility/pharmacy bank.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>No Manual Invoices:</strong> Automated payouts clear every bank settlement cycle without administration overhead.</div>
+          </li>
+        </ul>
+        <div class="visual-panel">
+          <div class="stat-box">
+            <div class="stat-val">95% / 5%</div>
+            <div class="stat-lbl">Facility Split Ratio (5% covers Twilio SMS, cloud hosting, and AI compute)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 9 -->
+    <div class="slide">
+      <div class="slide-num">09 / 10</div>
+      <h2 class="slide-title">Professional Branding</h2>
+      <p class="slide-subtitle">Sleek, custom, and offline-resilient</p>
+      <div class="slide-grid">
+        <ul class="slide-bullets">
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Custom Domain:</strong> Fully mapped to diabpcopilot.com for hospital/clinic credibility.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>PWA Installed App:</strong> Installs directly to staff devices, loading immediately like a native app.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Offline Synchronization:</strong> Service workers cache files offline. Staff can access and edit during network drops.</div>
+          </li>
+        </ul>
+        <div class="visual-panel">
+          <div class="stat-box">
+            <div class="stat-val">Offline-First</div>
+            <div class="stat-lbl">Auto-syncs changes back to database as soon as network returns</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 10 -->
+    <div class="slide">
+      <div class="slide-num">10 / 10</div>
+      <h2 class="slide-title">Launch in 60 Seconds</h2>
+      <p class="slide-subtitle">Zero upfront setup friction</p>
+      <div class="slide-grid">
+        <ul class="slide-bullets">
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Instant Registration:</strong> Clinic/Pharmacy registers on the landing page in under a minute.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Staff Invites:</strong> Add doctors, nurses, and pharmacists directly to the roster.</div>
+          </li>
+          <li>
+            <span class="bullet-icon">✓</span>
+            <div><strong>Patient Rollout:</strong> Print the onboarding code. Patients text to connect and immediately begin logging.</div>
+          </li>
+        </ul>
+        <div class="visual-panel" style="background: rgba(20, 184, 166, 0.1); border-color: var(--teal);">
+          <div style="font-size: 0.95rem; font-weight: bold; color: white;">Ready to scale?</div>
+          <p style="font-size: 0.75rem; color: #d1d5db; line-height: 1.4; margin-top: 4px;">
+            Open your Super Admin dashboard on diabpcopilot.com, download the presentation, and invite your clinical partners.
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer Navigation controls -->
+  <div class="nav-footer">
+    <div class="indicators" id="indicators">
+      <!-- Dots injected dynamically -->
+    </div>
+    <div class="nav-buttons">
+      <button class="nav-btn" id="prevBtn" onclick="changeSlide(-1)" disabled>◀ Back</button>
+      <button class="nav-btn primary" id="nextBtn" onclick="changeSlide(1)">Next ▶</button>
+    </div>
+  </div>
+
+  <script>
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const indContainer = document.getElementById('indicators');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    // Create indicators
+    slides.forEach((_, idx) => {
+      const dot = document.createElement('div');
+      dot.className = `ind-dot ${idx === 0 ? 'active' : ''}`;
+      dot.onclick = () => goToSlide(idx);
+      indContainer.appendChild(dot);
+    });
+
+    const dots = document.querySelectorAll('.ind-dot');
+
+    function updateControls() {
+      prevBtn.disabled = currentSlide === 0;
+      if (currentSlide === slides.length - 1) {
+        nextBtn.innerText = "Finish";
+      } else {
+        nextBtn.innerText = "Next ▶";
+      }
+    }
+
+    function goToSlide(n) {
+      slides[currentSlide].classList.remove('active');
+      dots[currentSlide].classList.remove('active');
+      currentSlide = n;
+      slides[currentSlide].classList.add('active');
+      dots[currentSlide].classList.add('active');
+      updateControls();
+    }
+
+    function changeSlide(direction) {
+      const nextIndex = currentSlide + direction;
+      if (nextIndex >= 0 && nextIndex < slides.length) {
+        goToSlide(nextIndex);
+      }
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') changeSlide(1);
+      if (e.key === 'ArrowLeft') changeSlide(-1);
+    });
+  </script>
+</body>
+</html>

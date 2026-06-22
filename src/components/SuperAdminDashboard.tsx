@@ -16,6 +16,118 @@ import {
 } from 'lucide-react';
 import type { PatientNcdProfile, NcdClinic, NcdPharmacy, NcdRefillOrder } from '../services/ncdService';
 
+const superAdminPitchCopy = `DiaBP-Copilot: B2B Clinician & Pharmacy Partnership Pitch
+
+1. The Core Elevator Pitch
+DiaBP-Copilot is an integrated, patient-centered remote care coordinator for chronic hypertension and diabetes. By linking clinicians, local community pharmacies, and patients into a single, closed-loop treatment registry, DiaBP-Copilot improves patient outcomes, stabilizes daily vitals, and guarantees recurring revenue for healthcare providers.
+
+2. Zero-Friction Patient Engagement
+- The WhatsApp bot connects patients instantly without requiring any native app downloads or smartphone upgrades.
+- Patients log blood pressure, blood glucose, and receive adherence rewards via a chat interface they already use daily.
+- Streaks and automated check-in alerts reduce compliance default rates by up to 60%.
+
+3. Automated Clinician Oversight
+- Priority Triage Queue: Clinic staff focus only on patients flagged with out-of-bounds vitals, eliminating manual logs.
+- Care Team Handover Notice Board: Prevents communication gaps between doctors, nurses, and pharmacists.
+- AI Foot Scanner: Computer-vision algorithms run self-calibrating erythema screening to detect silent ulcer risks early.
+
+4. Guaranteed Predictable Revenue
+- SafeMeds Refills: Refill orders are tracked and confirmed on WhatsApp, then dispatched automatically to community pharmacies.
+- Instant Paystack Splits: Direct payouts distribute 95% of prescription fees instantly to the pharmacy/facility bank account.
+- White-Labeled Presence: Serves the app under custom domain diabpcopilot.com, building local clinical credibility.`;
+
+const adminPitchSlides = [
+  {
+    title: "DiaBP-Copilot Overview",
+    subtitle: "Unifying Chronic NCD Care in Nigeria",
+    bullets: [
+      "Hospital-to-Pharmacy Bridge: Single loop for doctors, patients, and pharmacies.",
+      "Zero App Friction: Patients log BP/glucose and request refills on WhatsApp.",
+      "AI-Assisted Oversight: Early diabetic foot screening and triage queues."
+    ]
+  },
+  {
+    title: "The Chronic Care Crisis",
+    subtitle: "Why silent NCDs cost facilities and families",
+    bullets: [
+      "Invisible Data: Log sheets are lost; clinics can only react during emergencies.",
+      "Medication Default: Over 65% of patients miss chronic medication refills.",
+      "Escalating Costs: Stroke, amputation, and failure exhaust family savings."
+    ]
+  },
+  {
+    title: "The Frictionless Solution",
+    subtitle: "A unified ecosystem built for local realities",
+    bullets: [
+      "Unified Database: Connect doctors, staff, pharmacies, and patients.",
+      "60-Second Onboarding: Patients text a keyword to link their profile.",
+      "Triage Priority: High-risk patient trends flag clinic staff immediately."
+    ]
+  },
+  {
+    title: "Zero-Install Patient Engagement",
+    subtitle: "Leveraging the messaging app they use daily",
+    bullets: [
+      "WhatsApp Logging: Send vitals in simple chat text (e.g. '130/80').",
+      "Streak Rewards: Interactive motivation streaks keep patients logging.",
+      "Adherence Reminders: Auto-prompts prompt patients when readings slip."
+    ]
+  },
+  {
+    title: "The Clinician Dashboard",
+    subtitle: "Organized oversight with less admin overhead",
+    bullets: [
+      "Automatic Triaging: Algorithmic color-coding flags critical patient readings.",
+      "Notice Board: Shift-to-shift memos coordinate clinic notice handovers.",
+      "Text Nudges: Send SMS check-ins directly from the console."
+    ]
+  },
+  {
+    title: "SafeMeds Automated Refills",
+    subtitle: "Refill Countdowns: Automatically alerts the patient when drugs are low.",
+    bullets: [
+      "Direct Refill Approvals: Patients approve monthly quotes inside WhatsApp.",
+      "Community Dispatch: Refills route directly to preferred community pharmacies."
+    ]
+  },
+  {
+    title: "AI Diabetic Foot Screening",
+    subtitle: "Preventing amputations via computer vision",
+    bullets: [
+      "Hotspot Detection: AI analyzes foot sole photos for silent erythema risk.",
+      "Self-Calibrating Scan: Normalizes lighting/skin tones to limit false alarms.",
+      "Podiatry Referrals: Automatically alerts doctors to schedule clinical visits."
+    ]
+  },
+  {
+    title: "Instant Split Payouts",
+    subtitle: "Aligning profits with patient compliance",
+    bullets: [
+      "Integrated Billing: Collects subscription and drug fees securely online.",
+      "95% Instant Splits: Fees split immediately to your facility's bank account.",
+      "Zero Billing Admin: Auto-payouts clear on Paystack/Flutterwave billing rails."
+    ]
+  },
+  {
+    title: "Professional Branding & PWA",
+    subtitle: "Sleek, custom, and offline-resilient",
+    bullets: [
+      "Custom Domain: Runs under diabpcopilot.com for facility credibility.",
+      "Installable PWA: Installs on mobile home screens for fast operational access.",
+      "Offline Sync: Service workers cache records, auto-syncing when online."
+    ]
+  },
+  {
+    title: "Launch Plan",
+    subtitle: "Zero upfront friction setup",
+    bullets: [
+      "Instant Register: Setup your clinic/pharmacy in under 60 seconds.",
+      "Staff invites: Link doctors, pharmacists, and rosters easily.",
+      "Patient Rollout: Print the onboarding card and begin patient enrollment."
+    ]
+  }
+];
+
 interface SuperAdminDashboardProps {
   patients: PatientNcdProfile[];
   clinics: NcdClinic[];
@@ -43,7 +155,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   onDeletePatient,
   onDeleteOrder
 }) => {
-  const [activeTab, setActiveTab] = useState<'facilities' | 'patients' | 'audits'>('facilities');
+  const [activeTab, setActiveTab] = useState<'facilities' | 'patients' | 'audits' | 'pitchdeck'>('facilities');
+  const [pitchSlide, setPitchSlide] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -388,22 +501,31 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
           >
             <FileSpreadsheet size={12} /> System split Audits ({orders.length})
           </button>
+          <button
+            onClick={() => setActiveTab('pitchdeck')}
+            className={`tab-btn ${activeTab === 'pitchdeck' ? 'active' : ''}`}
+            style={{ fontSize: '0.75rem', padding: '8px 16px' }}
+          >
+            📢 Pitch Deck & Promo
+          </button>
         </div>
 
-        <div style={{ position: 'relative', width: '220px' }}>
-          <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <input 
-            type="text"
-            placeholder={`Search ${activeTab}...`}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              width: '100%', padding: '8px 12px 8px 30px', background: 'rgba(0,0,0,0.2)',
-              border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: 'white',
-              fontSize: '0.75rem', outline: 'none'
-            }}
-          />
-        </div>
+        {activeTab !== 'pitchdeck' && (
+          <div style={{ position: 'relative', width: '220px' }}>
+            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input 
+              type="text"
+              placeholder={`Search ${activeTab}...`}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                width: '100%', padding: '8px 12px 8px 30px', background: 'rgba(0,0,0,0.2)',
+                border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: 'white',
+                fontSize: '0.75rem', outline: 'none'
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* 4. Tab Contents */}
@@ -787,6 +909,261 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'pitchdeck' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', alignItems: 'start' }}>
+          
+          {/* Left Column: Skimmable Persuasive Pitch Copy */}
+          <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '12px' }}>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'white', fontWeight: 'bold' }}>
+                  📢 Partner & Clinic Pitch Material
+                </h4>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                  Persuasive B2B copy optimized to onboard clinics and pharmacies.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(superAdminPitchCopy);
+                  alert("Partnership pitch copy copied to clipboard!");
+                }}
+                style={{
+                  background: 'rgba(20, 184, 166, 0.15)',
+                  border: '1px solid rgba(20, 184, 166, 0.25)',
+                  color: 'var(--color-teal-light)',
+                  borderRadius: '6px',
+                  padding: '6px 12px',
+                  fontSize: '0.7rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(20, 184, 166, 0.25)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(20, 184, 166, 0.15)'}
+              >
+                📋 Copy Pitch Copy
+              </button>
+            </div>
+
+            {/* Skimmable Pitch copy */}
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.6', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <strong style={{ color: 'white', fontSize: '0.85rem', display: 'block', marginBottom: '4px' }}>
+                  🏥 The Core Proposition (For Clinical Partners)
+                </strong>
+                DiaBP-Copilot is an integrated, patient-centered remote care coordinator for chronic hypertension and diabetes. By linking clinicians, local community pharmacies, and patients into a single, closed-loop treatment registry, DiaBP-Copilot improves patient outcomes, stabilizes daily vitals, and guarantees recurring revenue for healthcare providers.
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '10px', padding: '12px' }}>
+                  <strong style={{ color: 'var(--color-teal-light)', display: 'block', marginBottom: '4px' }}>
+                    💬 Frictionless Patient Tracking
+                  </strong>
+                  No apps to download. Patients log vitals and request monthly refills by chatting on WhatsApp, which 98% of target patients already use daily. Streaks and automated check-ins reduce compliance default rates by up to 60%.
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '10px', padding: '12px' }}>
+                  <strong style={{ color: 'var(--color-teal-light)', display: 'block', marginBottom: '4px' }}>
+                    ⚡ Zero Clinician Data Entry
+                  </strong>
+                  Clinic staff focus only on patients flagged with out-of-bounds vitals, eliminating manual logs. The WhatsApp bot processes inputs, checks bounds, and pushes clean logs to the clinician dashboard automatically.
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '10px', padding: '12px' }}>
+                  <strong style={{ color: 'var(--color-teal-light)', display: 'block', marginBottom: '4px' }}>
+                    💊 SafeMeds Refill Revenue
+                  </strong>
+                  Refill orders are tracked and confirmed on WhatsApp, then dispatched automatically to community pharmacies. Payout splits route 95% of prescription fees instantly to the pharmacy/facility bank account.
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '10px', padding: '12px' }}>
+                  <strong style={{ color: 'var(--color-teal-light)', display: 'block', marginBottom: '4px' }}>
+                    📸 AI Foot Ulcer Diagnostics
+                  </strong>
+                  Computer-vision algorithms run self-calibrating erythema screening to detect silent ulcer risks early, compensating for dark skin tones and variable lighting to refer patients for podiatry consults.
+                </div>
+              </div>
+
+              {/* Objection Handling Cards */}
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px' }}>
+                <strong style={{ color: 'white', fontSize: '0.85rem', display: 'block', marginBottom: '10px' }}>
+                  🎯 Direct Objection Handlers (To close deals)
+                </strong>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ borderLeft: '3px solid #14b8a6', paddingLeft: '10px' }}>
+                    <span style={{ color: 'white', fontWeight: 'bold', display: 'block' }}>Q: "Why would a busy clinic spend time setting this up?"</span>
+                    <span style={{ color: 'var(--text-muted)' }}>A: Setting up takes 60 seconds. It immediately filters out the stable 80% of patients and alerts clinicians to the 20% in critical need, drastically reducing workload.</span>
+                  </div>
+                  <div style={{ borderLeft: '3px solid #14b8a6', paddingLeft: '10px' }}>
+                    <span style={{ color: 'white', fontWeight: 'bold', display: 'block' }}>Q: "How do we guarantee pharmacies fill orders correctly?"</span>
+                    <span style={{ color: 'var(--text-muted)' }}>A: Pharmacies receive direct notifications, locked in pre-calculated refills, and 95% split payouts on Paystack instantly, removing billing friction.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Slide Viewer Preview & Downloads */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            
+            {/* Slide Preview Container */}
+            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'white', textTransform: 'uppercase' }}>
+                  📊 Slide Preview
+                </span>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                  Slide {pitchSlide + 1} of {adminPitchSlides.length}
+                </span>
+              </div>
+
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.4) 100%)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: '12px',
+                padding: '24px',
+                minHeight: '200px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                textAlign: 'left'
+              }}>
+                <h5 style={{ margin: 0, fontSize: '1rem', color: 'white', fontWeight: 'bold' }}>
+                  {adminPitchSlides[pitchSlide].title}
+                </h5>
+                <p style={{ margin: '4px 0 12px 0', fontSize: '0.7rem', color: 'var(--color-teal-light)', fontWeight: 'bold' }}>
+                  {adminPitchSlides[pitchSlide].subtitle}
+                </p>
+                <ul style={{ margin: 0, paddingLeft: '14px', fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {adminPitchSlides[pitchSlide].bullets.map((b, i) => (
+                    <li key={i}>{b}</li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Slider controls */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <button
+                  disabled={pitchSlide === 0}
+                  onClick={() => setPitchSlide(p => Math.max(0, p - 1))}
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    color: pitchSlide === 0 ? 'rgba(255,255,255,0.2)' : 'white',
+                    borderRadius: '6px',
+                    padding: '4px 10px',
+                    fontSize: '0.65rem',
+                    fontWeight: 'bold',
+                    cursor: pitchSlide === 0 ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  ◀ Back
+                </button>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {adminPitchSlides.map((_, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => setPitchSlide(idx)}
+                      style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
+                        background: pitchSlide === idx ? 'var(--color-teal-light)' : 'rgba(255,255,255,0.15)',
+                        cursor: 'pointer'
+                      }}
+                    />
+                  ))}
+                </div>
+                <button
+                  disabled={pitchSlide === adminPitchSlides.length - 1}
+                  onClick={() => setPitchSlide(p => Math.min(adminPitchSlides.length - 1, p + 1))}
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    color: pitchSlide === adminPitchSlides.length - 1 ? 'rgba(255,255,255,0.2)' : 'white',
+                    borderRadius: '6px',
+                    padding: '4px 10px',
+                    fontSize: '0.65rem',
+                    fontWeight: 'bold',
+                    cursor: pitchSlide === adminPitchSlides.length - 1 ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  Next ▶
+                </button>
+              </div>
+            </div>
+
+            {/* Download and Print Options */}
+            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'white', textTransform: 'uppercase' }}>
+                📥 Presentation Assets
+              </span>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <button
+                  onClick={() => window.open('/diabp_pitch_deck.html', '_blank')}
+                  style={{
+                    background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
+                    border: 'none',
+                    color: 'white',
+                    borderRadius: '8px',
+                    padding: '10px 16px',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: '0 4px 12px rgba(20, 184, 166, 0.25)'
+                  }}
+                >
+                  🖥️ Open Presentation & Export to PDF
+                </button>
+
+                <button
+                  onClick={() => {
+                    const markdownText = `# DiaBP-Copilot Pitch Deck\n\n` + 
+                      `## 📢 Partnership Copy\n\n` +
+                      superAdminPitchCopy + `\n\n` +
+                      `---\n\n` +
+                      `## 📊 Slide Presentation\n\n` +
+                      adminPitchSlides.map((s, idx) => `### Slide ${idx + 1}: ${s.title}\n**${s.subtitle}**\n${s.bullets.map(b => `- ${b}`).join('\n')}`).join('\n\n---\n\n');
+                    
+                    const element = document.createElement("a");
+                    const file = new Blob([markdownText], { type: 'text/markdown' });
+                    element.href = URL.createObjectURL(file);
+                    element.download = "diabp_pitch_deck.md";
+                    document.body.appendChild(element);
+                    element.click();
+                    document.body.removeChild(element);
+                  }}
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: 'white',
+                    borderRadius: '8px',
+                    padding: '10px 16px',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  📥 Download Markdown Slides (.md)
+                </button>
+              </div>
+            </div>
+
+          </div>
+
         </div>
       )}
 
