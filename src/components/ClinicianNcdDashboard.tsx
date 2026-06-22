@@ -1013,7 +1013,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
       )}
 
       {/* Onboarding Quickstart Guide */}
-      {(() => {
+      {workspaceRole === 'admin' && (() => {
         const hasSubaccount = activeRole === 'clinic' ? !!activeClinic?.subaccountId : !!activePharmacy?.subaccountId;
         const hasOnboardedPatients = filteredPatients.length > 0;
         const hasVitalsCheckIn = filteredPatients.some(p => (p.bpHistory || []).length > 5 || (p.glucoseHistory || []).length > 5);
@@ -1025,7 +1025,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
           {
             id: 'payout',
             title: 'Link Payout Account',
-            description: 'Set up your bank account details to receive direct payouts via split transactions (95% to you instantly).',
+            description: 'Set up your bank account details to receive direct payouts for processed medication orders.',
             instructions: 'Click "Configure Bank Payout" to select your bank, verify your account number, and link it.',
             isCompleted: hasSubaccount,
             actionLabel: 'Configure Bank Payout',
@@ -1051,7 +1051,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
             id: 'patients',
             title: 'Onboard First Patient',
             description: 'Guide your customers to register. They can register online or self-onboard in under 1 minute via WhatsApp.',
-            instructions: 'Have patients text "join bet-sense" to +1 415 523 8886, or add them in the registry below.',
+            instructions: 'Instruct patients to register via the portal, or add them manually in the registry table below.',
             isCompleted: hasOnboardedPatients,
             actionLabel: 'View Patient Registry',
             actionClick: () => scrollToSection('patient-registry-table')
@@ -1091,7 +1091,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
             id: 'patients',
             title: 'Register Patient Directory',
             description: 'Add your chronic clinic patients to the digital health ecosystem so they can be monitored.',
-            instructions: 'Input their details during consults, or have patients text "join bet-sense" on WhatsApp to register.',
+            instructions: 'Input their details during consults, or instruct patients to register via the portal or WhatsApp.',
             isCompleted: hasOnboardedPatients,
             actionLabel: 'View Patient Registry',
             actionClick: () => scrollToSection('patient-registry-table')

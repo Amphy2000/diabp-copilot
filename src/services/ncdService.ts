@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import { createClient } from '@supabase/supabase-js';
 
 export interface BpReading {
   date: string;
@@ -1672,7 +1673,18 @@ export async function addFacilityStaff(
   facilityType: 'clinic' | 'pharmacy'
 ): Promise<void> {
   if (isSupabaseConfigured) {
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+    const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+    
+    // Create a temporary client with persistSession: false to avoid overwriting the logged in admin's session.
+    const tempSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      }
+    });
+
+    const { data: authData, error: authError } = await tempSupabase.auth.signUp({
       email,
       password,
       options: {
