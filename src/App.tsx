@@ -35,6 +35,7 @@ import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { Auth } from './components/Auth';
 import { supabase, isSupabaseConfigured } from './services/supabase';
 import { WhatsAppSimulator } from './components/WhatsAppSimulator';
+import { InstallPrompt } from './components/InstallPrompt';
 
 function App() {
   // Authentication State
@@ -417,6 +418,8 @@ function App() {
 
         </div>
       </header>
+
+      <InstallPrompt />
 
       {/* Main Page Content */}
       <main className="main-content">

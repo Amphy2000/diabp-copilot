@@ -4,13 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DiaBP-Copilot | AI Diabetes & Hypertension Care Hub</title>
-    <!-- Favicon link can be updated if custom asset is created -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🩺</text></svg>" />
+    <link rel="manifest" href="/manifest.json" />
     <!-- Flutterwave Standard Inline Checkout -->
     <script src="https://checkout.flutterwave.com/v3.js"></script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then((reg) => {
+            console.log('ServiceWorker registration successful with scope: ', reg.scope);
+          }).catch((err) => {
+            console.error('ServiceWorker registration failed: ', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>

@@ -1,9 +1,7 @@
-const CACHE_NAME = 'amphy-v75-bot-cache-v3';
+const CACHE_NAME = 'diabp-copilot-cache-v1';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  '/style.css',
-  '/app.js',
   '/favicon.svg',
   '/manifest.json'
 ];
@@ -35,7 +33,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET' || event.request.url.includes('/api/')) {
+  if (event.request.method !== 'GET' || event.request.url.includes('/api/') || event.request.url.includes('/supabase.co/')) {
     return;
   }
   event.respondWith(
@@ -57,7 +55,6 @@ self.addEventListener('notificationclick', function(event) {
   );
 });
 
-// Mobile Push Notifications Support
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
     const { title, body } = event.data;
@@ -66,7 +63,7 @@ self.addEventListener('message', (event) => {
       icon: '/favicon.svg',
       badge: '/favicon.svg',
       vibrate: [200, 100, 200],
-      tag: 'v75-bot-alert'
+      tag: 'diabp-copilot-alert'
     };
     self.registration.showNotification(title, options);
   }

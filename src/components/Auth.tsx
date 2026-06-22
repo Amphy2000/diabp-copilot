@@ -12,6 +12,7 @@ import {
 } from '../services/ncdService';
 import type { NcdClinic, NcdPharmacy, PatientNcdProfile } from '../services/ncdService';
 import { Activity, Loader2, AlertCircle, Sparkles, Building, User, Users, ShieldAlert } from 'lucide-react';
+import { InstallPrompt } from './InstallPrompt';
 
 export const Auth: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -208,6 +209,8 @@ export const Auth: React.FC = () => {
       {/* Background blobs consistency */}
       <div className="bg-blob bg-blob-1" style={{ top: '-10%', left: '-10%', width: '400px', height: '400px' }}></div>
       <div className="bg-blob bg-blob-2" style={{ bottom: '-10%', right: '-10%', width: '400px', height: '400px' }}></div>
+
+      <InstallPrompt />
 
       <div className="glass-panel animate-fade-in" style={{
         width: '100%',
