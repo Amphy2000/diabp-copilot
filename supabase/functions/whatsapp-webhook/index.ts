@@ -317,8 +317,10 @@ serve(async (req) => {
               const nextStreak = (patient.streak_days || 0) + 1;
               await supabase.from("ncd_profiles").update({ streak_days: nextStreak }).eq("id", patient.id);
 
+              const loggedSys = tempData.systolic;
+              const loggedDia = tempData.diastolic;
               await saveSession("idle", {});
-              replyText = `✓ Vitals logged successfully!\n\nBP: *${tempData.systolic}/${tempData.diastolic} mmHg*\nStreak: *${nextStreak} days*\n\nClinical team notified. Type *Menu* to return to options.`;
+              replyText = `✓ Vitals logged successfully!\n\nBP: *${loggedSys}/${loggedDia} mmHg*\nStreak: *${nextStreak} days*\n\nClinical team notified. Type *Menu* to return to options.`;
             } else {
               await saveSession("waiting_glucose_type", tempData);
               replyText = "Is this reading Fasting or Post-Meal?\n\n*1.* Fasting\n*2.* Post-Meal";
@@ -347,8 +349,11 @@ serve(async (req) => {
           const nextStreak = (patient.streak_days || 0) + 1;
           await supabase.from("ncd_profiles").update({ streak_days: nextStreak }).eq("id", patient.id);
 
+          const loggedSys = tempData.systolic;
+          const loggedDia = tempData.diastolic;
+          const loggedGlucose = tempData.glucose;
           await saveSession("idle", {});
-          replyText = `✓ Vitals logged successfully!\n\nBP: *${tempData.systolic}/${tempData.diastolic} mmHg*\nGlucose: *${tempData.glucose} mg/dL (${type})*\nStreak: *${nextStreak} days*\n\nClinical team notified. Type *Menu* to return to options.`;
+          replyText = `✓ Vitals logged successfully!\n\nBP: *${loggedSys}/${loggedDia} mmHg*\nGlucose: *${loggedGlucose} mg/dL (${type})*\nStreak: *${nextStreak} days*\n\nClinical team notified. Type *Menu* to return to options.`;
           break;
 
         case "waiting_refill_confirm":
@@ -358,8 +363,9 @@ serve(async (req) => {
               .update({ status: "Delivered" })
               .eq("id", tempData.orderId);
 
+            const totalNaira = tempData.totalNaira || 0;
             await saveSession("idle", {});
-            replyText = `💳 Refill Payment Confirmed successfully!\n\nAmount Settled: *₦${tempData.totalNaira.toLocaleString()}*\n\n✓ Refill Approved and marked as *Delivered*. Medications are out for delivery to your registered address.`;
+            replyText = `💳 Refill Payment Confirmed successfully!\n\nAmount Settled: *₦${totalNaira.toLocaleString()}*\n\n✓ Refill Approved and marked as *Delivered*. Medications are out for delivery to your registered address.`;
           } else {
             await saveSession("idle", {});
             replyText = "Refill payment cancelled. Type *Menu* to return to the options menu.";
