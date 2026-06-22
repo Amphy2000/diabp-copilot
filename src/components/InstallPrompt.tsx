@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, X, Smartphone } from 'lucide-react';
+import { X } from 'lucide-react';
 
 export const InstallPrompt: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -26,7 +26,6 @@ export const InstallPrompt: React.FC = () => {
       return;
     }
 
-    // Show the banner by default if not installed
     setShowPrompt(true);
 
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -51,6 +50,9 @@ export const InstallPrompt: React.FC = () => {
         setDeferredPrompt(null);
         setShowPrompt(false);
       });
+    } else {
+      // Fallback instruction for browsers where PWA trigger isn't ready
+      alert("To install DiaBP-Copilot on your home screen:\n\n1. Tap your browser menu (the three dots ⋮ in Chrome).\n2. Select 'Install app' or 'Add to Home screen'.");
     }
   };
 
@@ -65,97 +67,75 @@ export const InstallPrompt: React.FC = () => {
     <div 
       className="glass-panel animate-scale-up"
       style={{
-        margin: '12px auto',
-        maxWidth: '1200px',
+        margin: '16px auto 0 auto',
+        maxWidth: '650px',
         width: 'calc(100% - 32px)',
-        padding: '14px 20px',
-        background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.15) 0%, rgba(59, 130, 246, 0.08) 100%)',
-        border: '1px solid rgba(20, 184, 166, 0.25)',
-        borderRadius: '16px',
+        padding: '10px 20px',
+        background: 'rgba(20, 20, 22, 0.75)',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        borderRadius: '12px',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '16px',
+        justifyContent: 'center',
+        gap: '12px',
+        fontSize: '0.78rem',
+        color: '#e2e8f0',
+        zIndex: 99,
         flexWrap: 'wrap',
-        position: 'relative',
-        zIndex: 99
+        textAlign: 'center'
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '280px' }}>
-        <div style={{
-          background: 'rgba(20, 184, 166, 0.2)',
-          padding: '8px',
-          borderRadius: '12px',
-          color: '#14b8a6',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          border: '1px solid rgba(20, 184, 166, 0.15)'
-        }}>
-          <Smartphone size={20} />
-        </div>
-        <div>
-          <h4 style={{ margin: '0 0 2px 0', fontSize: '0.85rem', fontWeight: 'bold', color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            Install DiaBP-Copilot Mobile App
-            <span style={{ fontSize: '0.6rem', background: '#3b82f6', color: 'white', padding: '1px 6px', borderRadius: '50px', textTransform: 'uppercase', fontWeight: 'bold' }}>PWA Install</span>
-          </h4>
-          <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', lineHeight: '1.4' }}>
-            {isIOS 
-              ? "To install on your iPhone, tap the Share button (square with arrow up) in Safari and select 'Add to Home Screen'."
-              : deferredPrompt
-                ? "Add DiaBP-Copilot to your home screen for quick health tracking, faster loading times, and offline access."
-                : "To install, tap your browser menu (the three dots ⋮ in Chrome) and select 'Install app' or 'Add to Home Screen'."
-            }
-          </p>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        {!isIOS && deferredPrompt && (
+      {isIOS ? (
+        <span>
+          📱 Install DiaBP-Copilot on your home screen: Tap Share 📤 and select 'Add to Home Screen'
+        </span>
+      ) : (
+        <>
+          <span>
+            📱 Install DiaBP-Copilot on your home screen for quick access!
+          </span>
           <button
             onClick={handleInstall}
             style={{
-              background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
+              background: '#14b8a6',
               color: '#0d1117',
               border: 'none',
-              borderRadius: '8px',
-              padding: '6px 12px',
-              fontSize: '0.75rem',
-              fontWeight: 'bold',
+              borderRadius: '6px',
+              padding: '4px 14px',
+              fontSize: '0.72rem',
+              fontWeight: '900',
               cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxShadow: '0 4px 12px rgba(20, 184, 166, 0.25)',
-              transition: 'transform 0.15s'
+              transition: 'opacity 0.2s',
+              boxShadow: '0 2px 8px rgba(20, 184, 166, 0.2)'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
           >
-            <Download size={12} /> Install App
+            Install
           </button>
-        )}
-        <button
-          onClick={handleDismiss}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: '#94a3b8',
-            cursor: 'pointer',
-            padding: '4px',
-            borderRadius: '50px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'background 0.2s'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-          title="Dismiss"
-        >
-          <X size={14} />
-        </button>
-      </div>
+        </>
+      )}
+
+      <button
+        onClick={handleDismiss}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          color: '#64748b',
+          cursor: 'pointer',
+          padding: '2px',
+          marginLeft: '4px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'color 0.2s'
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.color = '#f87171'}
+        onMouseLeave={(e) => e.currentTarget.style.color = '#64748b'}
+        title="Dismiss"
+      >
+        <X size={12} />
+      </button>
     </div>
   );
 };
