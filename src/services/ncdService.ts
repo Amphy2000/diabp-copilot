@@ -502,6 +502,71 @@ export async function logVitalsEntry(
 }
 
 /**
+ * Appends a vital log for a specific patient (used by doctors/pharmacists during check-in)
+ */
+export async function logVitalsForPatient(
+  patientId: string,
+  systolic: number,
+  diastolic: number,
+  glucose: number,
+  glucoseType: 'Fasting' | 'Post-Meal'
+): Promise<void> {
+  const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const profile = await getPatientProfile(patientId);
+  
+  profile.bpHistory.push({ date: dateStr, systolic, diastolic });
+  profile.glucoseHistory.push({ date: dateStr, level: glucose, type: glucoseType });
+  profile.streakDays += 1;
+  
+  await savePatientProfile(profile, patientId);
+
+  // Update in the patients list inside localStorage if applicable
+  const patientsLocal = loadLocal<PatientNcdProfile[]>('diabp_patients', []);
+  const updatedPatients = patientsLocal.map(p => 
+    p.id === patientId 
+      ? { ...p, bpHistory: profile.bpHistory, glucoseHistory: profile.glucoseHistory, streakDays: profile.streakDays } 
+      : p
+  );
+  saveLocal('diabp_patients', updatedPatients);
+
+  // Trigger automated system alert notifications based on vital risk logs
+  const { strokeRisk, diabeticRisk, bpWarning, glucoseWarning } = evaluateNcdRisk(systolic, diastolic, glucose, glucoseType);
+  
+  if (strokeRisk === 'Emergency' || strokeRisk === 'High' || diabeticRisk === 'Emergency' || diabeticRisk === 'High') {
+    const riskType = (strokeRisk === 'Emergency' || strokeRisk === 'High') ? 'Blood Pressure' : 'Blood Sugar';
+    
+    await createSystemAlert(
+      patientId,
+      `Critical ${riskType} Logged`,
+      `Vitals warning: ${systolic}/${diastolic} mmHg, Glucose ${glucose} mg/dL. SMS alert nudged to patient. Clinical team notified.`,
+      'critical'
+    );
+  } else {
+    await createSystemAlert(
+      patientId,
+      'Stable Vitals Logged',
+      `Vitals logged within safe limits: ${systolic}/${diastolic} mmHg, Glucose ${glucose} mg/dL. Streak is now ${profile.streakDays} days!`,
+      'success'
+    );
+  }
+
+  if (isSupabaseConfigured) {
+    try {
+      await supabase.from('ncd_vitals').insert([{
+        patient_id: patientId,
+        date: dateStr,
+        systolic,
+        diastolic,
+        glucose_level: glucose,
+        glucose_type: glucoseType
+      }]);
+    } catch (err) {
+      console.error("Supabase vitals logging failed for patient:", err);
+    }
+  }
+}
+
+/**
  * Appends a new foot scan record to database
  */
 export async function logFootScanRecord(record: FootScanRecord): Promise<void> {

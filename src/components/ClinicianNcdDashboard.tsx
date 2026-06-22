@@ -76,6 +76,7 @@ interface ClinicianNcdDashboardProps {
   onUpdateClinic?: (updated: NcdClinic) => void;
   onUpdatePharmacy?: (updated: NcdPharmacy) => void;
   facilityUserRole?: 'admin' | 'staff';
+  onRefreshData?: () => void;
 }
 
 export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({ 
@@ -89,7 +90,8 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   onUpdatePharmacyPrices,
   onUpdateClinic,
   onUpdatePharmacy,
-  facilityUserRole = 'admin'
+  facilityUserRole = 'admin',
+  onRefreshData
 }) => {
   // Multi-Tenant Simulator State
   const [activeRole, setActiveRole] = useState<'clinic' | 'pharmacy'>(
@@ -129,6 +131,33 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<PatientNcdProfile | null>(null);
   const [viewingPrescriptionOrder, setViewingPrescriptionOrder] = useState<NcdRefillOrder | null>(null);
+  
+  // Check-in / BP Log Modal States
+  const [showCheckInModal, setShowCheckInModal] = useState(false);
+  const [checkInPatient, setCheckInPatient] = useState<PatientNcdProfile | null>(null);
+  const [checkInBpSystolic, setCheckInBpSystolic] = useState<number>(120);
+  const [checkInBpDiastolic, setCheckInBpDiastolic] = useState<number>(80);
+  const [checkInGlucose, setCheckInGlucose] = useState<number>(0);
+  const [checkInGlucoseType, setCheckInGlucoseType] = useState<'Fasting' | 'Post-Meal'>('Fasting');
+  const [sendWhatsAppChecked, setSendWhatsAppChecked] = useState(true);
+  const [generatedWhatsAppUrl, setGeneratedWhatsAppUrl] = useState<string | null>(null);
+  const [checkInSaving, setCheckInSaving] = useState(false);
+
+  const handleOpenCheckIn = (patient: PatientNcdProfile) => {
+    const bpArr = patient.bpHistory || [];
+    const latestBp = bpArr.length > 0 ? bpArr[bpArr.length - 1] : { systolic: 120, diastolic: 80 };
+    const glucoseArr = patient.glucoseHistory || [];
+    const latestGlucose = glucoseArr.length > 0 ? glucoseArr[glucoseArr.length - 1] : { level: 0, type: 'Fasting' };
+
+    setCheckInPatient(patient);
+    setCheckInBpSystolic(latestBp.systolic);
+    setCheckInBpDiastolic(latestBp.diastolic);
+    setCheckInGlucose(latestGlucose.level);
+    setCheckInGlucoseType(latestGlucose.type as 'Fasting' | 'Post-Meal');
+    setSendWhatsAppChecked(true);
+    setGeneratedWhatsAppUrl(null);
+    setShowCheckInModal(true);
+  };
   const [editingPrices, setEditingPrices] = useState(false);
   const [tempPrices, setTempPrices] = useState<{ [medId: string]: number }>({});
 
@@ -1328,16 +1357,34 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                           })()}
                         </td>
                         <td style={{ padding: '12px 8px', textAlign: 'center' }}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenPatientFile(p);
-                            }}
-                            className="btn-action-table"
-                            style={{ padding: '4px 8px', fontSize: '0.65rem' }}
-                          >
-                            Open File
-                          </button>
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenPatientFile(p);
+                              }}
+                              className="btn-action-table"
+                              style={{ padding: '4px 8px', fontSize: '0.65rem' }}
+                            >
+                              Open File
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenCheckIn(p);
+                              }}
+                              className="btn-action-table"
+                              style={{ 
+                                padding: '4px 8px', 
+                                fontSize: '0.65rem', 
+                                background: 'rgba(20, 184, 166, 0.15)', 
+                                color: 'var(--color-teal-light)', 
+                                border: '1px solid rgba(20, 184, 166, 0.3)' 
+                              }}
+                            >
+                              Check-in
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1404,6 +1451,25 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    onClick={() => handleOpenCheckIn(selectedPatient)}
+                    style={{
+                      background: 'rgba(59, 130, 246, 0.15)',
+                      border: '1px solid rgba(59, 130, 246, 0.3)',
+                      color: '#60a5fa',
+                      borderRadius: '6px',
+                      padding: '4px 8px',
+                      fontSize: '0.7rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    ⚡ Check-in / BP Log
+                  </button>
                   <button
                     onClick={() => {
                       setExportPatient(selectedPatient);
@@ -3472,6 +3538,19 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
             {/* Modal Form */}
             <form onSubmit={handleSavePayout} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
               
+              <div style={{
+                fontSize: '0.7rem',
+                color: '#fbbf24',
+                background: 'rgba(245, 158, 11, 0.08)',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid rgba(245, 158, 11, 0.2)',
+                lineHeight: '1.4',
+                marginBottom: '4px'
+              }}>
+                💰 <strong>Zero Upfront SaaS Cost:</strong> DiaBP-Copilot is completely free for clinics and pharmacies. We only charge a 2.5% to 5% commission on successfully completed medication refill checkouts. If you don't generate refill transactions, you pay absolutely ₦0.
+              </div>
+
               {payoutTab === 'automatic' ? (
                 <>
                   <div style={{
@@ -3654,6 +3733,251 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Patient Check-in Modal */}
+      {showCheckInModal && checkInPatient && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          zIndex: 9999, padding: '20px'
+        }}>
+          <div style={{
+            background: '#111827', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px',
+            width: '100%', maxWidth: '480px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '20px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                ⚡ Patient Check-in / BP & Glucose Log
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowCheckInModal(false);
+                  setGeneratedWhatsAppUrl(null);
+                }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.06)', border: 'none', borderRadius: '50%',
+                  width: '28px', height: '28px', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', color: 'white', cursor: 'pointer'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                Logging vitals for: <strong style={{ color: 'white' }}>{checkInPatient.name}</strong>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                    Systolic BP (mmHg)
+                  </label>
+                  <input 
+                    type="number"
+                    value={checkInBpSystolic}
+                    onChange={(e) => setCheckInBpSystolic(parseInt(e.target.value) || 120)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px', padding: '10px 12px', color: 'white', fontSize: '0.8rem', outline: 'none'
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                    Diastolic BP (mmHg)
+                  </label>
+                  <input 
+                    type="number"
+                    value={checkInBpDiastolic}
+                    onChange={(e) => setCheckInBpDiastolic(parseInt(e.target.value) || 80)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px', padding: '10px 12px', color: 'white', fontSize: '0.8rem', outline: 'none'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                    Blood Glucose (mg/dL)
+                  </label>
+                  <input 
+                    type="number"
+                    value={checkInGlucose}
+                    onChange={(e) => setCheckInGlucose(parseInt(e.target.value) || 0)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px', padding: '10px 12px', color: 'white', fontSize: '0.8rem', outline: 'none'
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                    Glucose Type
+                  </label>
+                  <select
+                    value={checkInGlucoseType}
+                    onChange={(e) => setCheckInGlucoseType(e.target.value as 'Fasting' | 'Post-Meal')}
+                    style={{
+                      background: '#1f2937', border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px', padding: '10px 12px', color: 'white', fontSize: '0.8rem', outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="Fasting">Fasting</option>
+                    <option value="Post-Meal">Post-Meal</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                <input 
+                  type="checkbox"
+                  id="sendWhatsApp"
+                  checked={sendWhatsAppChecked}
+                  onChange={(e) => setSendWhatsAppChecked(e.target.checked)}
+                  style={{ accentColor: '#10b981', cursor: 'pointer' }}
+                />
+                <label htmlFor="sendWhatsApp" style={{ fontSize: '0.75rem', color: 'white', cursor: 'pointer' }}>
+                  Generate WhatsApp Health Vitals Link
+                </label>
+              </div>
+
+              {generatedWhatsAppUrl && (
+                <div style={{
+                  background: 'rgba(7, 94, 84, 0.15)',
+                  border: '1px solid rgba(7, 94, 84, 0.3)',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  marginTop: '8px'
+                }}>
+                  <div style={{ fontSize: '0.7rem', color: '#4ade80', fontWeight: 'bold' }}>
+                    ✓ WhatsApp URL generated!
+                  </div>
+                  <div style={{ 
+                    fontSize: '0.65rem', color: 'var(--text-secondary)',
+                    maxHeight: '60px', overflowY: 'auto', background: 'rgba(0,0,0,0.2)', padding: '6px', borderRadius: '4px'
+                  }}>
+                    {decodeURIComponent(generatedWhatsAppUrl.split('text=')[1] || '')}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <a 
+                      href={generatedWhatsAppUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        flex: 1,
+                        background: '#25d366',
+                        color: 'black',
+                        textAlign: 'center',
+                        textDecoration: 'none',
+                        borderRadius: '6px',
+                        padding: '8px',
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold',
+                        display: 'inline-block'
+                      }}
+                    >
+                      📱 Send to WhatsApp Web
+                    </a>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(generatedWhatsAppUrl);
+                        alert("WhatsApp Web link copied to clipboard!");
+                      }}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        color: 'white',
+                        borderRadius: '6px',
+                        padding: '8px 12px',
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      📋 Copy Link
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCheckInModal(false);
+                    setGeneratedWhatsAppUrl(null);
+                  }}
+                  style={{
+                    background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--text-secondary)',
+                    borderRadius: '8px', padding: '8px 16px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={checkInSaving}
+                  onClick={async () => {
+                    if (!checkInPatient) return;
+                    setCheckInSaving(true);
+                    try {
+                      // Import logVitalsForPatient directly in component scope or use wrapper
+                      const { logVitalsForPatient: logVitals } = await import('../services/ncdService');
+                      await logVitals(
+                        checkInPatient.id || '',
+                        checkInBpSystolic,
+                        checkInBpDiastolic,
+                        checkInGlucose,
+                        checkInGlucoseType
+                      );
+
+                      if (sendWhatsAppChecked) {
+                        const facilityName = activeRole === 'clinic' ? activeClinic?.name : activePharmacy?.name;
+                        const messageText = `Hello ${checkInPatient.name},\n\nThis is a quick summary of your check-in vitals at *${facilityName}*:\n\n📈 *BP:* ${checkInBpSystolic}/${checkInBpDiastolic} mmHg\n🩸 *Glucose:* ${checkInGlucose > 0 ? `${checkInGlucose} mg/dL (${checkInGlucoseType})` : 'N/A'}\n\nTo view your historical charts or check your SafeMeds refill schedules, launch your assistant here: https://diabp-copilot.vercel.app/?patient_id=${checkInPatient.id}`;
+                        const phone = checkInPatient.phone || '';
+                        const cleanPhone = phone.replace(/\D/g, '').replace(/^0/, '234');
+                        const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageText)}`;
+                        setGeneratedWhatsAppUrl(waUrl);
+                      } else {
+                        setShowCheckInModal(false);
+                      }
+
+                      if (onRefreshData) onRefreshData();
+                    } catch (e) {
+                      console.error("Check-in save failed:", e);
+                    } finally {
+                      setCheckInSaving(false);
+                    }
+                  }}
+                  style={{
+                    background: 'var(--color-teal-light)', border: 'none', color: 'white',
+                    borderRadius: '8px', padding: '8px 16px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer',
+                    opacity: checkInSaving ? 0.6 : 1
+                  }}
+                >
+                  {checkInSaving ? 'Saving...' : 'Save & Generate Link'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

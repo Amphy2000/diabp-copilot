@@ -34,6 +34,7 @@ import { ClinicianNcdDashboard } from './components/ClinicianNcdDashboard';
 import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { Auth } from './components/Auth';
 import { supabase, isSupabaseConfigured } from './services/supabase';
+import { WhatsAppSimulator } from './components/WhatsAppSimulator';
 
 function App() {
   // Authentication State
@@ -293,6 +294,47 @@ function App() {
     }
   };
 
+  const handleRefreshData = async () => {
+    if (!session) return;
+    try {
+      const role = session.user.user_metadata.role;
+      const clinicsList = await getClinics();
+      const pharmaciesList = await getPharmacies();
+      setClinics(clinicsList);
+      setPharmacies(pharmaciesList);
+
+      if (role === 'patient') {
+        const profile = await getPatientProfile();
+        const refillOrders = await getRefillOrders();
+        setPatientProfile(profile);
+        setOrders(refillOrders);
+      } else if (role === 'doctor') {
+        const clinicId = userFacilityId || clinicsList[0]?.id;
+        if (clinicId) {
+          const clinicPatients = await getPatientsForClinic(clinicId);
+          const refillOrders = await getRefillOrders();
+          setPatients(clinicPatients);
+          setOrders(refillOrders);
+        }
+      } else if (role === 'pharmacist') {
+        const pharmacyId = userFacilityId || pharmaciesList[0]?.id;
+        if (pharmacyId) {
+          const pharmacyPatients = await getPatientsForPharmacy(pharmacyId);
+          const refillOrders = await getRefillOrders();
+          setPatients(pharmacyPatients);
+          setOrders(refillOrders);
+        }
+      } else if (role === 'admin') {
+        const allPatients = await getAllPatients();
+        const allOrders = await getRefillOrders();
+        setPatients(allPatients);
+        setOrders(allOrders);
+      }
+    } catch (e) {
+      console.error("Failed to refresh state data:", e);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUserFacilityId(null);
@@ -460,6 +502,7 @@ function App() {
               onUpdateClinic={handleUpdateClinic}
               onUpdatePharmacy={handleUpdatePharmacy}
               facilityUserRole={facilityUserRole}
+              onRefreshData={handleRefreshData}
             />
           </div>
         )}
@@ -478,6 +521,15 @@ function App() {
           </div>
         </div>
       </footer>
+
+      {session && (
+        <WhatsAppSimulator 
+          patients={patients}
+          orders={orders}
+          activePatientId={userRole === 'patient' ? patientProfile?.id : undefined}
+          onRefreshData={handleRefreshData}
+        />
+      )}
 
     </div>
   );
