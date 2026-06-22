@@ -14,7 +14,11 @@ import {
   ShoppingBag,
   Lock,
   ShieldCheck,
-  CreditCard
+  CreditCard,
+  Circle,
+  ArrowRight,
+  Sparkles,
+  MessageSquare
 } from 'lucide-react';
 import { 
   evaluateNcdRisk, 
@@ -55,6 +59,34 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
   const [billingEmail, setBillingEmail] = useState('');
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
   const [paymentError, setPaymentError] = useState('');
+
+  // Onboarding guide states
+  const [collapsedOnboarding, setCollapsedOnboarding] = useState<boolean>(() => {
+    const saved = localStorage.getItem('onboarding_collapsed');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+    const hasPhone = !!profile.phone;
+    const hasLoggedVitals = (profile.bpHistory || []).length > 5;
+    const hasCareTeam = !!profile.assignedClinicId || !!profile.assignedPharmacyId;
+    const hasFootScan = (profile.footScanHistory || []).length > 1;
+    const done = hasPhone && hasLoggedVitals && hasCareTeam && hasFootScan;
+    return done;
+  });
+
+  const toggleOnboarding = () => {
+    setCollapsedOnboarding(prev => {
+      localStorage.setItem('onboarding_collapsed', (!prev).toString());
+      return !prev;
+    });
+  };
+
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
 
   const handleUpgradeSubscription = (e: React.FormEvent) => {
     e.preventDefault();
@@ -381,6 +413,263 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
         </div>
       </div>
 
+      {/* Onboarding Quickstart Guide */}
+      {(() => {
+        const hasPhone = !!profile.phone;
+        const hasLoggedVitals = (profile.bpHistory || []).length > 5;
+        const hasCareTeam = !!profile.assignedClinicId || !!profile.assignedPharmacyId;
+        const hasFootScan = (profile.footScanHistory || []).length > 1;
+
+        const onboardingSteps = [
+          {
+            id: 'phone',
+            title: 'Link WhatsApp Bot',
+            description: 'Connect your phone to receive daily dose nudges and log vitals via text message.',
+            instructions: 'Send "join bet-sense" to +1 415 523 8886 on WhatsApp.',
+            isCompleted: hasPhone,
+            actionLabel: 'Link WhatsApp Now',
+            actionUrl: 'https://wa.me/14155238886?text=join%20bet-sense'
+          },
+          {
+            id: 'vitals',
+            title: 'Log Your First Readings',
+            description: 'Record your blood pressure and sugar levels to activate your automated NCD risk evaluation.',
+            instructions: 'Use the readings form below, or reply to the WhatsApp bot.',
+            isCompleted: hasLoggedVitals,
+            actionLabel: 'Go to Vitals Form',
+            actionClick: () => scrollToSection('vitals-form')
+          },
+          {
+            id: 'team',
+            title: 'Select Your Care Team',
+            description: 'Link your clinic or pharmacy to coordinate refills and physician consultations.',
+            instructions: 'Select your doctor clinic and preferred refill pharmacy below.',
+            isCompleted: hasCareTeam,
+            actionLabel: 'Select Care Team',
+            actionClick: () => scrollToSection('care-team-form')
+          },
+          {
+            id: 'foot',
+            title: 'Perform AI Foot Scan',
+            description: 'Upload a picture of your foot sole to scan for Neuropathic high-pressure hotspots.',
+            instructions: 'Upload a picture under the AI Diabetic Foot Scan panel.',
+            isCompleted: hasFootScan,
+            actionLabel: 'Open Foot Scanner',
+            actionClick: () => scrollToSection('foot-scanner')
+          }
+        ];
+
+        const completedSteps = onboardingSteps.filter(s => s.isCompleted).length;
+        const onboardingProgress = Math.round((completedSteps / onboardingSteps.length) * 100);
+
+        return (
+          <div className="glass-panel" style={{
+            background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.4) 100%)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '20px',
+            padding: '24px',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Glowing aura effect */}
+            <div style={{
+              position: 'absolute',
+              top: '-40px',
+              left: '-40px',
+              width: '150px',
+              height: '150px',
+              borderRadius: '50%',
+              background: 'rgba(20, 184, 166, 0.12)',
+              filter: 'blur(40px)',
+              pointerEvents: 'none'
+            }}></div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'white', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles className="w-5 h-5 text-teal-400 animate-pulse" />
+                  Quickstart Guide: Complete Your Self-Onboarding
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  Complete the following 4 steps to link your care cycle and get the most out of your health copilot.
+                </p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'white', background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: '100px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  Progress: {completedSteps}/4 Completed
+                </span>
+                <button
+                  onClick={toggleOnboarding}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    padding: 0
+                  }}
+                >
+                  {collapsedOnboarding ? 'Expand Guide ▾' : 'Hide Guide ▴'}
+                </button>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.04)', borderRadius: '100px', overflow: 'hidden', marginBottom: collapsedOnboarding ? '0' : '20px' }}>
+              <div style={{
+                width: `${onboardingProgress}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #14b8a6 0%, #3b82f6 100%)',
+                borderRadius: '100px',
+                boxShadow: '0 0 8px rgba(20, 184, 166, 0.4)',
+                transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+              }}></div>
+            </div>
+
+            {!collapsedOnboarding && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+                {onboardingSteps.map((step, idx) => {
+                  const IconComponent = step.id === 'phone' ? Phone : step.id === 'vitals' ? Activity : step.id === 'team' ? Compass : Camera;
+                  return (
+                    <div
+                      key={step.id}
+                      style={{
+                        background: step.isCompleted ? 'rgba(20, 184, 166, 0.03)' : 'rgba(255,255,255,0.01)',
+                        border: step.isCompleted ? '1px solid rgba(20, 184, 166, 0.15)' : '1px solid rgba(255, 255, 255, 0.04)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        transition: 'all 0.3s ease',
+                        position: 'relative'
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            background: step.isCompleted ? 'rgba(20, 184, 166, 0.1)' : 'rgba(255,255,255,0.04)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: step.isCompleted ? '#14b8a6' : 'var(--text-secondary)'
+                          }}>
+                            <IconComponent size={16} />
+                          </div>
+                          {step.isCompleted ? (
+                            <CheckCircle size={18} className="text-teal-400" style={{ fill: 'rgba(20, 184, 166, 0.1)' }} />
+                          ) : (
+                            <div style={{
+                              width: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
+                              border: '2px solid rgba(255,255,255,0.2)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '9px',
+                              fontWeight: 'bold',
+                              color: 'var(--text-secondary)'
+                            }}>
+                              {idx + 1}
+                            </div>
+                          )}
+                        </div>
+
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '0.85rem', color: 'white', fontWeight: 700 }}>
+                          {step.title}
+                        </h4>
+                        <p style={{ margin: '0 0 8px 0', fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                          {step.description}
+                        </p>
+                        <p style={{ margin: '0 0 16px 0', fontSize: '0.68rem', color: 'var(--text-muted)', fontStyle: 'italic', lineHeight: '1.3' }}>
+                          💡 {step.instructions}
+                        </p>
+                      </div>
+
+                      {step.isCompleted ? (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          color: '#14b8a6',
+                          fontSize: '0.7rem',
+                          fontWeight: 'bold',
+                          padding: '6px 0'
+                        }}>
+                          ✓ Setup Completed
+                        </div>
+                      ) : step.actionUrl ? (
+                        <a
+                          href={step.actionUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            background: '#25D366', // WhatsApp green
+                            color: 'black',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '6px 12px',
+                            fontSize: '0.72rem',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            textDecoration: 'none',
+                            textAlign: 'center',
+                            boxShadow: '0 4px 10px rgba(37, 211, 102, 0.2)',
+                            transition: 'transform 0.15s ease'
+                          }}
+                          onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
+                          onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+                        >
+                          <MessageSquare size={12} /> {step.actionLabel}
+                        </a>
+                      ) : (
+                        <button
+                          onClick={step.actionClick}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.06)',
+                            color: 'white',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: '6px',
+                            padding: '6px 12px',
+                            fontSize: '0.72rem',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                            e.currentTarget.style.transform = 'none';
+                          }}
+                        >
+                          {step.actionLabel} <ArrowRight size={12} className="text-teal-400" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {logMessage && (
         <div className="p-4 bg-teal-900/20 border border-teal-500/30 text-teal-300 rounded-xl text-sm font-semibold text-center">
           {logMessage}
@@ -689,7 +978,7 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
           </div>
 
           {/* Vitals Logger Form */}
-          <div className="glass-panel">
+          <div id="vitals-form" className="glass-panel">
             <div className="card-header-divider">
               <h3 className="card-title">
                 <Activity className="card-title-icon text-blue-400" />
@@ -766,7 +1055,7 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
           </div>
 
           {/* Primary Care Team Configuration */}
-          <div className="glass-panel">
+          <div id="care-team-form" className="glass-panel">
             <div className="card-header-divider">
               <h3 className="card-title">
                 <Compass className="card-title-icon text-teal-400" />
@@ -884,7 +1173,7 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
         {/* Right Column: AI Foot Ulcer Scanner */}
         <div className="right-column space-y-6">
           
-          <div className="glass-panel scanner-card">
+          <div id="foot-scanner" className="glass-panel scanner-card">
             <div className="card-header-divider" style={{ width: '100%' }}>
               <h3 className="card-title">
                 <Camera className="card-title-icon text-teal-400" />
