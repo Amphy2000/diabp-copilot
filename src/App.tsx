@@ -528,6 +528,8 @@ function App() {
           orders={orders}
           activePatientId={userRole === 'patient' ? patientProfile?.id : undefined}
           onRefreshData={handleRefreshData}
+          userRole={userRole}
+          userFacilityId={userFacilityId}
         />
       )}
 

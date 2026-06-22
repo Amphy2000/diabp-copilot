@@ -22,6 +22,8 @@ interface WhatsAppSimulatorProps {
   orders: NcdRefillOrder[];
   activePatientId?: string;
   onRefreshData?: () => void;
+  userRole?: 'patient' | 'doctor' | 'pharmacist' | 'admin' | null;
+  userFacilityId?: string | null;
 }
 
 interface ChatMessage {
@@ -35,7 +37,9 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
   patients,
   orders,
   activePatientId,
-  onRefreshData
+  onRefreshData,
+  userRole,
+  userFacilityId
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
@@ -43,9 +47,31 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
   const [inputVal, setInputVal] = useState('');
   
   // Bot flow states
-  const [flowState, setFlowState] = useState<'idle' | 'waiting_bp' | 'waiting_glucose' | 'waiting_glucose_type' | 'waiting_refill_confirm'>('idle');
+  const [flowState, setFlowState] = useState<'idle' | 'waiting_bp' | 'waiting_glucose' | 'waiting_glucose_type' | 'waiting_refill_confirm' | 'onboard_name' | 'onboard_age' | 'onboard_phone'>('idle');
   const [tempBp, setTempBp] = useState({ systolic: 120, diastolic: 80 });
   const [tempGlucose, setTempGlucose] = useState(100);
+
+  // Onboarding states
+  const [onboardName, setOnboardName] = useState('');
+  const [onboardAge, setOnboardAge] = useState<number>(45);
+  const [onboardPhone, setOnboardPhone] = useState('');
+  
+  // Patient search filter term
+  const [searchPatientTerm, setSearchPatientTerm] = useState('');
+
+  // Filter patient options based on role & facility connection to prevent data leakage
+  const visiblePatients = patients.filter(p => {
+    if (userRole === 'doctor' && userFacilityId) {
+      return p.assignedClinicId === userFacilityId;
+    }
+    if (userRole === 'pharmacist' && userFacilityId) {
+      return p.assignedPharmacyId === userFacilityId;
+    }
+    if (userRole === 'patient') {
+      return false; // Patients shouldn't see anyone else
+    }
+    return true; // Admin sees all
+  });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -53,23 +79,38 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
   useEffect(() => {
     if (activePatientId) {
       setSelectedPatientId(activePatientId);
-    } else if (patients.length > 0) {
-      setSelectedPatientId(patients[0].id || '');
+    } else if (selectedPatientId !== 'unregistered' && visiblePatients.length > 0) {
+      // Avoid overriding 'unregistered' selection on initial refresh
+      if (!visiblePatients.some(p => p.id === selectedPatientId)) {
+        setSelectedPatientId(visiblePatients[0].id || '');
+      }
     }
-  }, [activePatientId, patients]);
+  }, [activePatientId, visiblePatients]);
 
   // Reset messages when patient context changes
   useEffect(() => {
-    const patientName = patients.find(p => p.id === selectedPatientId)?.name || 'Patient';
-    setMessages([
-      {
-        id: 'welcome',
-        sender: 'bot',
-        text: `Green-check verified *DiaBP Safe-Meds Assistant* connected.\n\nHello ${patientName}! You can manage your chronic hypertension & diabetes care directly inside WhatsApp.\n\nType *Menu* or choose an action below to start.`,
-        timestamp: getFormattedTime()
-      }
-    ]);
-    setFlowState('idle');
+    if (selectedPatientId === 'unregistered') {
+      setMessages([
+        {
+          id: 'welcome',
+          sender: 'bot',
+          text: `Green-check verified *DiaBP Safe-Meds Assistant* connected.\n\nWelcome to DiaBP! I noticed this phone number is not registered in our network yet. Let's get you set up!\n\nWhat is your full name?`,
+          timestamp: getFormattedTime()
+        }
+      ]);
+      setFlowState('onboard_name');
+    } else {
+      const patientName = patients.find(p => p.id === selectedPatientId)?.name || 'Patient';
+      setMessages([
+        {
+          id: 'welcome',
+          sender: 'bot',
+          text: `Green-check verified *DiaBP Safe-Meds Assistant* connected.\n\nHello ${patientName}! You can manage your chronic hypertension & diabetes care directly inside WhatsApp.\n\nType *Menu* or choose an action below to start.`,
+          timestamp: getFormattedTime()
+        }
+      ]);
+      setFlowState('idle');
+    }
   }, [selectedPatientId, patients]);
 
   // Scroll to bottom of chat
@@ -126,7 +167,7 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
           } else if (messageText === '2' || lower.includes('refill') || lower.includes('confirm')) {
             const pendingOrders = orders.filter(o => o.patientId === selectedPatientId && o.status === 'Pending verification');
             if (pendingOrders.length === 0) {
-              addBotMessage("You don't have any pending refill orders waiting for confirmation. Go to the SafeMeds app workspace to request a refill quote.");
+              addBotMessage("You don't have any pending refill orders waiting for confirmation. Reply with *Refill* or type your medication names to request a refill quote directly via chat!");
             } else {
               const order = pendingOrders[0];
               setFlowState('waiting_refill_confirm');
@@ -207,7 +248,7 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
               }
 
               setFlowState('idle');
-              addBotMessage(`💳 Payment Processed successfully via DiaBP Pay!\n\nPharmacy Payout (95% Split): *₦${(order.totalNaira * 0.95).toLocaleString()}*\nPlatform Split Fee (5%): *₦${(order.totalNaira * 0.05).toLocaleString()}*\n\n✓ Refill Approved and marked as *Delivered*. Medications are out for delivery to your registered address.`);
+              addBotMessage(`💳 Refill Payment Confirmed successfully!\n\nAmount Settled: *₦${order.totalNaira.toLocaleString()}*\n\n✓ Refill Approved and marked as *Delivered*. Medications are out for delivery to your registered address.`);
               if (onRefreshData) onRefreshData();
             } else {
               setFlowState('idle');
@@ -217,6 +258,28 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
             setFlowState('idle');
             addBotMessage("Refill payment cancelled. Type *Menu* to start over.");
           }
+          break;
+
+        case 'onboard_name':
+          setOnboardName(messageText);
+          setFlowState('onboard_age');
+          addBotMessage(`Nice to meet you, *${messageText}*!\n\nWhat is your age?`);
+          break;
+
+        case 'onboard_age':
+          const ageVal = parseInt(messageText);
+          if (!isNaN(ageVal) && ageVal > 0) {
+            setOnboardAge(ageVal);
+            setFlowState('onboard_phone');
+            addBotMessage("Great! And what is your 11-digit phone number (e.g. 08012345678)?");
+          } else {
+            addBotMessage("Please enter your age as a valid number:");
+          }
+          break;
+
+        case 'onboard_phone':
+          setOnboardPhone(messageText);
+          await registerNewChatPatient(onboardName, onboardAge, messageText);
           break;
       }
     }, 800);
@@ -235,15 +298,83 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
     }
   };
 
+  const registerNewChatPatient = async (name: string, age: number, phone: string) => {
+    try {
+      const newId = 'c0000000-0000-0000-0000-' + Math.random().toString(36).substr(2, 12).padEnd(12, '0');
+      const clinicId = userRole === 'doctor' ? (userFacilityId || undefined) : undefined;
+      const pharmacyId = userRole === 'pharmacist' ? (userFacilityId || undefined) : undefined;
+
+      const newProfile: PatientNcdProfile = {
+        id: newId,
+        name,
+        age,
+        phone,
+        conditions: ['Essential Hypertension'],
+        isPremium: false,
+        bpHistory: [{ date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), systolic: 120, diastolic: 80 }],
+        glucoseHistory: [{ date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), level: 100, type: 'Fasting' }],
+        streakDays: 0,
+        weight: 70,
+        footScanHistory: [],
+        assignedClinicId: clinicId,
+        assignedPharmacyId: pharmacyId
+      };
+
+      // 1. Save locally to localStorage (both keys for compatibility)
+      const localPStr = localStorage.getItem('diabp_patients');
+      const localP = localPStr ? JSON.parse(localPStr) : [];
+      localP.push(newProfile);
+      localStorage.setItem('diabp_patients', JSON.stringify(localP));
+
+      const profilesLocalStr = localStorage.getItem('diabp_profiles');
+      const profilesLocal = profilesLocalStr ? JSON.parse(profilesLocalStr) : {};
+      profilesLocal[newId] = newProfile;
+      localStorage.setItem('diabp_profiles', JSON.stringify(profilesLocal));
+
+      // 2. Save in database if Supabase is active
+      if (isSupabaseConfigured) {
+        try {
+          await supabase.from('ncd_profiles').insert([{
+            id: newId,
+            name,
+            age,
+            phone,
+            conditions: ['Essential Hypertension'],
+            is_premium: false,
+            streak_days: 0,
+            weight: 70,
+            assigned_clinic_id: clinicId || null,
+            assigned_pharmacy_id: pharmacyId || null
+          }]);
+        } catch (e) {
+          console.warn("Supabase profile insert skipped (requires auth.users link). Local fallback active.");
+        }
+      }
+      
+      setFlowState('idle');
+      addBotMessage(`✓ Onboarding completed successfully! Your profile is registered.\n\nWelcome to DiaBP-Copilot! Type *Menu* to start managing your daily health.`);
+      
+      // Update selected patient
+      setSelectedPatientId(newId);
+      
+      // Refresh the App state
+      if (onRefreshData) onRefreshData();
+    } catch (e) {
+      console.error("Failed to register new chat patient:", e);
+      addBotMessage("Failed to register profile. Please try again.");
+      setFlowState('idle');
+    }
+  };
+
   const handleShortcutClick = (num: string, text: string) => {
     handleSend(num);
   };
 
   return (
     <>
-      {/* 1. Floating Toggle Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
+        className="wa-toggle-btn"
         style={{
           position: 'fixed',
           bottom: '24px',
@@ -295,7 +426,7 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
             background: 'var(--card-bg, #0f172a)',
             backdropFilter: 'blur(10px)',
           }}
-          className="animate-scale-up"
+          className="wa-chat-window animate-scale-up"
         >
           {/* Header */}
           <div
@@ -351,40 +482,68 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
           </div>
 
           {/* Test Patient Switcher (Developer Control Panel) */}
-          <div
-            style={{
-              background: 'rgba(255,255,255,0.02)',
-              borderBottom: '1px solid rgba(255,255,255,0.05)',
-              padding: '6px 12px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '0.7rem',
-              color: 'var(--text-muted, #94a3b8)',
-            }}
-          >
-            <span>Simulate Patient:</span>
-            <select
-              value={selectedPatientId}
-              onChange={(e) => setSelectedPatientId(e.target.value)}
+          {!activePatientId && userRole !== 'patient' && (
+            <div
               style={{
-                background: 'rgba(0,0,0,0.3)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: 'white',
+                background: 'rgba(255,255,255,0.02)',
+                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                padding: '8px 12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
                 fontSize: '0.7rem',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                outline: 'none',
-                maxWidth: '180px',
+                color: 'var(--text-muted, #94a3b8)',
               }}
             >
-              {patients.map(p => (
-                <option key={p.id} value={p.id} style={{ background: '#1e293b' }}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Simulate Patient:</span>
+                <select
+                  value={selectedPatientId}
+                  onChange={(e) => setSelectedPatientId(e.target.value)}
+                  style={{
+                    background: 'rgba(0,0,0,0.3)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: 'white',
+                    fontSize: '0.7rem',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    outline: 'none',
+                    maxWidth: '180px',
+                  }}
+                >
+                  <option value="unregistered" style={{ background: '#1e293b', color: '#10b981', fontWeight: 'bold' }}>➕ Simulate New Patient (Self-Onboard)</option>
+                  {visiblePatients
+                    .filter(p => p.name.toLowerCase().includes(searchPatientTerm.toLowerCase()))
+                    .map(p => (
+                      <option key={p.id} value={p.id} style={{ background: '#1e293b' }}>
+                        {p.name}
+                      </option>
+                    ))
+                  }
+                </select>
+              </div>
+              
+              {/* Search filter for 400+ patients */}
+              {visiblePatients.length > 3 && (
+                <input 
+                  type="text"
+                  placeholder="🔍 Search patients list..."
+                  value={searchPatientTerm}
+                  onChange={(e) => setSearchPatientTerm(e.target.value)}
+                  style={{
+                    background: 'rgba(0,0,0,0.2)',
+                    border: '1px solid rgba(255,255,255,0.05)',
+                    borderRadius: '4px',
+                    padding: '4px 8px',
+                    color: 'white',
+                    fontSize: '0.65rem',
+                    outline: 'none',
+                    width: '100%'
+                  }}
+                />
+              )}
+            </div>
+          )}
 
           {/* Messages Area */}
           <div
@@ -571,7 +730,7 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
                   fontWeight: 'bold',
                 }}
               >
-                Pay & Split Payout
+                Approve & Pay Refill
               </button>
               <button
                 onClick={() => handleSend('2')}

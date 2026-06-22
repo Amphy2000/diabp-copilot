@@ -1006,14 +1006,6 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
             </div>
 
             <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '12px', textAlign: 'left' }}>
-              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Net Payout</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#38bdf8', marginTop: '4px' }}>
-                ₦{(totalRevenue * (1 - commissionRate)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '2px' }}>Settled to bank account</div>
-            </div>
-
-            <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '16px', borderRadius: '12px', textAlign: 'left' }}>
               <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Active Patients</div>
               <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#eab308', marginTop: '4px' }}>
                 {activePatientsCount}
@@ -1039,7 +1031,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
               Financial Revenue Analytics Locked
             </h4>
             <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-secondary)', maxWidth: '380px' }}>
-              Financial reporting, commission splits, and settlement details are only accessible to the Owner or designated Admin role. Contact your facility manager to adjust permissions.
+              Financial reporting, revenue analytics, and billing settlement details are only accessible to the Owner or designated Admin role. Contact your facility manager to adjust permissions.
             </p>
           </div>
         )}
@@ -3538,19 +3530,6 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
             {/* Modal Form */}
             <form onSubmit={handleSavePayout} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
               
-              <div style={{
-                fontSize: '0.7rem',
-                color: '#fbbf24',
-                background: 'rgba(245, 158, 11, 0.08)',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                border: '1px solid rgba(245, 158, 11, 0.2)',
-                lineHeight: '1.4',
-                marginBottom: '4px'
-              }}>
-                💰 <strong>Zero Upfront SaaS Cost:</strong> DiaBP-Copilot is completely free for clinics and pharmacies. We only charge a 2.5% to 5% commission on successfully completed medication refill checkouts. If you don't generate refill transactions, you pay absolutely ₦0.
-              </div>
-
               {payoutTab === 'automatic' ? (
                 <>
                   <div style={{

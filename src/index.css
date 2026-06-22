@@ -1378,3 +1378,33 @@ body {
   0% { transform: scale(0.75); opacity: 0.8; }
   85%, 100% { transform: scale(2.2); opacity: 0; }
 }
+
+/* Responsive Overrides for Floating WhatsApp Widget */
+@media (max-width: 768px) {
+  .wa-toggle-btn {
+    width: 48px !important;
+    height: 48px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    justify-content: center !important;
+    align-items: center !important;
+    font-size: 0 !important; /* Hide text label on mobile */
+    bottom: 16px !important;
+    right: 16px !important;
+  }
+  
+  .wa-toggle-btn svg {
+    width: 22px !important;
+    height: 22px !important;
+    margin: 0 !important;
+  }
+
+  .wa-chat-window {
+    bottom: 76px !important;
+    right: 12px !important;
+    left: 12px !important;
+    width: auto !important;
+    height: 450px !important;
+    max-height: calc(100vh - 100px) !important;
+  }
+}
