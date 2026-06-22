@@ -81,6 +81,99 @@ interface ClinicianNcdDashboardProps {
   onRefreshData?: () => void;
 }
 
+const pitchSlides = [
+  {
+    title: "DiaBP-Copilot",
+    subtitle: "Reimagining Chronic Disease Care in Nigeria & Beyond",
+    bullets: [
+      "📢 Connecting Clinicians, Community Pharmacies, and Patients",
+      "🤖 Driven by WhatsApp AI bot and computer-vision diagnostics",
+      "🌐 Custom branded deployment at diabpcopilot.com"
+    ]
+  },
+  {
+    title: "The Silent Epidemic",
+    subtitle: "Nigeria's NCD Challenge",
+    bullets: [
+      "💔 Hypertension & Diabetes cause millions of avoidable strokes & amputations.",
+      "📉 Patient adherence is low (<35%) due to complex tracking requirements.",
+      "⚠️ Facilities lack continuous home patient data, resulting in reactive emergency care."
+    ]
+  },
+  {
+    title: "The Solution: DiaBP-Copilot",
+    subtitle: "A Zero-Barrier Connected Care Loop",
+    bullets: [
+      "📲 WhatsApp Bot: Patients log readings & request refills on their existing messaging app.",
+      "🥼 Clinician Dashboard: Real-time patient triage queues & AI foot scan alerts.",
+      "💊 Pharmacy network: Automated monthly drug refill fulfillment with split payments."
+    ]
+  },
+  {
+    title: "Zero-Install WhatsApp Assistant",
+    subtitle: "Engaging patients where they already are",
+    bullets: [
+      "💬 98% of patients already use WhatsApp daily. No app download is required.",
+      "⚡ Self-onboard in 60 seconds by texting 'join bet-sense' to +1 415 523 8886.",
+      "📈 Automated nudge schedules check in on patients when they forget to track."
+    ]
+  },
+  {
+    title: "Clinician Workspace",
+    subtitle: "Real-time oversight with less admin overhead",
+    bullets: [
+      "🚨 Automated Triage: Priority queue flags patients with critical blood pressure/glucose.",
+      "📝 Care Team Notice Board: Shift-to-shift handover notes prevent critical errors.",
+      "👥 Roster Management: Invite doctors, nurses, and staff with secure role limitations."
+    ]
+  },
+  {
+    title: "SafeMeds Refills",
+    subtitle: "Securing medication adherence & predictable revenue",
+    bullets: [
+      "🔄 Subscription-based tracking automatically calculates drug depletion cycles.",
+      "💳 Refill Quotes: Patients approve monthly quotes directly inside WhatsApp.",
+      "📦 Community dispatch: Fulfillments routed directly to community pharmacies."
+    ]
+  },
+  {
+    title: "AI Diabetic Foot Screening",
+    subtitle: "Early neuropathy detection preventing amputations",
+    bullets: [
+      "📸 Patients upload foot sole photos via WhatsApp or dashboard camera.",
+      "🔬 AI Hotspot Detection: Screens image for high-friction zones and early ulcer risk.",
+      "🥼 Auto-Flagging: Instantly alerts the clinic to schedule podiatry consults."
+    ]
+  },
+  {
+    title: "Instant Split Payouts",
+    subtitle: "Sustainable monetization for health partners",
+    bullets: [
+      "💳 Integrated Paystack/Flutterwave billing rails.",
+      "⚡ Instant Splits: 95% of customer subscription/drug fees sent straight to your bank.",
+      "🔒 5% Platform Fee: Covers automated SMS bundles, hosting, and AI compute."
+    ]
+  },
+  {
+    title: "Branding & PWA Capabilities",
+    subtitle: "Enterprise-grade presentation",
+    bullets: [
+      "🏷️ White-Labeled: Fully branded on custom domain diabpcopilot.com.",
+      "📱 Progressive Web App: Installable on Home Screen for Android & iOS.",
+      "🔌 Offline Synchronization: Access database and log consults without internet."
+    ]
+  },
+  {
+    title: "Transform Your Facility",
+    subtitle: "Launch in under 60 seconds",
+    bullets: [
+      "🏥 Setup your clinic/pharmacy on diabpcopilot.com.",
+      "📈 Improve patient retention, increase revenue, and prevent NCD complications.",
+      "🚀 Contact: support@diabpcopilot.com | Start today."
+    ]
+  }
+];
+
 export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({ 
   orders, 
   onUpdateOrderStatus, 
@@ -268,6 +361,9 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   const [staffError, setStaffError] = useState('');
   const [staffSuccess, setStaffSuccess] = useState('');
   const [collapsedStaffPanel, setCollapsedStaffPanel] = useState(true);
+  const [collapsedNoticeBoard, setCollapsedNoticeBoard] = useState(true);
+  const [showPitchDeck, setShowPitchDeck] = useState(false);
+  const [currentPitchSlide, setCurrentPitchSlide] = useState(0);
 
   // Onboarding guide state
   const [collapsedOnboarding, setCollapsedOnboarding] = useState<boolean>(() => {
@@ -1030,6 +1126,30 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                 💳 Payout Settings
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentPitchSlide(0);
+                setShowPitchDeck(true);
+              }}
+              style={{
+                background: 'rgba(20, 184, 166, 0.15)',
+                border: '1px solid rgba(20, 184, 166, 0.3)',
+                color: 'var(--color-teal-light)',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                fontSize: '0.7rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              📢 Pitch Deck & Promo
+            </button>
           </div>
         </div>
       </div>
@@ -1629,7 +1749,10 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
 
       {/* Care Team Handover & Notice Board */}
       <div className="glass-panel" style={{ padding: '20px', marginBottom: '16px', background: 'rgba(13, 17, 23, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+        <div 
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px', cursor: 'pointer' }}
+          onClick={() => setCollapsedNoticeBoard(!collapsedNoticeBoard)}
+        >
           <div>
             <h3 style={{ margin: 0, fontSize: '0.85rem', color: 'white', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <FileText className="w-4 h-4 text-teal-400" />
@@ -1639,9 +1762,14 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
               Post shift notes, critical announcements, and medication shortages for staff members.
             </p>
           </div>
-          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: '4px' }}>
-            Facility: {activeRole === 'clinic' ? (activeClinic?.name || 'Clinic') : (activePharmacy?.name || 'Pharmacy')}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: '4px' }}>
+              Facility: {activeRole === 'clinic' ? (activeClinic?.name || 'Clinic') : (activePharmacy?.name || 'Pharmacy')}
+            </span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              {collapsedNoticeBoard ? 'Expand ▾' : 'Collapse ▴'}
+            </span>
+          </div>
         </div>
 
         <form onSubmit={handleAddCareNote} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
@@ -1684,54 +1812,82 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
           </button>
         </form>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: collapsedNoticeBoard ? 'none' : '180px', overflowY: 'auto' }}>
           {careNotes.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '15px', color: 'var(--text-muted)', fontSize: '0.72rem', fontStyle: 'italic' }}>
               No active memos posted.
             </div>
           ) : (
-            careNotes.map((note) => (
-              <div 
-                key={note.id} 
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'start',
-                  background: 'rgba(255, 255, 255, 0.01)',
-                  border: '1px solid rgba(255,255,255,0.03)',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  fontSize: '0.75rem'
-                }}
-              >
-                <div style={{ textAlign: 'left', flex: 1, paddingRight: '12px' }}>
-                  <p style={{ margin: 0, color: 'white', lineHeight: '1.4' }}>{note.content}</p>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px', fontSize: '0.62rem', color: 'var(--text-muted)' }}>
-                    <span style={{ color: 'var(--color-teal-light)', fontWeight: 'bold' }}>{note.author}</span>
-                    <span>•</span>
-                    <span>{new Date(note.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+            <>
+              {(collapsedNoticeBoard ? careNotes.slice(0, 1) : careNotes).map((note) => (
+                <div 
+                  key={note.id} 
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'start',
+                    background: 'rgba(255, 255, 255, 0.01)',
+                    border: '1px solid rgba(255,255,255,0.03)',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    fontSize: '0.75rem'
+                  }}
+                >
+                  <div style={{ textAlign: 'left', flex: 1, paddingRight: '12px' }}>
+                    <p style={{ margin: 0, color: 'white', lineHeight: '1.4' }}>{note.content}</p>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px', fontSize: '0.62rem', color: 'var(--text-muted)' }}>
+                      <span style={{ color: 'var(--color-teal-light)', fontWeight: 'bold' }}>{note.author}</span>
+                      <span>•</span>
+                      <span>{new Date(note.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
                   </div>
+                  {(workspaceRole === 'admin' || note.author === currentUserEmail) && (
+                    <button
+                      onClick={() => handleDeleteCareNote(note.id)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        fontSize: '0.65rem',
+                        padding: '2px 6px',
+                        borderRadius: '4px'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.color = '#f87171'}
+                      onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
-                {(workspaceRole === 'admin' || note.author === currentUserEmail) && (
-                  <button
-                    onClick={() => handleDeleteCareNote(note.id)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--text-muted)',
-                      cursor: 'pointer',
-                      fontSize: '0.65rem',
-                      padding: '2px 6px',
-                      borderRadius: '4px'
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.color = '#f87171'}
-                    onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
-                  >
-                    Delete
-                  </button>
-                )}
-              </div>
-            ))
+              ))}
+              {collapsedNoticeBoard && careNotes.length > 1 && (
+                <div 
+                  onClick={() => setCollapsedNoticeBoard(false)}
+                  style={{ 
+                    textAlign: 'center', 
+                    padding: '6px', 
+                    color: 'var(--text-muted)', 
+                    fontSize: '0.7rem', 
+                    cursor: 'pointer',
+                    background: 'rgba(255,255,255,0.02)',
+                    borderRadius: '6px',
+                    border: '1px dashed rgba(255,255,255,0.05)',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+                    e.currentTarget.style.color = 'white';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
+                    e.currentTarget.style.color = 'var(--text-muted)';
+                  }}
+                >
+                  + {careNotes.length - 1} more memo{careNotes.length - 1 > 1 ? 's' : ''} • Click to expand and view all
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -3103,10 +3259,11 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                 View and manage registered staff accounts and assign workspace permissions.
               </p>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setStaffError('');
                   setStaffSuccess('');
                   setAddingStaff(true);
@@ -4428,7 +4585,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
 
                       if (sendWhatsAppChecked) {
                         const facilityName = activeRole === 'clinic' ? activeClinic?.name : activePharmacy?.name;
-                        const messageText = `Hello ${checkInPatient.name},\n\nThis is a quick summary of your check-in vitals at *${facilityName}*:\n\n📈 *BP:* ${checkInBpSystolic}/${checkInBpDiastolic} mmHg\n🩸 *Glucose:* ${checkInGlucose > 0 ? `${checkInGlucose} mg/dL (${checkInGlucoseType})` : 'N/A'}\n\nTo view your historical charts or check your SafeMeds refill schedules, launch your assistant here: https://diabp-copilot.vercel.app/?patient_id=${checkInPatient.id}`;
+                        const messageText = `Hello ${checkInPatient.name},\n\nThis is a quick summary of your check-in vitals at *${facilityName}*:\n\n📈 *BP:* ${checkInBpSystolic}/${checkInBpDiastolic} mmHg\n🩸 *Glucose:* ${checkInGlucose > 0 ? `${checkInGlucose} mg/dL (${checkInGlucoseType})` : 'N/A'}\n\nTo view your historical charts or check your SafeMeds refill schedules, launch your assistant here: https://diabpcopilot.com/?patient_id=${checkInPatient.id}`;
                         const phone = checkInPatient.phone || '';
                         const cleanPhone = phone.replace(/\D/g, '').replace(/^0/, '234');
                         const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageText)}`;
@@ -4453,6 +4610,270 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                   {checkInSaving ? 'Saving...' : 'Save & Generate Link'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pitch Deck & Marketing Hub Modal */}
+      {showPitchDeck && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(10, 10, 12, 0.85)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 99999,
+          padding: '20px'
+        }}>
+          <div className="glass-panel animate-scale-in" style={{
+            width: '100%',
+            maxWidth: '750px',
+            background: 'rgba(20, 24, 33, 0.95)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '20px',
+            overflow: 'hidden',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            flexDirection: 'column',
+            maxHeight: '90vh'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 24px',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              background: 'rgba(0,0,0,0.2)'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', color: 'white', fontWeight: 'bold' }}>
+                  📢 DiaBP-Copilot Pitch Deck & Marketing Hub
+                </h3>
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                  Promotional launch copy and interactive slide presentation for partners and clinics.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowPitchDeck(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  padding: '4px'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.color = 'white'}
+                onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div style={{
+              padding: '24px',
+              overflowY: 'auto',
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '24px'
+            }}>
+              
+              {/* Part 1: High Conversion Copy */}
+              <div style={{
+                background: 'rgba(20, 184, 166, 0.04)',
+                border: '1px solid rgba(20, 184, 166, 0.15)',
+                borderRadius: '12px',
+                padding: '16px',
+                textAlign: 'left'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--color-teal-light)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    📢 Short Pitch Copy
+                  </span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText("DiaBP-Copilot is Nigeria's first integrated AI-powered care coordinator for hypertension and diabetes. By connecting clinicians, community pharmacies, and patients through an effortless, zero-app-friction WhatsApp bot and a premium web dashboard, DiaBP-Copilot automates vitals tracking, guarantees medication adherence via SafeMeds refills, and deploys computer-vision AI to screen for diabetic foot complications. Elevate patient outcomes and streamline your clinical workflow—fully branded under diabpcopilot.com. Get started in under 60 seconds.");
+                      alert("Promotional text copied to clipboard!");
+                    }}
+                    style={{
+                      background: 'rgba(20, 184, 166, 0.15)',
+                      border: '1px solid rgba(20, 184, 166, 0.25)',
+                      color: 'var(--color-teal-light)',
+                      borderRadius: '6px',
+                      padding: '4px 8px',
+                      fontSize: '0.65rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Copy Text
+                  </button>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                  DiaBP-Copilot is Nigeria's first integrated AI-powered care coordinator for hypertension and diabetes. By connecting clinicians, community pharmacies, and patients through an effortless, zero-app-friction WhatsApp bot and a premium web dashboard, DiaBP-Copilot automates vitals tracking, guarantees medication adherence via SafeMeds refills, and deploys computer-vision AI to screen for diabetic foot complications. Elevate patient outcomes and streamline your clinical workflow—fully branded under diabpcopilot.com. Get started in under 60 seconds.
+                </p>
+              </div>
+
+              {/* Part 2: Interactive Slideshow */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'white', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    📊 Interactive Presentation Slides
+                  </span>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                    Slide {currentPitchSlide + 1} of {pitchSlides.length}
+                  </span>
+                </div>
+
+                {/* Slide Card */}
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.6) 100%)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: '16px',
+                  padding: '32px 24px',
+                  minHeight: '220px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  textAlign: 'center',
+                  position: 'relative',
+                  boxShadow: 'inset 0 0 20px rgba(0,0,0,0.2)'
+                }}>
+                  <h4 style={{ margin: 0, fontSize: '1.25rem', color: 'white', fontWeight: '800' }}>
+                    {pitchSlides[currentPitchSlide].title}
+                  </h4>
+                  <p style={{ margin: '8px 0 16px 0', fontSize: '0.8rem', color: 'var(--color-teal-light)', fontWeight: 'bold' }}>
+                    {pitchSlides[currentPitchSlide].subtitle}
+                  </p>
+                  <ul style={{
+                    margin: 0,
+                    padding: 0,
+                    listStyleType: 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    maxWidth: '480px',
+                    textAlign: 'left'
+                  }}>
+                    {pitchSlides[currentPitchSlide].bullets.map((b, i) => (
+                      <li key={i} style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: '8px', lineHeight: '1.4' }}>
+                        <span>•</span>
+                        <span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Slideshow Controls */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+                  <button
+                    disabled={currentPitchSlide === 0}
+                    onClick={() => setCurrentPitchSlide(prev => Math.max(0, prev - 1))}
+                    style={{
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      color: currentPitchSlide === 0 ? 'rgba(255,255,255,0.2)' : 'white',
+                      borderRadius: '8px',
+                      padding: '6px 12px',
+                      fontSize: '0.7rem',
+                      fontWeight: 'bold',
+                      cursor: currentPitchSlide === 0 ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    ◀ Back
+                  </button>
+                  
+                  {/* Indicators */}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {pitchSlides.map((_, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => setCurrentPitchSlide(idx)}
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: currentPitchSlide === idx ? 'var(--color-teal-light)' : 'rgba(255,255,255,0.15)',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s'
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  <button
+                    disabled={currentPitchSlide === pitchSlides.length - 1}
+                    onClick={() => setCurrentPitchSlide(prev => Math.min(pitchSlides.length - 1, prev + 1))}
+                    style={{
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      color: currentPitchSlide === pitchSlides.length - 1 ? 'rgba(255,255,255,0.2)' : 'white',
+                      borderRadius: '8px',
+                      padding: '6px 12px',
+                      fontSize: '0.7rem',
+                      fontWeight: 'bold',
+                      cursor: currentPitchSlide === pitchSlides.length - 1 ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    Next ▶
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '16px 24px',
+              borderTop: '1px solid rgba(255,255,255,0.06)',
+              background: 'rgba(0,0,0,0.2)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                💡 Tip: You can print this page to export slides as a PDF.
+              </span>
+              <button
+                onClick={() => {
+                  const markdownText = `# DiaBP-Copilot Pitch Deck\n\n` + 
+                    `## 📢 Promotional Copy\n\n` +
+                    `DiaBP-Copilot is Nigeria's first integrated AI-powered care coordinator for hypertension and diabetes. By connecting clinicians, community pharmacies, and patients through an effortless, zero-app-friction WhatsApp bot and a premium web dashboard, DiaBP-Copilot automates vitals tracking, guarantees medication adherence via SafeMeds refills, and deploys computer-vision AI to screen for diabetic foot complications. Elevate patient outcomes and streamline your clinical workflow—fully branded under diabpcopilot.com.\n\n` +
+                    `---\n\n` +
+                    `## 📊 Slide Presentation\n\n` +
+                    pitchSlides.map((s, idx) => `### Slide ${idx + 1}: ${s.title}\n**${s.subtitle}**\n${s.bullets.map(b => `- ${b}`).join('\n')}`).join('\n\n---\n\n');
+                  
+                  const element = document.createElement("a");
+                  const file = new Blob([markdownText], { type: 'text/markdown' });
+                  element.href = URL.createObjectURL(file);
+                  element.download = "diabp_pitch_deck.md";
+                  document.body.appendChild(element);
+                  element.click();
+                  document.body.removeChild(element);
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
+                  border: 'none',
+                  color: 'white',
+                  borderRadius: '8px',
+                  padding: '8px 16px',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(20, 184, 166, 0.25)'
+                }}
+              >
+                📥 Download Pitch Deck (.md)
+              </button>
             </div>
           </div>
         </div>

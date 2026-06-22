@@ -151,11 +151,11 @@ serve(async (req) => {
     if (lower === "menu" || lower === "hello" || lower === "hi") {
       if (patient) {
         await saveSession("idle", {});
-        replyText = `Hello ${patient.name}! Welcome back to DiaBP Safe-Meds Assistant.\n\nMain Menu:\n\n*1.* Log Daily Vitals 📈\n*2.* Confirm Monthly Refill 💊\n*3.* Get Health PDF Report 📄\n\nReply with the option number (1, 2 or 3) to choose. Or visit our app at https://diabp-copilot.vercel.app to view your dashboard.`;
+        replyText = `Hello ${patient.name}! Welcome back to DiaBP Safe-Meds Assistant.\n\nMain Menu:\n\n*1.* Log Daily Vitals 📈\n*2.* Confirm Monthly Refill 💊\n*3.* Get Health PDF Report 📄\n\nReply with the option number (1, 2 or 3) to choose. Or visit our app at https://diabpcopilot.com to view your dashboard.`;
       } else if (sessionState === "clinician_dashboard") {
-        replyText = `Hello! You are registered as a Care Clinician (Doctor/Nurse).\n\nPlease log in to your web dashboard at https://diabp-copilot.vercel.app to manage your registry and patients.`;
+        replyText = `Hello! You are registered as a Care Clinician (Doctor/Nurse).\n\nPlease log in to your web dashboard at https://diabpcopilot.com to manage your registry and patients.`;
       } else if (sessionState === "pharmacist_dashboard") {
-        replyText = `Hello! You are registered as a Community Pharmacy Partner.\n\nPlease log in to your web dashboard at https://diabp-copilot.vercel.app to view and fulfill monthly refill orders.`;
+        replyText = `Hello! You are registered as a Community Pharmacy Partner.\n\nPlease log in to your web dashboard at https://diabpcopilot.com to view and fulfill monthly refill orders.`;
       } else {
         await saveSession("onboard_role", {});
         replyText = `Welcome to DiaBP! Let's get you set up. Are you a:\n\n*1.* Patient 🩺\n*2.* Doctor/Clinician 🥼\n*3.* Pharmacist/Pharmacy 💊\n\nReply with the option number (1, 2 or 3) to choose.`;
@@ -260,7 +260,7 @@ serve(async (req) => {
 
             const registeredEmail = tempData.email;
             await saveSession("idle", {});
-            replyText = `✓ Onboarding completed successfully! Your profile is registered.\n\nUsername: *${registeredEmail}*\nTemporary Password: *${messageText}*\n\nWe encourage you to download and log in to the App to view your vitals dashboard & unlock premium features (like the AI foot scanner):\n\n🔗 https://diabp-copilot.vercel.app`;
+            replyText = `✓ Onboarding completed successfully! Your profile is registered.\n\nUsername: *${registeredEmail}*\nTemporary Password: *${messageText}*\n\nWe encourage you to download and log in to the App to view your vitals dashboard & unlock premium features (like the AI foot scanner):\n\n🔗 https://diabpcopilot.com`;
           } catch (insertErr) {
             console.error("[WhatsApp Webhook] Onboarding insert failed:", insertErr);
             replyText = "Error saving your profile database record. Please try again or type *Menu* to restart.";
@@ -345,7 +345,7 @@ serve(async (req) => {
             const registeredEmail = tempData.email;
             await saveSession("clinician_dashboard", { email: registeredEmail });
 
-            replyText = `✓ Onboarding completed successfully! Your clinic is registered.\n\nClinic: *${tempData.clinic_name}*\nUsername: *${registeredEmail}*\nTemporary Password: *${messageText}*\n\nPlease visit https://diabp-copilot.vercel.app to log in as a Doctor and manage your clinical dashboard.`;
+            replyText = `✓ Onboarding completed successfully! Your clinic is registered.\n\nClinic: *${tempData.clinic_name}*\nUsername: *${registeredEmail}*\nTemporary Password: *${messageText}*\n\nPlease visit https://diabpcopilot.com to log in as a Doctor and manage your clinical dashboard.`;
           } catch (err) {
             console.error("[WhatsApp Webhook] Doctor onboarding failed:", err);
             replyText = "Error saving your clinic registry details. Please try again or type *Menu* to restart.";
@@ -431,7 +431,7 @@ serve(async (req) => {
             const registeredEmail = tempData.email;
             await saveSession("pharmacist_dashboard", { email: registeredEmail });
 
-            replyText = `✓ Onboarding completed successfully! Your pharmacy is registered.\n\nPharmacy: *${tempData.pharm_name}*\nUsername: *${registeredEmail}*\nTemporary Password: *${messageText}*\n\nPlease visit https://diabp-copilot.vercel.app to log in as a Pharmacist and manage your pharmacy dashboard.`;
+            replyText = `✓ Onboarding completed successfully! Your pharmacy is registered.\n\nPharmacy: *${tempData.pharm_name}*\nUsername: *${registeredEmail}*\nTemporary Password: *${messageText}*\n\nPlease visit https://diabpcopilot.com to log in as a Pharmacist and manage your pharmacy dashboard.`;
           } catch (err) {
             console.error("[WhatsApp Webhook] Pharmacist onboarding failed:", err);
             replyText = "Error saving your pharmacy registry details. Please try again or type *Menu* to restart.";
@@ -468,7 +468,7 @@ serve(async (req) => {
               replyText = `Refill Request Found!\n\nMedications: *${order.items?.join(", ")}*\nTotal Amount: *₦${order.total_naira.toLocaleString()}*\n\nWould you like to approve and pay for this monthly refill?\n\n*1.* Yes, approve & pay\n*2.* Cancel`;
             }
           } else if (messageText === "3" || lower.includes("report") || lower.includes("pdf")) {
-            replyText = "Generating your secure DiaBP Health Vitals Audit PDF report...\n\n📄 https://diabp-copilot.vercel.app/mock_report.pdf\n\nThis report has been uploaded to your clinician's registry automatically.";
+            replyText = "Generating your secure DiaBP Health Vitals Audit PDF report...\n\n📄 https://diabpcopilot.com/mock_report.pdf\n\nThis report has been uploaded to your clinician's registry automatically.";
           } else {
             replyText = "I didn't understand that command. Type *Menu* to return to the options menu.";
           }

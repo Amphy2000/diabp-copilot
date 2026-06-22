@@ -174,7 +174,7 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
               addBotMessage(`Refill Request Found!\n\nMedications: *${order.items.join(', ')}*\nTotal Amount: *₦${order.totalNaira.toLocaleString()}*\n\nWould you like to approve and pay for this monthly refill?\n\n*1.* Yes, approve & pay\n*2.* Cancel`);
             }
           } else if (messageText === '3' || lower.includes('report') || lower.includes('pdf')) {
-            addBotMessage("Generating your secure DiaBP Health Vitals Audit PDF report...\n\n📄 [Download BP & Sugar Audit Report](https://diabp-copilot.vercel.app/mock_report.pdf)\n\nThis report has been uploaded to your clinician's registry automatically.");
+            addBotMessage("Generating your secure DiaBP Health Vitals Audit PDF report...\n\n📄 [Download BP & Sugar Audit Report](https://diabpcopilot.com/mock_report.pdf)\n\nThis report has been uploaded to your clinician's registry automatically.");
           } else {
             addBotMessage("I didn't understand that command. Type *Menu* to return to options.");
           }
@@ -373,6 +373,7 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
   return (
     <>
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="wa-toggle-btn"
         style={{
@@ -383,15 +384,14 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
           background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
           color: 'white',
           border: '1px solid rgba(255,255,255,0.15)',
-          borderRadius: '50px',
-          padding: '12px 20px',
+          borderRadius: '50%',
+          width: '50px',
+          height: '50px',
           boxShadow: '0 8px 32px rgba(34, 197, 94, 0.4)',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          justifyContent: 'center',
           cursor: 'pointer',
-          fontWeight: 'bold',
-          fontSize: '0.85rem',
           transition: 'transform 0.2s, box-shadow 0.2s',
         }}
         onMouseEnter={(e) => {
@@ -402,9 +402,9 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
           e.currentTarget.style.transform = 'translateY(0)';
           e.currentTarget.style.boxShadow = '0 8px 32px rgba(34, 197, 94, 0.4)';
         }}
+        title="DiaBP WhatsApp Assistant Bot"
       >
-        <MessageCircle className="w-5 h-5" />
-        DiaBP WhatsApp Bot
+        <MessageCircle className="w-5.5 h-5.5" />
       </button>
 
       {/* 2. Chat Simulator Panel */}
