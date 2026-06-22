@@ -151,7 +151,7 @@ serve(async (req) => {
     if (lower === "menu" || lower === "hello" || lower === "hi") {
       await saveSession("idle", {});
       if (patient) {
-        replyText = `Hello ${patient.name}! Welcome back to DiaBP Safe-Meds Assistant.\n\nMain Menu:\n\n*1.* Log Daily Vitals 📈\n*2.* Confirm Monthly Refill 💊\n*3.* Get Health PDF Report 📄\n\nReply with the option number (1, 2 or 3) to choose.`;
+        replyText = `Hello ${patient.name}! Welcome back to DiaBP Safe-Meds Assistant.\n\nMain Menu:\n\n*1.* Log Daily Vitals 📈\n*2.* Confirm Monthly Refill 💊\n*3.* Get Health PDF Report 📄\n\nReply with the option number (1, 2 or 3) to choose. Or visit our app at https://diabp-copilot.vercel.app to view your dashboard.`;
       } else {
         await saveSession("onboard_name", {});
         replyText = `Welcome to DiaBP! I noticed this phone number is not registered in our care network yet. Let's get you set up!\n\nWhat is your full name?`;
@@ -212,12 +212,19 @@ serve(async (req) => {
               console.warn("[WhatsApp Webhook] Auth user create skipped:", authErr.message);
             }
 
+            let phoneValue = messageText;
+            const enteredLast10 = messageText.slice(-10);
+            const senderLast10 = senderPhone.slice(-10);
+            if (enteredLast10 !== senderLast10) {
+              phoneValue = `${messageText} (WhatsApp: +${senderPhone})`;
+            }
+
             // 2. Insert the profile satisfying all NOT NULL constraints
             const { error: insertErr } = await supabase.from("ncd_profiles").insert([{
               id: authUserId,
               name: tempData.name,
               age: tempData.age,
-              phone: messageText,
+              phone: phoneValue,
               conditions: ["Essential Hypertension"],
               baseline_bp: "120/80",
               target_glucose_range: "Fasting: 80-130 mg/dL",
@@ -229,8 +236,9 @@ serve(async (req) => {
 
             if (insertErr) throw insertErr;
 
+            const registeredEmail = tempData.email;
             await saveSession("idle", {});
-            replyText = `✓ Onboarding completed successfully! Your profile is registered.\n\nUsername: *${tempData.email}*\nTemporary Password: *${messageText}*\n\nWe encourage you to download and log in to the App to view your vitals dashboard & unlock premium features (like the AI foot scanner):\n\n🔗 https://diabp-copilot.vercel.app`;
+            replyText = `✓ Onboarding completed successfully! Your profile is registered.\n\nUsername: *${registeredEmail}*\nTemporary Password: *${messageText}*\n\nWe encourage you to download and log in to the App to view your vitals dashboard & unlock premium features (like the AI foot scanner):\n\n🔗 https://diabp-copilot.vercel.app`;
           } catch (insertErr) {
             console.error("[WhatsApp Webhook] Onboarding insert failed:", insertErr);
             replyText = "Error saving your profile database record. Please try again or type *Menu* to restart.";
