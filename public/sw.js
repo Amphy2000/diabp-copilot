@@ -43,6 +43,45 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+// State for background reminders (held in service worker memory)
+let reminderConfig = {
+  enabled: false,
+  reminderTime: '08:00',
+  streakDays: 1,
+  hasLoggedToday: false,
+  lastReminderDate: ''
+};
+
+// Background reminder check interval (runs in the Service Worker thread)
+setInterval(() => {
+  if (!reminderConfig.enabled) return;
+
+  const now = new Date();
+  const currentHours = String(now.getHours()).padStart(2, '0');
+  const currentMinutes = String(now.getMinutes()).padStart(2, '0');
+  const currentTimeStr = `${currentHours}:${currentMinutes}`;
+
+  if (currentTimeStr === reminderConfig.reminderTime) {
+    const todayStr = now.toDateString();
+    if (reminderConfig.lastReminderDate !== todayStr && !reminderConfig.hasLoggedToday) {
+      reminderConfig.lastReminderDate = todayStr;
+      
+      const title = "⏰ Daily Health Check-in";
+      const body = `Time to log your blood pressure and glucose readings to keep your ${reminderConfig.streakDays}-day care streak active!`;
+      
+      const options = {
+        body,
+        icon: '/favicon.svg',
+        badge: '/favicon.svg',
+        vibrate: [200, 100, 200],
+        tag: 'diabp-copilot-daily-reminder'
+      };
+      
+      self.registration.showNotification(title, options);
+    }
+  }
+}, 30000); // Check every 30 seconds
+
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
   event.waitUntil(
@@ -56,7 +95,9 @@ self.addEventListener('notificationclick', function(event) {
 });
 
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
+  if (!event.data) return;
+
+  if (event.data.type === 'SHOW_NOTIFICATION') {
     const { title, body } = event.data;
     const options = {
       body,
@@ -66,5 +107,43 @@ self.addEventListener('message', (event) => {
       tag: 'diabp-copilot-alert'
     };
     self.registration.showNotification(title, options);
+  }
+
+  else if (event.data.type === 'SYNC_REMINDER_SETTINGS') {
+    const { enabled, reminderTime, streakDays, hasLoggedToday } = event.data.payload;
+    reminderConfig.enabled = enabled;
+    reminderConfig.reminderTime = reminderTime || '08:00';
+    reminderConfig.streakDays = streakDays || 1;
+    reminderConfig.hasLoggedToday = hasLoggedToday || false;
+  }
+
+  else if (event.data.type === 'PATIENT_LOGGED_VITALS') {
+    const { patientId, patientName, systolic, diastolic, glucose, glucoseType, streakDays } = event.data.payload;
+    
+    // Update reminder state locally in Service Worker immediately so we do not notify them again today
+    reminderConfig.hasLoggedToday = true;
+
+    // 1. Instantly display clinician push notification
+    const title = `🚨 Vitals Logged: ${patientName}`;
+    const body = `BP: ${systolic}/${diastolic} mmHg | Glucose: ${glucose > 0 ? `${glucose} mg/dL (${glucoseType})` : 'N/A'}. Streak: ${streakDays} days!`;
+    const options = {
+      body,
+      icon: '/favicon.svg',
+      badge: '/favicon.svg',
+      vibrate: [200, 100, 200],
+      tag: `vitals-log-${patientId}`,
+      data: { patientId }
+    };
+    self.registration.showNotification(title, options);
+
+    // 2. Broadcast this log to all open window tabs (clients)
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      clientList.forEach((client) => {
+        client.postMessage({
+          type: 'VITALS_LOGGED_BROADCAST',
+          payload: event.data.payload
+        });
+      });
+    });
   }
 });

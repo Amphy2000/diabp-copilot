@@ -236,80 +236,105 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   }
   const [realTimeToasts, setRealTimeToasts] = useState<RealTimeToast[]>([]);
 
-  // Listen for real-time vitals updates
+  // Listen for real-time vitals updates (via BroadcastChannel or Service Worker messages)
   useEffect(() => {
+    const handleVitalsLogged = (payload: any) => {
+      const { patientId, patientName, systolic, diastolic, glucose, glucoseType } = payload;
+      
+      // Evaluate risk level to show in toast
+      const { strokeRisk, diabeticRisk } = evaluateNcdRisk(systolic, diastolic, glucose, glucoseType);
+      const isCritical = strokeRisk === 'Emergency' || strokeRisk === 'High' || diabeticRisk === 'Emergency' || diabeticRisk === 'High';
+      const riskLevel = isCritical ? 'Critical' : 'Stable';
+
+      // Audio cue using browser Web Audio API (cross-platform zero-dependency beep)
+      try {
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        if (isCritical) {
+          oscillator.type = 'sawtooth';
+          oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // High pitch alarm A5
+          gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+          oscillator.start();
+          oscillator.stop(audioCtx.currentTime + 0.15);
+          
+          setTimeout(() => {
+            const audioCtx2 = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const osc2 = audioCtx2.createOscillator();
+            const gain2 = audioCtx2.createGain();
+            osc2.connect(gain2);
+            gain2.connect(audioCtx2.destination);
+            osc2.type = 'sawtooth';
+            osc2.frequency.setValueAtTime(880, audioCtx2.currentTime);
+            gain2.gain.setValueAtTime(0.12, audioCtx2.currentTime);
+            osc2.start();
+            osc2.stop(audioCtx2.currentTime + 0.15);
+          }, 200);
+        } else {
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(587.33, audioCtx.currentTime); // Melodic tone D5
+          gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+          oscillator.start();
+          oscillator.stop(audioCtx.currentTime + 0.2);
+        }
+      } catch (e) {
+        console.warn("Web Audio beep execution failed:", e);
+      }
+
+      const newToast: RealTimeToast = {
+        id: `toast-${Date.now()}-${Math.random()}`,
+        patientName,
+        patientId,
+        systolic,
+        diastolic,
+        glucose,
+        glucoseType,
+        riskLevel,
+        timestamp: new Date()
+      };
+
+      setRealTimeToasts(prev => {
+        // Prevent duplicate toasts for same log events in case channel & SW messages trigger close together
+        if (prev.some(t => t.patientId === patientId && t.systolic === systolic && t.diastolic === diastolic)) {
+          return prev;
+        }
+        return [newToast, ...prev];
+      });
+
+      // Auto dismiss toast after 8 seconds
+      setTimeout(() => {
+        setRealTimeToasts(prev => prev.filter(t => t.id !== newToast.id));
+      }, 8000);
+    };
+
+    // 1. BroadcastChannel Listener
     const channel = new BroadcastChannel('diabp-copilot-channel');
     channel.onmessage = (event) => {
       if (event.data && event.data.type === 'VITALS_LOGGED') {
-        const { patientId, patientName, systolic, diastolic, glucose, glucoseType } = event.data.payload;
-        
-        // Evaluate risk level to show in toast
-        const { strokeRisk, diabeticRisk } = evaluateNcdRisk(systolic, diastolic, glucose, glucoseType);
-        const isCritical = strokeRisk === 'Emergency' || strokeRisk === 'High' || diabeticRisk === 'Emergency' || diabeticRisk === 'High';
-        const riskLevel = isCritical ? 'Critical' : 'Stable';
-
-        // Audio cue using browser Web Audio API (cross-platform zero-dependency beep)
-        try {
-          const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-          const oscillator = audioCtx.createOscillator();
-          const gainNode = audioCtx.createGain();
-          
-          oscillator.connect(gainNode);
-          gainNode.connect(audioCtx.destination);
-          
-          if (isCritical) {
-            oscillator.type = 'sawtooth';
-            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // High pitch alarm A5
-            gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
-            oscillator.start();
-            oscillator.stop(audioCtx.currentTime + 0.15);
-            
-            setTimeout(() => {
-              const audioCtx2 = new (window.AudioContext || (window as any).webkitAudioContext)();
-              const osc2 = audioCtx2.createOscillator();
-              const gain2 = audioCtx2.createGain();
-              osc2.connect(gain2);
-              gain2.connect(audioCtx2.destination);
-              osc2.type = 'sawtooth';
-              osc2.frequency.setValueAtTime(880, audioCtx2.currentTime);
-              gain2.gain.setValueAtTime(0.12, audioCtx2.currentTime);
-              osc2.start();
-              osc2.stop(audioCtx2.currentTime + 0.15);
-            }, 200);
-          } else {
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(587.33, audioCtx.currentTime); // Melodic tone D5
-            gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
-            oscillator.start();
-            oscillator.stop(audioCtx.currentTime + 0.2);
-          }
-        } catch (e) {
-          console.warn("Web Audio beep execution failed:", e);
-        }
-
-        const newToast: RealTimeToast = {
-          id: `toast-${Date.now()}-${Math.random()}`,
-          patientName,
-          patientId,
-          systolic,
-          diastolic,
-          glucose,
-          glucoseType,
-          riskLevel,
-          timestamp: new Date()
-        };
-
-        setRealTimeToasts(prev => [newToast, ...prev]);
-
-        // Auto dismiss toast after 8 seconds
-        setTimeout(() => {
-          setRealTimeToasts(prev => prev.filter(t => t.id !== newToast.id));
-        }, 8000);
+        handleVitalsLogged(event.data.payload);
       }
     };
 
+    // 2. Service Worker Message Listener (Updates toast alerts when clinician tab is in background)
+    const handleSWMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'VITALS_LOGGED_BROADCAST') {
+        handleVitalsLogged(event.data.payload);
+      }
+    };
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSWMessage);
+    }
+
     return () => {
       channel.close();
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+      }
     };
   }, []);
 

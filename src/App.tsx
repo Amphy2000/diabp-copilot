@@ -324,63 +324,82 @@ function App() {
     }
   }, []);
 
-  // Listen to BroadcastChannel for real-time vitals updates
+  // Listen to BroadcastChannel and Service Worker messages for real-time vitals updates
   useEffect(() => {
-    const channel = new BroadcastChannel('diabp-copilot-channel');
-    channel.onmessage = (event) => {
-      if (event.data && event.data.type === 'VITALS_LOGGED') {
-        const { patientId, patientName, systolic, diastolic, glucose, glucoseType, streakDays } = event.data.payload;
-        
-        // Update local patients state for clinician dashboard charts
-        const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        setPatients(prev => {
-          const exists = prev.some(p => p.id === patientId);
-          if (!exists) return prev;
-          return prev.map(p => {
-            if (p.id === patientId) {
-              const bpHist = p.bpHistory || [];
-              const glucoseHist = p.glucoseHistory || [];
-              
-              // Prevent duplicate logs on same date if already present, otherwise append
-              const dateExists = bpHist.some(b => b.date === dateStr);
-              const updatedBpHistory = dateExists ? bpHist : [...bpHist, { date: dateStr, systolic, diastolic }];
-              const updatedGlucoseHistory = dateExists ? glucoseHist : [...glucoseHist, { date: dateStr, level: glucose, type: glucoseType }];
-              
-              return {
-                ...p,
-                bpHistory: updatedBpHistory,
-                glucoseHistory: updatedGlucoseHistory,
-                streakDays: streakDays
-              };
-            }
-            return p;
-          });
-        });
-
-        // Trigger browser push notification if logged-in user is a clinician/admin
-        const role = session?.user?.user_metadata?.role;
-        if (role === 'doctor' || role === 'pharmacist' || role === 'admin') {
-          const title = `🚨 Vitals Logged: ${patientName}`;
-          const body = `BP: ${systolic}/${diastolic} mmHg | Glucose: ${glucose > 0 ? `${glucose} mg/dL (${glucoseType})` : 'N/A'}. Streak: ${streakDays} days!`;
-          
-          if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({
-              type: 'SHOW_NOTIFICATION',
-              title,
-              body
-            });
-          } else if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(title, {
-              body,
-              icon: '/favicon.svg'
-            });
+    const handleVitalsLogged = (payload: any) => {
+      const { patientId, patientName, systolic, diastolic, glucose, glucoseType, streakDays } = payload;
+      
+      // Update local patients state for clinician dashboard charts
+      const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      setPatients(prev => {
+        const exists = prev.some(p => p.id === patientId);
+        if (!exists) return prev;
+        return prev.map(p => {
+          if (p.id === patientId) {
+            const bpHist = p.bpHistory || [];
+            const glucoseHist = p.glucoseHistory || [];
+            
+            // Prevent duplicate logs on same date if already present, otherwise append
+            const dateExists = bpHist.some(b => b.date === dateStr);
+            const updatedBpHistory = dateExists ? bpHist : [...bpHist, { date: dateStr, systolic, diastolic }];
+            const updatedGlucoseHistory = dateExists ? glucoseHist : [...glucoseHist, { date: dateStr, level: glucose, type: glucoseType }];
+            
+            return {
+              ...p,
+              bpHistory: updatedBpHistory,
+              glucoseHistory: updatedGlucoseHistory,
+              streakDays: streakDays
+            };
           }
+          return p;
+        });
+      });
+
+      // Trigger browser push notification if logged-in user is a clinician/admin
+      const role = session?.user?.user_metadata?.role;
+      if (role === 'doctor' || role === 'pharmacist' || role === 'admin') {
+        const title = `🚨 Vitals Logged: ${patientName}`;
+        const body = `BP: ${systolic}/${diastolic} mmHg | Glucose: ${glucose > 0 ? `${glucose} mg/dL (${glucoseType})` : 'N/A'}. Streak: ${streakDays} days!`;
+        
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'SHOW_NOTIFICATION',
+            title,
+            body
+          });
+        } else if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(title, {
+            body,
+            icon: '/favicon.svg'
+          });
         }
       }
     };
 
+    // 1. BroadcastChannel Listener
+    const channel = new BroadcastChannel('diabp-copilot-channel');
+    channel.onmessage = (event) => {
+      if (event.data && event.data.type === 'VITALS_LOGGED') {
+        handleVitalsLogged(event.data.payload);
+      }
+    };
+
+    // 2. Service Worker Message Listener (Handles updates when tabs are in background/inactive)
+    const handleSWMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'VITALS_LOGGED_BROADCAST') {
+        handleVitalsLogged(event.data.payload);
+      }
+    };
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSWMessage);
+    }
+
     return () => {
       channel.close();
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+      }
     };
   }, [session]);
 

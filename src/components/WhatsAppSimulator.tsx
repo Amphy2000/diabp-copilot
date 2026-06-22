@@ -314,6 +314,22 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
         console.error("Failed to broadcast WhatsApp vitals log:", err);
       }
 
+      // Post to Service Worker to trigger background push notifications even if clinician tab is closed
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'PATIENT_LOGGED_VITALS',
+          payload: {
+            patientId: selectedPatientId,
+            patientName,
+            systolic,
+            diastolic,
+            glucose,
+            glucoseType: type,
+            streakDays: streak
+          }
+        });
+      }
+
       addBotMessage(`✓ Vitals logged successfully!\n\nBP: *${systolic}/${diastolic} mmHg*\nGlucose: *${glucose > 0 ? `${glucose} mg/dL (${type})` : 'N/A'}*\n\nDiaBP clinician team alert: *Logged Stable*. Vitals charts and triage registry updated in real-time.`);
       if (onRefreshData) onRefreshData();
     } catch (e) {

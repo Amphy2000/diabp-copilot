@@ -104,6 +104,26 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
     return () => clearInterval(interval);
   }, [dailyRemindersEnabled, reminderTime, profile.bpHistory, profile.glucoseHistory, profile.streakDays]);
 
+  // Sync reminder configurations to Service Worker for background execution when tab is closed
+  useEffect(() => {
+    const todayStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const hasLoggedToday = 
+      (profile.bpHistory || []).some(bp => bp.date === todayStr) || 
+      (profile.glucoseHistory || []).some(gl => gl.date === todayStr);
+
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'SYNC_REMINDER_SETTINGS',
+        payload: {
+          enabled: dailyRemindersEnabled,
+          reminderTime: reminderTime,
+          streakDays: profile.streakDays || 1,
+          hasLoggedToday
+        }
+      });
+    }
+  }, [dailyRemindersEnabled, reminderTime, profile.bpHistory, profile.glucoseHistory, profile.streakDays]);
+
   const handleTestReminder = () => {
     if ('Notification' in window) {
       if (Notification.permission === 'default') {
@@ -402,6 +422,22 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
       console.error("Failed to broadcast vital logging event:", err);
     }
 
+    // Post to Service Worker to trigger background push notifications even if clinician tab is closed
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'PATIENT_LOGGED_VITALS',
+        payload: {
+          patientId: profile.id,
+          patientName: profile.name,
+          systolic,
+          diastolic,
+          glucose,
+          glucoseType,
+          streakDays: newStreakDays
+        }
+      });
+    }
+
     setLogMessage("Vitals logged successfully. AI risk calculations updated.");
     setTimeout(() => setLogMessage(null), 3000);
   };
@@ -625,23 +661,18 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
         const hasLoggedVitals = (profile.bpHistory || []).length > 5;
         const hasCareTeam = !!profile.assignedClinicId || !!profile.assignedPharmacyId;
         const hasFootScan = (profile.footScanHistory || []).length > 1;
-        const hasOrder = orders.length > 0;
-
         const envWhatsappNumber = import.meta.env.VITE_WHATSAPP_NUMBER || '+1 415 523 8886';
         const envWhatsappKeyword = import.meta.env.VITE_WHATSAPP_KEYWORD || 'join bet-sense';
-        const isSandbox = envWhatsappNumber.includes('415 523 8886');
         const waCleanNumber = envWhatsappNumber.replace(/\s+/g, '').replace(/[^\d+]/g, '');
         const waTextParam = encodeURIComponent(envWhatsappKeyword);
         const actionUrl = `https://wa.me/${waCleanNumber.replace('+', '')}?text=${waTextParam}`;
-
+ 
         const onboardingSteps = [
           {
             id: 'phone',
             title: 'Link WhatsApp Bot',
             description: 'Connect your phone to receive daily dose nudges and log vitals via text message.',
-            instructions: isSandbox 
-              ? `Send "${envWhatsappKeyword}" to ${envWhatsappNumber} on WhatsApp.`
-              : `Send any message to our Care Line at ${envWhatsappNumber} on WhatsApp.`,
+            instructions: `Connect your account by sending a message to our WhatsApp Care Line at ${envWhatsappNumber}.`,
             isCompleted: hasPhone,
             actionLabel: 'Link WhatsApp Now',
             actionUrl: actionUrl
