@@ -525,11 +525,11 @@ function App() {
         </div>
       </footer>
 
-      {session && (
+      {session && userRole !== 'patient' && (
         <WhatsAppSimulator 
           patients={patients}
           orders={orders}
-          activePatientId={userRole === 'patient' ? patientProfile?.id : undefined}
+          activePatientId={undefined}
           onRefreshData={handleRefreshData}
           userRole={userRole}
           userFacilityId={userFacilityId}
