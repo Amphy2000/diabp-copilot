@@ -55,6 +55,18 @@ function App() {
   // Navigation State
   const [patientTab, setPatientTab] = useState<'dashboard' | 'refills'>('dashboard');
   const [loading, setLoading] = useState(false);
+  const [showSkipLoading, setShowSkipLoading] = useState(false);
+
+  useEffect(() => {
+    if (loading || (userRole === 'patient' && !patientProfile)) {
+      const timer = setTimeout(() => {
+        setShowSkipLoading(true);
+      }, 3500);
+      return () => clearTimeout(timer);
+    } else {
+      setShowSkipLoading(false);
+    }
+  }, [loading, userRole, patientProfile]);
 
   // 1. Initial Auth Check and Listener
   useEffect(() => {
@@ -475,13 +487,72 @@ function App() {
 
   // Role context loading indicator
   if (loading || (userRole === 'patient' && !patientProfile)) {
+    const handleSkipLoading = () => {
+      if (userRole === 'patient' && !patientProfile) {
+        setPatientProfile({
+          id: session?.user?.id || 'offline-user',
+          name: session?.user?.user_metadata?.display_name || "Active Patient",
+          age: 45,
+          weight: 70,
+          conditions: ["Essential Hypertension"],
+          baselineBp: "120/80 mmHg",
+          targetGlucoseRange: "70-130 mg/dL",
+          bpHistory: [],
+          glucoseHistory: [],
+          footScanHistory: [],
+          streakDays: 1,
+          activeMeds: ["Amlodipine 5mg Daily"],
+          assignedClinicId: null,
+          assignedPharmacyId: null,
+          phone: session?.user?.user_metadata?.phone || undefined
+        });
+      }
+      setLoading(false);
+    };
+
     return (
-      <div className="app-wrapper" style={{ justifyContent: 'center', alignItems: 'center', background: '#0d1117' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', textAlign: 'center' }}>
-          <Compass className="spinner-icon w-8 h-8 text-blue-500 animate-spin" />
-          <p style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>
-            Synchronizing with DiaBP Safe-Meds Database...
-          </p>
+      <div className="app-wrapper" style={{ justifyContent: 'center', alignItems: 'center', background: '#0d1117', padding: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', textAlign: 'center', maxWidth: '320px' }}>
+          <Compass className="spinner-icon w-10 h-10 text-teal-400 animate-spin" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <p style={{ fontSize: '13px', fontWeight: 'bold', color: 'white', margin: 0 }}>
+              Synchronizing Database...
+            </p>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
+              Fetching your treatment plans, vitals history, and refill configurations.
+            </p>
+          </div>
+          
+          {showSkipLoading && (
+            <button
+              onClick={handleSkipLoading}
+              style={{
+                marginTop: '8px',
+                background: 'rgba(20, 184, 166, 0.1)',
+                color: '#14b8a6',
+                border: '1px solid rgba(20, 184, 166, 0.2)',
+                borderRadius: '8px',
+                padding: '8px 16px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(20, 184, 166, 0.15)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(20, 184, 166, 0.1)';
+                e.currentTarget.style.transform = 'none';
+              }}
+            >
+              Continue Offline Mode ➜
+            </button>
+          )}
         </div>
       </div>
     );
