@@ -420,15 +420,24 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
         const hasCareTeam = !!profile.assignedClinicId || !!profile.assignedPharmacyId;
         const hasFootScan = (profile.footScanHistory || []).length > 1;
 
+        const envWhatsappNumber = import.meta.env.VITE_WHATSAPP_NUMBER || '+1 415 523 8886';
+        const envWhatsappKeyword = import.meta.env.VITE_WHATSAPP_KEYWORD || 'join bet-sense';
+        const isSandbox = envWhatsappNumber.includes('415 523 8886');
+        const waCleanNumber = envWhatsappNumber.replace(/\s+/g, '').replace(/[^\d+]/g, '');
+        const waTextParam = encodeURIComponent(envWhatsappKeyword);
+        const actionUrl = `https://wa.me/${waCleanNumber.replace('+', '')}?text=${waTextParam}`;
+
         const onboardingSteps = [
           {
             id: 'phone',
             title: 'Link WhatsApp Bot',
             description: 'Connect your phone to receive daily dose nudges and log vitals via text message.',
-            instructions: 'Send "join bet-sense" to +1 415 523 8886 on WhatsApp.',
+            instructions: isSandbox 
+              ? `Send "${envWhatsappKeyword}" to ${envWhatsappNumber} on WhatsApp.`
+              : `Send any message to our Care Line at ${envWhatsappNumber} on WhatsApp.`,
             isCompleted: hasPhone,
             actionLabel: 'Link WhatsApp Now',
-            actionUrl: 'https://wa.me/14155238886?text=join%20bet-sense'
+            actionUrl: actionUrl
           },
           {
             id: 'vitals',
