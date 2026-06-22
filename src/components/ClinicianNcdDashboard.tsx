@@ -134,6 +134,78 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   const [selectedPatient, setSelectedPatient] = useState<PatientNcdProfile | null>(null);
   const [viewingPrescriptionOrder, setViewingPrescriptionOrder] = useState<NcdRefillOrder | null>(null);
   
+  // Care Notes State (Shared Workspace Notice & Handover Memos)
+  const [careNotes, setCareNotes] = useState<{ id: string; author: string; content: string; createdAt: string }[]>([]);
+  const [newNoteText, setNewNoteText] = useState('');
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>('Care Member');
+
+  const currentFacilityId = activeRole === 'clinic' ? activeClinicId : activePharmacyId;
+
+  // Load facility notice board notes
+  useEffect(() => {
+    if (!currentFacilityId) return;
+    const stored = localStorage.getItem(`diabp_care_notes_${currentFacilityId}`);
+    if (stored) {
+      setCareNotes(JSON.parse(stored));
+    } else {
+      const defaults = [
+        {
+          id: 'default-1',
+          author: 'System Care Coordinator',
+          content: 'Welcome to your Care Team Handover & Notice Board. Use this space to log patient status updates, shift changes, or inventory notes.',
+          createdAt: new Date().toISOString()
+        }
+      ];
+      setCareNotes(defaults);
+      localStorage.setItem(`diabp_care_notes_${currentFacilityId}`, JSON.stringify(defaults));
+    }
+  }, [currentFacilityId]);
+
+  // Load current authenticated user info
+  useEffect(() => {
+    async function fetchUser() {
+      if (isSupabaseConfigured) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user?.email) setCurrentUserEmail(user.email);
+        } catch {}
+      } else {
+        try {
+          const stored = localStorage.getItem('amphy_mock_session');
+          if (stored) {
+            const session = JSON.parse(stored);
+            if (session?.user?.email) setCurrentUserEmail(session.user.email);
+          }
+        } catch {}
+      }
+    }
+    fetchUser();
+  }, []);
+
+  const handleAddCareNote = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newNoteText.trim() || !currentFacilityId) return;
+
+    const newNote = {
+      id: `note-${Date.now()}`,
+      author: currentUserEmail,
+      content: newNoteText.trim(),
+      createdAt: new Date().toISOString()
+    };
+
+    const updated = [newNote, ...careNotes];
+    setCareNotes(updated);
+    localStorage.setItem(`diabp_care_notes_${currentFacilityId}`, JSON.stringify(updated));
+    setNewNoteText('');
+  };
+
+  const handleDeleteCareNote = (noteId: string) => {
+    if (!currentFacilityId) return;
+    const updated = careNotes.filter(n => n.id !== noteId);
+    setCareNotes(updated);
+    localStorage.setItem(`diabp_care_notes_${currentFacilityId}`, JSON.stringify(updated));
+  };
+  
   // Check-in / BP Log Modal States
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [checkInPatient, setCheckInPatient] = useState<PatientNcdProfile | null>(null);
@@ -963,7 +1035,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
       </div>
 
       {/* Facility Warning Banner */}
-      {!isFacilityPremium && (
+      {workspaceRole === 'admin' && !isFacilityPremium && (
         <div style={{
           background: 'linear-gradient(90deg, rgba(234, 179, 8, 0.15) 0%, rgba(202, 138, 4, 0.05) 100%)',
           border: '1px solid rgba(234, 179, 8, 0.3)',
@@ -1013,7 +1085,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
       )}
 
       {/* Onboarding Quickstart Guide */}
-      {workspaceRole === 'admin' && (() => {
+      {(() => {
         const hasSubaccount = activeRole === 'clinic' ? !!activeClinic?.subaccountId : !!activePharmacy?.subaccountId;
         const hasOnboardedPatients = filteredPatients.length > 0;
         const hasVitalsCheckIn = filteredPatients.some(p => (p.bpHistory || []).length > 5 || (p.glucoseHistory || []).length > 5);
@@ -1021,7 +1093,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
         const hasAddedStaff = staffList.length > 1;
         const hasRefillApproved = filteredOrders.some(o => o.status !== 'Pending Verification');
 
-        const onboardingSteps = activeRole === 'pharmacy' ? [
+        const fullSteps = activeRole === 'pharmacy' ? [
           {
             id: 'payout',
             title: 'Link Payout Account',
@@ -1107,6 +1179,11 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
           }
         ];
 
+        // Filter out admin-only setup tasks for staff dispenser roles
+        const onboardingSteps = workspaceRole === 'admin' 
+          ? fullSteps 
+          : fullSteps.filter(s => s.id !== 'payout' && s.id !== 'pricing' && s.id !== 'staff');
+
         const completedSteps = onboardingSteps.filter(s => s.isCompleted).length;
         const onboardingProgress = Math.round((completedSteps / onboardingSteps.length) * 100);
 
@@ -1137,10 +1214,14 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'white', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Sparkles className="w-5 h-5 text-teal-400 animate-pulse" />
-                  Quickstart Guide: Complete Your Facility Onboarding
+                  {workspaceRole === 'admin' 
+                    ? 'Quickstart Guide: Complete Your Facility Onboarding' 
+                    : 'Quickstart Guide: Daily Clinic Operations Onboarding'}
                 </h3>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  Complete the following {onboardingSteps.length} steps to verify your payouts, set catalog prices, and register patient care sheets.
+                  {workspaceRole === 'admin' 
+                    ? `Complete the following ${onboardingSteps.length} steps to verify your payouts, set catalog prices, and register patient care sheets.`
+                    : `Complete the following ${onboardingSteps.length} steps to manage your patient registry, log vitals, and coordinate refills.`}
                 </p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -1544,7 +1625,115 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
             </div>
           )}
         </div>
+      </div>
 
+      {/* Care Team Handover & Notice Board */}
+      <div className="glass-panel" style={{ padding: '20px', marginBottom: '16px', background: 'rgba(13, 17, 23, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '0.85rem', color: 'white', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FileText className="w-4 h-4 text-teal-400" />
+              Care Team Handover & Notice Board
+            </h3>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+              Post shift notes, critical announcements, and medication shortages for staff members.
+            </p>
+          </div>
+          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: '4px' }}>
+            Facility: {activeRole === 'clinic' ? (activeClinic?.name || 'Clinic') : (activePharmacy?.name || 'Pharmacy')}
+          </span>
+        </div>
+
+        <form onSubmit={handleAddCareNote} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          <input
+            type="text"
+            placeholder="Type a shift handover note or announcement..."
+            value={newNoteText}
+            onChange={(e) => setNewNoteText(e.target.value)}
+            style={{
+              flex: 1,
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '8px',
+              padding: '8px 12px',
+              color: 'white',
+              fontSize: '0.75rem',
+              outline: 'none',
+              transition: 'border-color 0.2s'
+            }}
+            onFocus={(e) => e.target.style.borderColor = '#14b8a6'}
+            onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.08)'}
+          />
+          <button
+            type="submit"
+            style={{
+              background: 'rgba(20, 184, 166, 0.15)',
+              color: 'var(--color-teal-light)',
+              border: '1px solid rgba(20, 184, 166, 0.3)',
+              borderRadius: '8px',
+              padding: '0 16px',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(20, 184, 166, 0.25)'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(20, 184, 166, 0.15)'; }}
+          >
+            Post Memo
+          </button>
+        </form>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
+          {careNotes.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '15px', color: 'var(--text-muted)', fontSize: '0.72rem', fontStyle: 'italic' }}>
+              No active memos posted.
+            </div>
+          ) : (
+            careNotes.map((note) => (
+              <div 
+                key={note.id} 
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'start',
+                  background: 'rgba(255, 255, 255, 0.01)',
+                  border: '1px solid rgba(255,255,255,0.03)',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.75rem'
+                }}
+              >
+                <div style={{ textAlign: 'left', flex: 1, paddingRight: '12px' }}>
+                  <p style={{ margin: 0, color: 'white', lineHeight: '1.4' }}>{note.content}</p>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px', fontSize: '0.62rem', color: 'var(--text-muted)' }}>
+                    <span style={{ color: 'var(--color-teal-light)', fontWeight: 'bold' }}>{note.author}</span>
+                    <span>•</span>
+                    <span>{new Date(note.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                </div>
+                {(workspaceRole === 'admin' || note.author === currentUserEmail) && (
+                  <button
+                    onClick={() => handleDeleteCareNote(note.id)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      fontSize: '0.65rem',
+                      padding: '2px 6px',
+                      borderRadius: '4px'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.color = '#f87171'}
+                    onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       {/* 2. Grid Layout: Left Registry Directory & Right Auditing Detail File */}

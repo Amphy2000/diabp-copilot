@@ -1022,29 +1022,81 @@ export function analyzeFootImage(file: File): Promise<FootScanRecord> {
         const imgData = ctx.getImageData(0, 0, width, height);
         const pixels = imgData.data;
 
+        // First pass: Calculate average color channels for skin pixels to calibrate against lighting/skin-tone
+        let skinPixelCount = 0;
+        let sumR = 0;
+        let sumG = 0;
+        let sumB = 0;
+        let sumRgRatio = 0;
+        let sumRbRatio = 0;
+
+        for (let i = 0; i < pixels.length; i += 4) {
+          const r = pixels[i];
+          const g = pixels[i + 1];
+          const b = pixels[i + 2];
+
+          // Filter out background: exclude too dark/too bright and ensure typical skin signature (R > G)
+          if (r > 35 && g > 25 && b > 20 && r < 245 && g < 245 && b < 245 && r > g) {
+            skinPixelCount++;
+            sumR += r;
+            sumG += g;
+            sumB += b;
+            sumRgRatio += r / (g + 1);
+            sumRbRatio += r / (b + 1);
+          }
+        }
+
+        // Validate image contains enough skin pixels (at least 10% of image size: 300 * 400 * 0.10 = 12000)
+        // If not, they likely uploaded a non-skin / non-sole photo or a completely dark/blurry picture.
+        if (skinPixelCount < 12000) {
+          resolve({
+            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            hasHotspots: false,
+            hotspots: [],
+            riskScore: 0,
+            recommendations: [
+              "⚠️ Could not verify clear foot sole profile. Please ensure:",
+              "1. You are photographing the bottom of a bare foot sole.",
+              "2. The photo is taken under clear lighting without heavy shadows.",
+              "3. Your foot sole fills most of the camera frame."
+            ]
+          });
+          return;
+        }
+
+        // Calibrate baseline ratios for patient's skin-tone and ambient camera lighting
+        const avgRg = sumRgRatio / skinPixelCount;
+        const avgRb = sumRbRatio / skinPixelCount;
+        
+        // Outlier thresholds: pixels must be significantly redder (e.g. 26% higher R/G and R/B ratios) than their skin baseline
+        const rgThreshold = Math.max(1.22, avgRg * 1.26);
+        const rbThreshold = Math.max(1.25, avgRb * 1.26);
+
         // Grid-based clustering bounds (10x10 grid)
         const gridCols = 10;
         const gridRows = 10;
         const cellW = width / gridCols;
         const cellH = height / gridRows;
         
-        // Matrix to track count of high-redness pixels in each grid block
+        // Matrix to track count of high-redness outlier pixels in each grid block
         const redCounts = Array(gridRows).fill(0).map(() => Array(gridCols).fill(0));
         const sumX = Array(gridRows).fill(0).map(() => Array(gridCols).fill(0));
         const sumY = Array(gridRows).fill(0).map(() => Array(gridCols).fill(0));
 
-        // Iterate pixel-by-pixel
+        // Second pass: Identify erythematous outlier pixels
         for (let y = 0; y < height; y++) {
           for (let x = 0; x < width; x++) {
             const index = (y * width + x) * 4;
-            const r = pixels[index];     // Red
-            const g = pixels[index + 1]; // Green
-            const b = pixels[index + 2]; // Blue
+            const r = pixels[index];
+            const g = pixels[index + 1];
+            const b = pixels[index + 2];
 
-            // Redness threshold detection:
-            // High intensity Red, and significantly higher than Green and Blue channels
-            if (r > 150 && (r - g > 65) && (r - b > 65)) {
-              // Locate corresponding grid cell
+            const rgRatio = r / (g + 1);
+            const rbRatio = r / (b + 1);
+
+            // Outlier check: pixel is significantly redder than the foot's average skin baseline,
+            // has typical skin signature, and is not extremely dark.
+            if (r > 65 && r > g && r > b && rgRatio > rgThreshold && rbRatio > rbThreshold) {
               const col = Math.floor(x / cellW);
               const row = Math.floor(y / cellH);
               if (col >= 0 && col < gridCols && row >= 0 && row < gridRows) {
@@ -1056,9 +1108,9 @@ export function analyzeFootImage(file: File): Promise<FootScanRecord> {
           }
         }
 
-        // Find clusters with high density of red pixels (erythematous hotspots)
+        // Find clusters with high density of red outlier pixels (hotspots)
         const hotspots: FootHotspot[] = [];
-        const threshold = (cellW * cellH) * 0.04; // at least 4% of cell pixels must be red
+        const threshold = (cellW * cellH) * 0.035; // at least 3.5% of cell pixels must be outlier red
 
         for (let r = 0; r < gridRows; r++) {
           for (let c = 0; c < gridCols; c++) {
@@ -1068,7 +1120,6 @@ export function analyzeFootImage(file: File): Promise<FootScanRecord> {
               const avgY = sumY[r][c] / count;
               
               // Map coordinates to percentage ranges (matching CSS sole layout positioning)
-              // Centered sole overlay spans roughly: left 20%-80% (scale accordingly)
               const pctX = Math.round((avgX / width) * 100);
               const pctY = Math.round((avgY / height) * 100);
 
