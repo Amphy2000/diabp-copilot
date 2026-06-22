@@ -289,6 +289,31 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
     try {
       await logVitalsForPatient(selectedPatientId, systolic, diastolic, glucose, type);
       setFlowState('idle');
+      
+      const patient = patients.find(p => p.id === selectedPatientId);
+      const patientName = patient ? patient.name : 'A Patient';
+      const streak = patient ? (patient.streakDays || 0) + 1 : 1;
+
+      // Broadcast event to notify clinician sessions
+      try {
+        const channel = new BroadcastChannel('diabp-copilot-channel');
+        channel.postMessage({
+          type: 'VITALS_LOGGED',
+          payload: {
+            patientId: selectedPatientId,
+            patientName,
+            systolic,
+            diastolic,
+            glucose,
+            glucoseType: type,
+            streakDays: streak
+          }
+        });
+        channel.close();
+      } catch (err) {
+        console.error("Failed to broadcast WhatsApp vitals log:", err);
+      }
+
       addBotMessage(`✓ Vitals logged successfully!\n\nBP: *${systolic}/${diastolic} mmHg*\nGlucose: *${glucose > 0 ? `${glucose} mg/dL (${type})` : 'N/A'}*\n\nDiaBP clinician team alert: *Logged Stable*. Vitals charts and triage registry updated in real-time.`);
       if (onRefreshData) onRefreshData();
     } catch (e) {

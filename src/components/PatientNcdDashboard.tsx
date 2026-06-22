@@ -47,6 +47,120 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
   const [glucoseType, setGlucoseType] = useState<'Fasting' | 'Post-Meal'>('Fasting');
   const [logMessage, setLogMessage] = useState<string | null>(null);
 
+  // Reminders states
+  const [dailyRemindersEnabled, setDailyRemindersEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('daily_reminders_enabled') !== 'false';
+  });
+  const [reminderTime, setReminderTime] = useState<string>(() => {
+    return localStorage.getItem('daily_reminder_time') || '08:00';
+  });
+  const [reminderFeedback, setReminderFeedback] = useState<string | null>(null);
+  const [collapsedReminders, setCollapsedReminders] = useState(true);
+
+  // Background check for daily reminder schedule
+  useEffect(() => {
+    if (!dailyRemindersEnabled) return;
+
+    const checkReminder = () => {
+      const now = new Date();
+      const currentHours = String(now.getHours()).padStart(2, '0');
+      const currentMinutes = String(now.getMinutes()).padStart(2, '0');
+      const currentTimeStr = `${currentHours}:${currentMinutes}`;
+
+      if (currentTimeStr === reminderTime) {
+        const todayStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const hasLoggedToday = 
+          (profile.bpHistory || []).some(bp => bp.date === todayStr) || 
+          (profile.glucoseHistory || []).some(gl => gl.date === todayStr);
+
+        if (!hasLoggedToday) {
+          const todayDateStr = now.toDateString();
+          const lastReminderDate = localStorage.getItem('last_reminder_date');
+          if (lastReminderDate !== todayDateStr) {
+            localStorage.setItem('last_reminder_date', todayDateStr);
+            const title = "⏰ Daily Health Check-in";
+            const body = `Time to log your blood pressure and glucose readings to keep your ${profile.streakDays || 0}-day care streak active!`;
+
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+              navigator.serviceWorker.controller.postMessage({
+                type: 'SHOW_NOTIFICATION',
+                title,
+                body
+              });
+            } else if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification(title, {
+                body,
+                icon: '/favicon.svg'
+              });
+            }
+          }
+        }
+      }
+    };
+
+    // Run check immediately and then every 30 seconds
+    checkReminder();
+    const interval = setInterval(checkReminder, 30000);
+    return () => clearInterval(interval);
+  }, [dailyRemindersEnabled, reminderTime, profile.bpHistory, profile.glucoseHistory, profile.streakDays]);
+
+  const handleTestReminder = () => {
+    if ('Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            triggerNotification();
+          } else {
+            setReminderFeedback("⚠️ Notification permission was denied.");
+            setTimeout(() => setReminderFeedback(null), 3000);
+          }
+        });
+      } else if (Notification.permission === 'granted') {
+        triggerNotification();
+      } else {
+        setReminderFeedback("⚠️ Notifications are blocked by your browser settings.");
+        setTimeout(() => setReminderFeedback(null), 3000);
+      }
+    } else {
+      setReminderFeedback("⚠️ Your browser does not support notifications.");
+      setTimeout(() => setReminderFeedback(null), 3000);
+    }
+
+    function triggerNotification() {
+      const title = "⏰ Daily Health Check-in (Test)";
+      const body = `Time to log your blood pressure and glucose readings to keep your ${profile.streakDays || 0}-day care streak active!`;
+
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SHOW_NOTIFICATION',
+          title,
+          body
+        });
+      } else {
+        new Notification(title, {
+          body,
+          icon: '/favicon.svg'
+        });
+      }
+      setReminderFeedback("⚡ Test notification sent! Check your screen/notification tray.");
+      setTimeout(() => setReminderFeedback(null), 4000);
+    }
+  };
+
+  const handleSaveReminderPreferences = (enabled: boolean, time: string) => {
+    setDailyRemindersEnabled(enabled);
+    setReminderTime(time);
+    localStorage.setItem('daily_reminders_enabled', String(enabled));
+    localStorage.setItem('daily_reminder_time', time);
+    
+    if (enabled && 'Notification' in window && Notification.permission !== 'granted') {
+      Notification.requestPermission();
+    }
+
+    setReminderFeedback("✓ Reminder preferences saved successfully.");
+    setTimeout(() => setReminderFeedback(null), 3000);
+  };
+
   // Contact editing states
   const [isEditingContact, setIsEditingContact] = useState(false);
   const [editPhone, setEditPhone] = useState(profile.phone || '');
@@ -259,12 +373,34 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
     const updatedBpHistory = [...bpHist, { date: today, systolic, diastolic }];
     const updatedGlucoseHistory = [...glucoseHist, { date: today, level: glucose, type: glucoseType }];
 
+    const newStreakDays = (profile.streakDays || 0) + 1;
+
     onUpdateProfile({
       ...profile,
       bpHistory: updatedBpHistory,
       glucoseHistory: updatedGlucoseHistory,
-      streakDays: (profile.streakDays || 0) + 1
+      streakDays: newStreakDays
     });
+
+    // Send broadcast message to notify clinicians
+    try {
+      const channel = new BroadcastChannel('diabp-copilot-channel');
+      channel.postMessage({
+        type: 'VITALS_LOGGED',
+        payload: {
+          patientId: profile.id,
+          patientName: profile.name,
+          systolic,
+          diastolic,
+          glucose,
+          glucoseType,
+          streakDays: newStreakDays
+        }
+      });
+      channel.close();
+    } catch (err) {
+      console.error("Failed to broadcast vital logging event:", err);
+    }
 
     setLogMessage("Vitals logged successfully. AI risk calculations updated.");
     setTimeout(() => setLogMessage(null), 3000);
@@ -412,6 +548,76 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
           </div>
         </div>
       </div>
+
+      {/* Daily check-in reminder banner if they haven't logged today */}
+      {(() => {
+        const todayStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const hasLoggedToday = 
+          (profile.bpHistory || []).some(bp => bp.date === todayStr) || 
+          (profile.glucoseHistory || []).some(gl => gl.date === todayStr);
+          
+        if (hasLoggedToday) return null;
+        
+        return (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(251, 146, 60, 0.1) 100%)',
+            border: '1px solid rgba(239, 68, 68, 0.25)',
+            padding: '16px 20px',
+            borderRadius: '16px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '12px',
+            marginBottom: '16px',
+            boxShadow: '0 4px 15px rgba(239, 68, 68, 0.08)',
+            animation: 'pulse 2s infinite ease-in-out'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                background: 'rgba(239, 68, 68, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#f87171',
+                flexShrink: 0
+              }}>
+                <Clock className="w-5 h-5 animate-bounce" />
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <h4 style={{ margin: 0, fontSize: '0.85rem', color: 'white', fontWeight: 'bold' }}>
+                  ⏰ Daily Health Check-in Overdue!
+                </h4>
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                  You have not logged your readings today. Record your vitals now to keep your <strong>{profile.streakDays || 0}-day</strong> streak alive!
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => scrollToSection('vitals-form')}
+              style={{
+                background: '#ef4444',
+                border: 'none',
+                color: 'white',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                fontSize: '0.75rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              Record Vitals <ArrowRight size={12} />
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Onboarding Quickstart Guide */}
       {(() => {
@@ -1369,6 +1575,126 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
               )}
             </div>
           )}
+
+          {/* Notification & Daily Reminder Settings Card */}
+          <div className="glass-panel" style={{ marginTop: '16px', background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.4) 100%)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div 
+              className="card-header-divider" 
+              style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+              onClick={() => setCollapsedReminders(!collapsedReminders)}
+            >
+              <h3 className="card-title">
+                <Clock className="card-title-icon text-blue-400" />
+                🔔 Notification & Reminders
+              </h3>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                {collapsedReminders ? 'Expand ▾' : 'Collapse ▴'}
+              </span>
+            </div>
+
+            {!collapsedReminders && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', color: 'var(--text-secondary)' }}>
+                <p style={{ margin: 0, fontSize: '0.75rem', lineHeight: '1.4' }}>
+                  Enable automated push reminders to stay on top of your daily vitals logging. Keeps your care streak active and clinicians updated.
+                </p>
+
+                {reminderFeedback && (
+                  <div style={{ 
+                    padding: '8px 12px', 
+                    borderRadius: '8px', 
+                    fontSize: '0.7rem', 
+                    background: reminderFeedback.includes('⚠️') ? 'rgba(239, 68, 68, 0.12)' : 'rgba(20, 184, 166, 0.12)', 
+                    color: reminderFeedback.includes('⚠️') ? '#f87171' : '#5eead4',
+                    border: reminderFeedback.includes('⚠️') ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(20, 184, 166, 0.2)',
+                    fontWeight: 'bold'
+                  }}>
+                    {reminderFeedback}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'white' }}>Daily Push Notifications</div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Get a daily nudge to record readings</div>
+                  </div>
+                  <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '38px', height: '20px' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={dailyRemindersEnabled}
+                      onChange={(e) => handleSaveReminderPreferences(e.target.checked, reminderTime)}
+                      style={{ opacity: 0, width: 0, height: 0 }}
+                    />
+                    <span style={{
+                      position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                      backgroundColor: dailyRemindersEnabled ? '#14b8a6' : 'rgba(255,255,255,0.1)',
+                      transition: '.3s', borderRadius: '20px'
+                    }}>
+                      <span style={{
+                        position: 'absolute', content: '""', height: '14px', width: '14px', left: '3px', bottom: '3px',
+                        backgroundColor: 'white', transition: '.3s', borderRadius: '50%',
+                        transform: dailyRemindersEnabled ? 'translateX(18px)' : 'none'
+                      }}></span>
+                    </span>
+                  </label>
+                </div>
+
+                {dailyRemindersEnabled && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 'bold', color: 'white', textAlign: 'left' }}>
+                      Preferred Reminder Time:
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <select 
+                        value={reminderTime} 
+                        onChange={(e) => handleSaveReminderPreferences(dailyRemindersEnabled, e.target.value)}
+                        style={{
+                          flex: 1,
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '8px',
+                          padding: '8px 12px',
+                          color: 'white',
+                          fontSize: '0.78rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="06:00" style={{ background: '#111827' }}>6:00 AM (Early Morning Check)</option>
+                        <option value="08:00" style={{ background: '#111827' }}>8:00 AM (Morning Routine)</option>
+                        <option value="12:00" style={{ background: '#111827' }}>12:00 PM (Midday Check)</option>
+                        <option value="17:00" style={{ background: '#111827' }}>5:00 PM (Late Afternoon Check)</option>
+                        <option value="20:00" style={{ background: '#111827' }}>8:00 PM (Evening Routine)</option>
+                        <option value="22:00" style={{ background: '#111827' }}>10:00 PM (Before Bed)</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleTestReminder}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                  onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'}
+                >
+                  ⚡ Test Daily Reminder Now
+                </button>
+              </div>
+            )}
+          </div>
 
         </div>
 

@@ -223,6 +223,96 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
     }
   }, [facilityUserRole, userRole]);
 
+  interface RealTimeToast {
+    id: string;
+    patientName: string;
+    patientId: string;
+    systolic: number;
+    diastolic: number;
+    glucose: number;
+    glucoseType: string;
+    riskLevel: 'Critical' | 'Stable';
+    timestamp: Date;
+  }
+  const [realTimeToasts, setRealTimeToasts] = useState<RealTimeToast[]>([]);
+
+  // Listen for real-time vitals updates
+  useEffect(() => {
+    const channel = new BroadcastChannel('diabp-copilot-channel');
+    channel.onmessage = (event) => {
+      if (event.data && event.data.type === 'VITALS_LOGGED') {
+        const { patientId, patientName, systolic, diastolic, glucose, glucoseType } = event.data.payload;
+        
+        // Evaluate risk level to show in toast
+        const { strokeRisk, diabeticRisk } = evaluateNcdRisk(systolic, diastolic, glucose, glucoseType);
+        const isCritical = strokeRisk === 'Emergency' || strokeRisk === 'High' || diabeticRisk === 'Emergency' || diabeticRisk === 'High';
+        const riskLevel = isCritical ? 'Critical' : 'Stable';
+
+        // Audio cue using browser Web Audio API (cross-platform zero-dependency beep)
+        try {
+          const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const oscillator = audioCtx.createOscillator();
+          const gainNode = audioCtx.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioCtx.destination);
+          
+          if (isCritical) {
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // High pitch alarm A5
+            gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.15);
+            
+            setTimeout(() => {
+              const audioCtx2 = new (window.AudioContext || (window as any).webkitAudioContext)();
+              const osc2 = audioCtx2.createOscillator();
+              const gain2 = audioCtx2.createGain();
+              osc2.connect(gain2);
+              gain2.connect(audioCtx2.destination);
+              osc2.type = 'sawtooth';
+              osc2.frequency.setValueAtTime(880, audioCtx2.currentTime);
+              gain2.gain.setValueAtTime(0.12, audioCtx2.currentTime);
+              osc2.start();
+              osc2.stop(audioCtx2.currentTime + 0.15);
+            }, 200);
+          } else {
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(587.33, audioCtx.currentTime); // Melodic tone D5
+            gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.2);
+          }
+        } catch (e) {
+          console.warn("Web Audio beep execution failed:", e);
+        }
+
+        const newToast: RealTimeToast = {
+          id: `toast-${Date.now()}-${Math.random()}`,
+          patientName,
+          patientId,
+          systolic,
+          diastolic,
+          glucose,
+          glucoseType,
+          riskLevel,
+          timestamp: new Date()
+        };
+
+        setRealTimeToasts(prev => [newToast, ...prev]);
+
+        // Auto dismiss toast after 8 seconds
+        setTimeout(() => {
+          setRealTimeToasts(prev => prev.filter(t => t.id !== newToast.id));
+        }, 8000);
+      }
+    };
+
+    return () => {
+      channel.close();
+    };
+  }, []);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<PatientNcdProfile | null>(null);
   const [viewingPrescriptionOrder, setViewingPrescriptionOrder] = useState<NcdRefillOrder | null>(null);
@@ -4586,6 +4676,125 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Real-time Push Notification Toasts Stack */}
+      {realTimeToasts.length > 0 && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          zIndex: 99999,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          width: '100%',
+          maxWidth: '380px',
+          pointerEvents: 'none'
+        }}>
+          {realTimeToasts.map((toast) => {
+            const isCritical = toast.riskLevel === 'Critical';
+            
+            return (
+              <div 
+                key={toast.id}
+                style={{
+                  background: 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
+                  border: isCritical ? '2px solid #ef4444' : '1px solid rgba(20, 184, 166, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  boxShadow: isCritical 
+                    ? '0 10px 25px -5px rgba(239, 68, 68, 0.25)' 
+                    : '0 10px 25px -5px rgba(20, 184, 166, 0.15)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  pointerEvents: 'auto',
+                  position: 'relative'
+                }}
+              >
+                {/* Close Button */}
+                <button
+                  onClick={() => setRealTimeToasts(prev => prev.filter(t => t.id !== toast.id))}
+                  style={{
+                    position: 'absolute',
+                    top: '12px',
+                    right: '12px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    fontSize: '11px'
+                  }}
+                >
+                  ✕
+                </button>
+ 
+                {/* Toast Header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    background: isCritical ? '#ef4444' : '#14b8a6'
+                  }} />
+                  <span style={{ 
+                    fontSize: '0.7rem', 
+                    fontWeight: 'bold', 
+                    textTransform: 'uppercase', 
+                    color: isCritical ? '#ef4444' : '#14b8a6',
+                    letterSpacing: '0.05em'
+                  }}>
+                    {isCritical ? '🚨 Critical Alert' : '✓ Vitals Logged'}
+                  </span>
+                  <span style={{ fontSize: '9px', color: 'var(--text-muted)', marginLeft: 'auto', marginRight: '14px' }}>
+                    just now
+                  </span>
+                </div>
+ 
+                {/* Toast Body */}
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>
+                    {toast.patientName}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: '1.4' }}>
+                    Logged new readings: <strong style={{ color: 'white' }}>{toast.systolic}/{toast.diastolic} mmHg</strong> BP and <strong style={{ color: 'white' }}>{toast.glucose > 0 ? `${toast.glucose} mg/dL (${toast.glucoseType})` : 'N/A'}</strong> Glucose.
+                  </div>
+                </div>
+ 
+                {/* Toast Footer / Action Link */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                  <button
+                    onClick={() => {
+                      const found = patients.find(p => p.id === toast.patientId);
+                      if (found) {
+                        setSelectedPatient(found);
+                        // Focus on the patient table
+                        setTimeout(() => scrollToSection('patient-registry-table'), 50);
+                      }
+                      setRealTimeToasts(prev => prev.filter(t => t.id !== toast.id));
+                    }}
+                    style={{
+                      background: isCritical ? 'rgba(239, 68, 68, 0.15)' : 'rgba(20, 184, 166, 0.12)',
+                      border: 'none',
+                      color: isCritical ? '#f87171' : '#5eead4',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontSize: '0.7rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    View Patient Registry →
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
