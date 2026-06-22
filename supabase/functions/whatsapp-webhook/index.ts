@@ -138,10 +138,12 @@ serve(async (req) => {
     };
 
     // B. Resolve Patient Profile in Database by Phone Number
+    // Query by matching phone number in database
+    const last10Digits = senderPhone.slice(-10);
     const { data: profiles, error: profileErr } = await supabase
       .from("ncd_profiles")
       .select("*")
-      .or(`phone.eq.${senderPhone},phone.eq.+${senderPhone},phone.ilike.%${senderPhone.slice(-10)}`);
+      .or(`phone.eq.${senderPhone},phone.eq.+${senderPhone},phone.ilike.%${last10Digits}`);
 
     const patient = profiles && profiles.length > 0 ? profiles[0] : null;
 
@@ -169,32 +171,69 @@ serve(async (req) => {
           const ageVal = parseInt(messageText);
           if (!isNaN(ageVal) && ageVal > 0) {
             tempData.age = ageVal;
-            await saveSession("onboard_phone", tempData);
-            replyText = `Great! And what is your 11-digit phone number (e.g. 08012345678)?`;
+            await saveSession("onboard_email", tempData);
+            replyText = `Great! Please enter your email address. This will be your username to log in to the DiaBP Web App:`;
           } else {
             replyText = "Please enter your age as a valid number:";
           }
           break;
 
+        case "onboard_email":
+          const emailInput = messageText.trim();
+          if (emailInput.includes("@") && emailInput.includes(".")) {
+            tempData.email = emailInput;
+            await saveSession("onboard_phone", tempData);
+            replyText = `Excellent! What is your 11-digit phone number (e.g. 08012345678)?`;
+          } else {
+            replyText = "Invalid email format. Please enter a valid email address:";
+          }
+          break;
+
         case "onboard_phone":
+          // Create the patient profile in database
           try {
-            const newId = crypto.randomUUID();
-            await supabase.from("ncd_profiles").insert([{
-              id: newId,
+            let authUserId = crypto.randomUUID();
+            
+            // 1. Create a real user in Supabase Auth dynamically
+            try {
+              const { data: authData, error: authCreateErr } = await supabase.auth.admin.createUser({
+                email: tempData.email,
+                password: messageText, // Temporary password is their phone number
+                email_confirm: true,
+                user_metadata: { role: "patient" }
+              });
+
+              if (authCreateErr) {
+                console.error("[WhatsApp Webhook] Supabase Auth creation error:", authCreateErr.message);
+              } else if (authData?.user?.id) {
+                authUserId = authData.user.id;
+              }
+            } catch (authErr) {
+              console.warn("[WhatsApp Webhook] Auth user create skipped:", authErr.message);
+            }
+
+            // 2. Insert the profile satisfying all NOT NULL constraints
+            const { error: insertErr } = await supabase.from("ncd_profiles").insert([{
+              id: authUserId,
               name: tempData.name,
               age: tempData.age,
               phone: messageText,
               conditions: ["Essential Hypertension"],
+              baseline_bp: "120/80",
+              target_glucose_range: "Fasting: 80-130 mg/dL",
+              active_meds: [],
               is_premium: false,
               streak_days: 0,
               weight: 70
             }]);
 
+            if (insertErr) throw insertErr;
+
             await saveSession("idle", {});
-            replyText = `✓ Onboarding completed successfully! Your profile is registered.\n\nWelcome to DiaBP! Type *Menu* to start managing your daily health.`;
+            replyText = `✓ Onboarding completed successfully! Your profile is registered.\n\nUsername: *${tempData.email}*\nTemporary Password: *${messageText}*\n\nWe encourage you to download and log in to the App to view your vitals dashboard & unlock premium features (like the AI foot scanner):\n\n🔗 https://diabp-copilot.vercel.app`;
           } catch (insertErr) {
             console.error("[WhatsApp Webhook] Onboarding insert failed:", insertErr);
-            replyText = "Error saving your profile. Please try again or type *Menu* to restart.";
+            replyText = "Error saving your profile database record. Please try again or type *Menu* to restart.";
             await saveSession("idle", {});
           }
           break;
