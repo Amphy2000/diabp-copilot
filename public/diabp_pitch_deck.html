@@ -288,28 +288,43 @@
 
     /* Print/PDF Export Stylesheet */
     @media print {
-      body {
+      html, body {
         background: white !important;
         color: black !important;
+        display: block !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
       }
       
-      header, .nav-footer, .print-btn {
+      header, .nav-footer, .print-btn, .indicators, .ind-dot, .logo-container {
         display: none !important;
       }
 
       .slideshow-container {
+        display: block !important;
         padding: 0 !important;
+        margin: 0 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
       }
 
       .slide {
         display: block !important;
-        page-break-after: always;
+        position: relative !important;
+        page-break-after: always !important;
+        break-after: page !important;
         max-width: 100% !important;
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
         padding: 40px !important;
         color: black !important;
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+        height: auto !important;
       }
 
       .slide-title {

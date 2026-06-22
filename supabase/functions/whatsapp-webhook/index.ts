@@ -247,7 +247,7 @@ serve(async (req) => {
               name: tempData.name,
               age: tempData.age,
               phone: phoneValue,
-              conditions: ["Essential Hypertension"],
+              conditions: ["Essential Hypertension", "Type 2 Diabetes Mellitus"],
               baseline_bp: "120/80",
               target_glucose_range: "Fasting: 80-130 mg/dL",
               active_meds: [],
