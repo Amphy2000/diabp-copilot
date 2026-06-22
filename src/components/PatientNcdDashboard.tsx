@@ -510,12 +510,12 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
                   Quickstart Guide: Complete Your Self-Onboarding
                 </h3>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  Complete the following 4 steps to link your care cycle and get the most out of your health copilot.
+                  Complete the following {onboardingSteps.length} steps to link your care cycle and get the most out of your health copilot.
                 </p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'white', background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: '100px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  Progress: {completedSteps}/4 Completed
+                  Progress: {completedSteps}/{onboardingSteps.length} Completed
                 </span>
                 <button
                   onClick={toggleOnboarding}

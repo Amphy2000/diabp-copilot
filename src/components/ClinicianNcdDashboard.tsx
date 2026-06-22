@@ -18,7 +18,9 @@ import {
   Eye,
   ShoppingBag,
   Lock,
-  CreditCard
+  CreditCard,
+  Sparkles,
+  Circle
 } from 'lucide-react';
 import { 
   auditNcdRegimen,
@@ -194,6 +196,29 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   const [staffError, setStaffError] = useState('');
   const [staffSuccess, setStaffSuccess] = useState('');
   const [collapsedStaffPanel, setCollapsedStaffPanel] = useState(true);
+
+  // Onboarding guide state
+  const [collapsedOnboarding, setCollapsedOnboarding] = useState<boolean>(() => {
+    const saved = localStorage.getItem('clinician_onboarding_collapsed');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+    return false; // Default to open initially
+  });
+
+  const toggleOnboarding = () => {
+    setCollapsedOnboarding(prev => {
+      localStorage.setItem('clinician_onboarding_collapsed', (!prev).toString());
+      return !prev;
+    });
+  };
+
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
 
   // Set default staff role when activeRole changes
   useEffect(() => {
@@ -987,6 +1012,289 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
         </div>
       )}
 
+      {/* Onboarding Quickstart Guide */}
+      {(() => {
+        const hasSubaccount = activeRole === 'clinic' ? !!activeClinic?.subaccountId : !!activePharmacy?.subaccountId;
+        const hasOnboardedPatients = filteredPatients.length > 0;
+        const hasVitalsCheckIn = filteredPatients.some(p => (p.bpHistory || []).length > 5 || (p.glucoseHistory || []).length > 5);
+        const hasDrugPricing = !!activePharmacy?.prices && Object.keys(activePharmacy.prices).length > 0;
+        const hasAddedStaff = staffList.length > 1;
+        const hasRefillApproved = filteredOrders.some(o => o.status !== 'Pending Verification');
+
+        const onboardingSteps = activeRole === 'pharmacy' ? [
+          {
+            id: 'payout',
+            title: 'Link Payout Account',
+            description: 'Set up your bank account details to receive direct payouts via split transactions (95% to you instantly).',
+            instructions: 'Click "Configure Bank Payout" to select your bank, verify your account number, and link it.',
+            isCompleted: hasSubaccount,
+            actionLabel: 'Configure Bank Payout',
+            actionClick: () => setEditingPayout(true)
+          },
+          {
+            id: 'pricing',
+            title: 'Set Medication Pricing',
+            description: 'Customize drug prices for Metformin, Amlodipine, etc., to allow patients to purchase from your inventory.',
+            instructions: 'Click "Manage Prices" to customize medication catalog pricing for your pharmacy.',
+            isCompleted: hasDrugPricing,
+            actionLabel: 'Manage Prices',
+            actionClick: () => {
+              if (!isFacilityPremium) {
+                setUpgradeTarget('pharmacy');
+                setFacilityUpgradeModalOpen(true);
+              } else {
+                setEditingPrices(true);
+              }
+            }
+          },
+          {
+            id: 'patients',
+            title: 'Onboard First Patient',
+            description: 'Guide your customers to register. They can register online or self-onboard in under 1 minute via WhatsApp.',
+            instructions: 'Have patients text "join bet-sense" to +1 415 523 8886, or add them in the registry below.',
+            isCompleted: hasOnboardedPatients,
+            actionLabel: 'View Patient Registry',
+            actionClick: () => scrollToSection('patient-registry-table')
+          },
+          {
+            id: 'fulfillment',
+            title: 'Approve First Refill',
+            description: 'Review patient prescription signature uploads and approve refills in your orders queue.',
+            instructions: 'Go to the refills queue, audit the prescription sheet, and click "Verify & Approve".',
+            isCompleted: hasRefillApproved,
+            actionLabel: 'Go to Refills Queue',
+            actionClick: () => scrollToSection('refills-queue-section')
+          }
+        ] : [
+          {
+            id: 'payout',
+            title: 'Link Payout Account',
+            description: 'Set up your bank account details to receive consultation fees or medication co-pays directly.',
+            instructions: 'Click "Configure Bank Payout" to select your bank, verify your account number, and link it.',
+            isCompleted: hasSubaccount,
+            actionLabel: 'Configure Bank Payout',
+            actionClick: () => setEditingPayout(true)
+          },
+          {
+            id: 'staff',
+            title: 'Add Roster Staff Accounts',
+            description: 'Register nurses, front desk assistants, or junior physicians to help manage patient records.',
+            instructions: 'Expand the Care Team & Staff Directory card below and input staff registration credentials.',
+            isCompleted: hasAddedStaff,
+            actionLabel: 'Manage Staff Directory',
+            actionClick: () => {
+              setCollapsedStaffPanel(false);
+              setTimeout(() => scrollToSection('staff-directory-section'), 100);
+            }
+          },
+          {
+            id: 'patients',
+            title: 'Register Patient Directory',
+            description: 'Add your chronic clinic patients to the digital health ecosystem so they can be monitored.',
+            instructions: 'Input their details during consults, or have patients text "join bet-sense" on WhatsApp to register.',
+            isCompleted: hasOnboardedPatients,
+            actionLabel: 'View Patient Registry',
+            actionClick: () => scrollToSection('patient-registry-table')
+          },
+          {
+            id: 'vitals',
+            title: 'Record Clinical Check-in',
+            description: 'Log vital readings (BP, blood glucose) for a patient during an in-clinic medical consultation.',
+            instructions: 'Click the check-in button next to any patient in the table to log their daily readings.',
+            isCompleted: hasVitalsCheckIn,
+            actionLabel: 'Record Check-in Vitals',
+            actionClick: () => scrollToSection('patient-registry-table')
+          }
+        ];
+
+        const completedSteps = onboardingSteps.filter(s => s.isCompleted).length;
+        const onboardingProgress = Math.round((completedSteps / onboardingSteps.length) * 100);
+
+        return (
+          <div className="glass-panel" style={{
+            background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.4) 100%)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '20px',
+            padding: '24px',
+            position: 'relative',
+            overflow: 'hidden',
+            marginBottom: '16px'
+          }}>
+            {/* Glowing aura effect */}
+            <div style={{
+              position: 'absolute',
+              top: '-40px',
+              left: '-40px',
+              width: '150px',
+              height: '150px',
+              borderRadius: '50%',
+              background: 'rgba(20, 184, 166, 0.12)',
+              filter: 'blur(40px)',
+              pointerEvents: 'none'
+            }}></div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'white', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles className="w-5 h-5 text-teal-400 animate-pulse" />
+                  Quickstart Guide: Complete Your Facility Onboarding
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  Complete the following {onboardingSteps.length} steps to verify your payouts, set catalog prices, and register patient care sheets.
+                </p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'white', background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: '100px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  Progress: {completedSteps}/{onboardingSteps.length} Completed
+                </span>
+                <button
+                  type="button"
+                  onClick={toggleOnboarding}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    padding: 0
+                  }}
+                >
+                  {collapsedOnboarding ? 'Expand Guide ▾' : 'Hide Guide ▴'}
+                </button>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.04)', borderRadius: '100px', overflow: 'hidden', marginBottom: collapsedOnboarding ? '0' : '20px' }}>
+              <div style={{
+                width: `${onboardingProgress}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #14b8a6 0%, #3b82f6 100%)',
+                borderRadius: '100px',
+                boxShadow: '0 0 8px rgba(20, 184, 166, 0.4)',
+                transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+              }}></div>
+            </div>
+
+            {!collapsedOnboarding && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+                {onboardingSteps.map((step, idx) => {
+                  const IconComponent = step.id === 'payout' ? CreditCard : step.id === 'pricing' ? Calculator : step.id === 'patients' ? Users : step.id === 'fulfillment' ? ClipboardList : step.id === 'staff' ? Users : step.id === 'vitals' ? Activity : Sparkles;
+                  return (
+                    <div
+                      key={step.id}
+                      style={{
+                        background: step.isCompleted ? 'rgba(20, 184, 166, 0.03)' : 'rgba(255,255,255,0.01)',
+                        border: step.isCompleted ? '1px solid rgba(20, 184, 166, 0.15)' : '1px solid rgba(255, 255, 255, 0.04)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        transition: 'all 0.3s ease',
+                        position: 'relative'
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            background: step.isCompleted ? 'rgba(20, 184, 166, 0.1)' : 'rgba(255,255,255,0.04)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: step.isCompleted ? '#14b8a6' : 'var(--text-secondary)'
+                          }}>
+                            <IconComponent size={16} />
+                          </div>
+                          {step.isCompleted ? (
+                            <CheckCircle size={18} className="text-teal-400" style={{ fill: 'rgba(20, 184, 166, 0.1)' }} />
+                          ) : (
+                            <div style={{
+                              width: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
+                              border: '2px solid rgba(255,255,255,0.2)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '9px',
+                              fontWeight: 'bold',
+                              color: 'var(--text-secondary)'
+                            }}>
+                              {idx + 1}
+                            </div>
+                          )}
+                        </div>
+
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '0.85rem', color: 'white', fontWeight: 700 }}>
+                          {step.title}
+                        </h4>
+                        <p style={{ margin: '0 0 8px 0', fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                          {step.description}
+                        </p>
+                        {!step.isCompleted && (
+                          <p style={{ margin: '0 0 16px 0', fontSize: '0.68rem', color: 'var(--text-muted)', fontStyle: 'italic', lineHeight: '1.3' }}>
+                            💡 {step.instructions}
+                          </p>
+                        )}
+                      </div>
+
+                      {step.isCompleted ? (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          color: '#14b8a6',
+                          fontSize: '0.7rem',
+                          fontWeight: 'bold',
+                          padding: '6px 0'
+                        }}>
+                          ✓ Setup Completed
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={step.actionClick}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.06)',
+                            color: 'white',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: '6px',
+                            padding: '6px 12px',
+                            fontSize: '0.72rem',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                            e.currentTarget.style.transform = 'none';
+                          }}
+                        >
+                          {step.actionLabel} <ArrowRight size={12} className="text-teal-400" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Facility Revenue Analytics Card */}
       {workspaceRole === 'admin' && (
       <div className="glass-panel" style={{ padding: '20px', marginBottom: '16px', background: 'rgba(13, 17, 23, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
@@ -1243,7 +1551,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
       <div className="dashboard-grid">
         
         {/* Left Column: Patients Registry */}
-        <div className="glass-panel left-column">
+        <div id="patient-registry-table" className="glass-panel left-column">
           <div className="card-header-divider" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 className="card-title" style={{ margin: 0 }}>
               <Users className="card-title-icon text-teal-400" /> 
@@ -1879,7 +2187,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
       </div>
 
       {/* 3. Orders List Table */}
-      <div className="glass-panel">
+      <div id="refills-queue-section" className="glass-panel">
         <div className="card-header-divider" style={{ borderBottom: 'none', paddingBottom: '0' }}>
           <h3 className="card-title">
             <ClipboardList className="card-title-icon text-teal-400" /> Prescriptions & Refill Requests
@@ -2593,7 +2901,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
 
       {/* Facility Staff Management Directory Panel */}
       {workspaceRole === 'admin' && (
-        <div className="glass-panel" style={{ marginTop: '24px', background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.3) 0%, rgba(15, 23, 42, 0.3) 100%)', border: '1px solid rgba(255,255,255,0.05)', padding: '20px', borderRadius: '16px' }}>
+        <div id="staff-directory-section" className="glass-panel" style={{ marginTop: '24px', background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.3) 0%, rgba(15, 23, 42, 0.3) 100%)', border: '1px solid rgba(255,255,255,0.05)', padding: '20px', borderRadius: '16px' }}>
           <div 
             style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', borderBottom: collapsedStaffPanel ? 'none' : '1px solid rgba(255,255,255,0.06)', paddingBottom: collapsedStaffPanel ? '0' : '12px' }}
             onClick={() => setCollapsedStaffPanel(!collapsedStaffPanel)}
