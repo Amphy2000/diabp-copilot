@@ -80,6 +80,7 @@ function App() {
       setPatients([]);
       setOrders([]);
       setUserFacilityId(null);
+      setLoading(false);
       return;
     }
 

@@ -595,9 +595,11 @@ export const PatientNcdDashboard: React.FC<PatientNcdDashboardProps> = ({ profil
                         <p style={{ margin: '0 0 8px 0', fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
                           {step.description}
                         </p>
-                        <p style={{ margin: '0 0 16px 0', fontSize: '0.68rem', color: 'var(--text-muted)', fontStyle: 'italic', lineHeight: '1.3' }}>
-                          💡 {step.instructions}
-                        </p>
+                        {!step.isCompleted && (
+                          <p style={{ margin: '0 0 16px 0', fontSize: '0.68rem', color: 'var(--text-muted)', fontStyle: 'italic', lineHeight: '1.3' }}>
+                            💡 {step.instructions}
+                          </p>
+                        )}
                       </div>
 
                       {step.isCompleted ? (
