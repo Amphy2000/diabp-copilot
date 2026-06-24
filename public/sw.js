@@ -87,10 +87,65 @@ self.addEventListener('notificationclick', function(event) {
   event.notification.close();
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-      if (clientList.length > 0) {
-        return clientList[0].focus();
+      // Focus existing open window if any
+      for (const client of clientList) {
+        if (client.url && 'focus' in client) {
+          return client.focus();
+        }
       }
+      // Otherwise open a new window
       return clients.openWindow('/');
+    })
+  );
+});
+
+// ==============================================
+// BACKGROUND PUSH NOTIFICATIONS (Web Push API)
+// Fires even when app is completely closed
+// ==============================================
+self.addEventListener('push', function(event) {
+  let data = { title: 'DiaBP Copilot', body: 'You have a new notification', tag: 'diabp-copilot' };
+  
+  try {
+    if (event.data) {
+      const parsed = event.data.json();
+      data = { ...data, ...parsed };
+    }
+  } catch (e) {
+    console.warn('Could not parse push data:', e);
+  }
+
+  const options = {
+    body: data.body,
+    icon: data.icon || '/favicon.svg',
+    badge: data.badge || '/favicon.svg',
+    tag: data.tag || 'diabp-copilot',
+    vibrate: [200, 100, 200, 100, 400],
+    requireInteraction: true,
+    data: data
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+// Re-subscribe if browser invalidates push subscription
+self.addEventListener('pushsubscriptionchange', function(event) {
+  event.waitUntil(
+    self.registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: 'BE49G-g17PiHyCzeCE3vJtr4eOlDzXYXz6n-ErsAw2H7vEKEgITWUO7b4EWaDbeaGHAA4-EHgnecb7fFIlLIAxE'
+    }).then(function(newSubscription) {
+      // Notify the app to update the subscription in the database
+      self.clients.matchAll({ type: 'window' }).then(function(clientList) {
+        clientList.forEach(function(client) {
+          client.postMessage({
+            type: 'PUSH_SUBSCRIPTION_UPDATED',
+            payload: JSON.stringify(newSubscription)
+          });
+        });
+      });
     })
   );
 });

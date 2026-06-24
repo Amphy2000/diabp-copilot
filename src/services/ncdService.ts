@@ -261,7 +261,7 @@ function loadLocal(key: string, fallback: any) {
 /**
  * Loads patient profile from Supabase with LocalStorage fallback
  */
-export async function getPatientProfile(userId?: string): Promise<PatientNcdProfile> {
+export async function getPatientProfile(userId?: string, displayNameFallback?: string): Promise<PatientNcdProfile> {
   if (isSupabaseConfigured) {
     try {
       let targetId = userId;
@@ -383,8 +383,24 @@ export async function getPatientProfile(userId?: string): Promise<PatientNcdProf
   if (allProfiles[targetId]) {
     return { id: targetId, ...allProfiles[targetId] };
   }
-  // No stored profile at all — return clean default (NOT another user's profile)
-  return { id: targetId, ...INITIAL_NCD_PATIENT };
+  // No stored profile at all — return a CLEAN default with caller-provided name
+  // NEVER fall back to INITIAL_NCD_PATIENT (has hardcoded 'Chief Chinedu Eze' demo data)
+  return {
+    id: targetId,
+    name: displayNameFallback || 'New Patient',
+    age: 40,
+    weight: 70,
+    conditions: [],
+    baselineBp: '',
+    targetGlucoseRange: '70-130 mg/dL',
+    bpHistory: [],
+    glucoseHistory: [],
+    footScanHistory: [],
+    streakDays: 0,
+    activeMeds: [],
+    assignedClinicId: null,
+    assignedPharmacyId: null
+  };
 }
 
 /**
@@ -1962,5 +1978,89 @@ export async function deleteRefillOrder(orderId: string): Promise<void> {
     const orders = loadLocal(ORDERS_KEY, INITIAL_NCD_ORDERS);
     const updated = orders.filter((o: any) => o.id !== orderId);
     saveLocal(ORDERS_KEY, updated);
+  }
+}
+
+// =============================================
+// WEB PUSH SUBSCRIPTION MANAGEMENT
+// =============================================
+
+/**
+ * Save a browser push subscription to Supabase so the server can push to this device.
+ * Called after the user grants notification permission.
+ */
+export async function savePushSubscription(
+  subscription: PushSubscription,
+  userRole: string
+): Promise<void> {
+  if (!isSupabaseConfigured) return; // Requires server-side Supabase
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const sub = subscription.toJSON();
+    const payload = {
+      user_id: user.id,
+      user_role: userRole,
+      endpoint: sub.endpoint,
+      p256dh: sub.keys?.p256dh || '',
+      auth: sub.keys?.auth || ''
+    };
+
+    // Upsert: if same endpoint exists, update the role
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .upsert(payload, { onConflict: 'endpoint' });
+
+    if (error) {
+      console.error('Failed to save push subscription:', error);
+    }
+  } catch (err) {
+    console.error('Push subscription save error:', err);
+  }
+}
+
+/**
+ * Trigger the server-side send-push Edge Function to send real background push notifications
+ * to all subscribed devices matching the target role (patients/clinicians/all).
+ */
+export async function triggerServerPush(
+  title: string,
+  body: string,
+  target: 'patients' | 'clinicians' | 'all',
+  tag?: string
+): Promise<{ sent: number; total: number } | null> {
+  if (!isSupabaseConfigured) {
+    console.info('Server push requires Supabase — skipped in offline mode');
+    return null;
+  }
+
+  try {
+    const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+    const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/send-push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+        'apikey': supabaseAnonKey
+      },
+      body: JSON.stringify({ title, body, target, tag: tag || 'diabp-copilot' })
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error('send-push function error:', response.status, text);
+      return null;
+    }
+
+    const result = await response.json();
+    console.log(`Server push result: ${result.sent}/${result.total} sent`);
+    return result;
+  } catch (err) {
+    console.error('Failed to trigger server push:', err);
+    return null;
   }
 }

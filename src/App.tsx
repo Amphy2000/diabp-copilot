@@ -26,7 +26,9 @@ import {
   deleteClinic,
   deletePharmacy,
   deletePatientProfile,
-  deleteRefillOrder
+  deleteRefillOrder,
+  savePushSubscription,
+  triggerServerPush
 } from './services/ncdService';
 import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy } from './services/ncdService';
 import { PatientNcdDashboard } from './components/PatientNcdDashboard';
@@ -156,7 +158,7 @@ function App() {
         if (role === 'patient') {
           let profile: PatientNcdProfile | null = null;
           try {
-            profile = await getPatientProfile();
+            profile = await getPatientProfile(undefined, session.user.user_metadata?.display_name);
           } catch (e) {
             console.error("Failed to load patient profile:", e);
           }
@@ -349,12 +351,70 @@ function App() {
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
-  // Request Notification permission on mount
+  // Request Notification permission + subscribe to Web Push (enables background notifications)
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
+    if (!userRole || !session) return; // Wait until we know the user's role
+
+    const VAPID_PUBLIC_KEY = 'BE49G-g17PiHyCzeCE3vJtr4eOlDzXYXz6n-ErsAw2H7vEKEgITWUO7b4EWaDbeaGHAA4-EHgnecb7fFIlLIAxE';
+
+    function urlBase64ToUint8Array(base64String: string): Uint8Array {
+      const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = atob(base64);
+      return new Uint8Array([...rawData].map(c => c.charCodeAt(0)));
     }
-  }, []);
+
+    async function subscribeToPush() {
+      try {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+        const reg = await navigator.serviceWorker.ready;
+        let permission = Notification.permission;
+
+        if (permission === 'default') {
+          permission = await Notification.requestPermission();
+        }
+
+        if (permission !== 'granted') return;
+
+        // Check if already subscribed
+        let subscription = await reg.pushManager.getSubscription();
+        if (!subscription) {
+          subscription = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+          });
+        }
+
+        // Save to Supabase so server can push to this device
+        await savePushSubscription(subscription, userRole!);
+
+        // Sync role to SW
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'SYNC_USER_ROLE',
+            payload: { role: userRole }
+          });
+        }
+      } catch (err) {
+        console.warn('Push subscription failed (non-fatal):', err);
+      }
+    }
+
+    subscribeToPush();
+
+    // Handle SW re-subscription events
+    const handleSWPushUpdate = (event: MessageEvent) => {
+      if (event.data?.type === 'PUSH_SUBSCRIPTION_UPDATED') {
+        try {
+          const sub = JSON.parse(event.data.payload) as PushSubscription;
+          savePushSubscription(sub, userRole!);
+        } catch {}
+      }
+    };
+    navigator.serviceWorker?.addEventListener('message', handleSWPushUpdate);
+    return () => navigator.serviceWorker?.removeEventListener('message', handleSWPushUpdate);
+  }, [userRole, session]);
 
   // Synchronize userRole to service worker dynamically
   useEffect(() => {
@@ -410,11 +470,15 @@ function App() {
 
       // Trigger browser push notification if logged-in user is a clinician/admin
       const isClinician = userRole === 'doctor' || userRole === 'pharmacist' || userRole === 'admin';
+      const title = `🚨 Vitals Logged: ${patientName}`;
+      const body = `BP: ${systolic}/${diastolic} mmHg | Glucose: ${glucose > 0 ? `${glucose} mg/dL (${glucoseType})` : 'N/A'}. Streak: ${streakDays} days!`;
+
+      // SERVER PUSH: Send to ALL clinicians via server-side Web Push (works even when app is closed)
+      // This fires regardless of who the current user is (patient logging = clinicians get push)
+      triggerServerPush(title, body, 'clinicians', `vitals-${patientId}`);
+
       if (isClinician) {
-        const title = `🚨 Vitals Logged: ${patientName}`;
-        const body = `BP: ${systolic}/${diastolic} mmHg | Glucose: ${glucose > 0 ? `${glucose} mg/dL (${glucoseType})` : 'N/A'}. Streak: ${streakDays} days!`;
-        
-        // Native push via SW
+        // Also show local notification on THIS device (same-device clinician)
         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
           navigator.serviceWorker.controller.postMessage({
             type: 'SHOW_NOTIFICATION',
@@ -422,10 +486,7 @@ function App() {
             body
           });
         } else if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(title, {
-            body,
-            icon: '/favicon.svg'
-          });
+          new Notification(title, { body, icon: '/favicon.svg' });
         }
 
         // In-app global toast fallback (always shows, even if OS push is blocked)
@@ -678,7 +739,7 @@ function App() {
       setPharmacies(pharmaciesList);
 
       if (role === 'patient') {
-        const profile = await getPatientProfile();
+        const profile = await getPatientProfile(undefined, session.user.user_metadata?.display_name);
         const refillOrders = await getRefillOrders();
         setPatientProfile(profile);
         setOrders(refillOrders);

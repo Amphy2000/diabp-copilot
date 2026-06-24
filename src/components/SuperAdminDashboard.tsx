@@ -16,6 +16,7 @@ import {
   Search
 } from 'lucide-react';
 import type { PatientNcdProfile, NcdClinic, NcdPharmacy, NcdRefillOrder } from '../services/ncdService';
+import { triggerServerPush } from '../services/ncdService';
 
 const superAdminPitchCopy = `DiaBP-Copilot: B2B Clinician & Pharmacy Partnership Pitch
 
@@ -259,6 +260,14 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     });
     previewChannel.close();
 
+    // SERVER PUSH: Reach clinicians on ALL devices (background-capable)
+    triggerServerPush(
+      '🚨 HIGH RISK: Simulated Patient Vitals',
+      'BP: 178/106 mmHg | Glucose: 250 mg/dL (Post-Meal) — Immediate review required.',
+      'clinicians',
+      'test-clinician-alert'
+    );
+
     setBroadcastStatus("🚨 Sent test clinician alert (High risk vitals: 178/106 mmHg, 250 mg/dL)!");
     setTimeout(() => setBroadcastStatus(null), 4000);
   };
@@ -302,6 +311,14 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       }
     });
     previewChannel.close();
+
+    // SERVER PUSH: Reach patients on ALL devices (background-capable)
+    triggerServerPush(
+      '⏰ Daily Health Check-in Reminder',
+      'Time to log your blood pressure and glucose readings to keep your care streak active!',
+      'patients',
+      'daily-reminder-test'
+    );
 
     setBroadcastStatus("⏰ Sent test patient daily reminder push notification!");
     setTimeout(() => setBroadcastStatus(null), 4000);
