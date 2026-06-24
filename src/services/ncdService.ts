@@ -286,7 +286,9 @@ export async function getPatientProfile(userId?: string): Promise<PatientNcdProf
         if (profileErr.code === 'PGRST116') {
           if (!userId) {
             console.info("No profile found in Supabase. Initializing default profile...");
-            const localProfile = loadLocal(PROFILE_KEY, INITIAL_NCD_PATIENT);
+            // Use per-user localStorage key to avoid pulling another user's profile
+            const perUserLocal = loadLocal(`diabp_profile_${targetId}`, null);
+            const localProfile = perUserLocal || INITIAL_NCD_PATIENT;
             await savePatientProfile(localProfile, targetId);
             return { id: targetId, ...localProfile };
           }
@@ -373,17 +375,35 @@ export async function getPatientProfile(userId?: string): Promise<PatientNcdProf
   }
 
   const allProfiles = loadLocal('diabp_profiles', {});
+  // Check per-user specific key first (new method), then legacy dict
+  const perUserProfile = loadLocal(`diabp_profile_${targetId}`, null);
+  if (perUserProfile) {
+    return { id: targetId, ...perUserProfile };
+  }
   if (allProfiles[targetId]) {
     return { id: targetId, ...allProfiles[targetId] };
   }
-  return { id: targetId, ...loadLocal(PROFILE_KEY, INITIAL_NCD_PATIENT) };
+  // No stored profile at all — return clean default (NOT another user's profile)
+  return { id: targetId, ...INITIAL_NCD_PATIENT };
 }
 
 /**
  * Saves patient profile to Supabase with LocalStorage fallback
  */
 export async function savePatientProfile(profile: PatientNcdProfile, userId?: string): Promise<void> {
-  // Always update LocalStorage first
+  // Get targeted userId to use user-specific storage (avoid cross-user bleed)
+  let earlyId = userId;
+  if (!earlyId) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      earlyId = user?.id;
+    } catch {}
+  }
+  // Save to user-specific localStorage key (e.g. diabp_profile_<userId>)
+  if (earlyId) {
+    saveLocal(`diabp_profile_${earlyId}`, profile);
+  }
+  // Also keep legacy shared key updated for compatibility (will be migrated away)
   saveLocal(PROFILE_KEY, profile);
 
   let targetId = userId;

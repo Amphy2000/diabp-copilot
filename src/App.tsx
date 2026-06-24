@@ -118,9 +118,24 @@ function App() {
     }
 
     async function loadData() {
+      const role = session.user?.user_metadata?.role || 'patient';
+
+      // OPTIMISTIC: Pre-fill patient profile from per-user localStorage immediately
+      // so the UI appears at once while Supabase loads in background
+      if (role === 'patient') {
+        const cachedKey = `diabp_profile_${session.user.id}`;
+        try {
+          const cached = localStorage.getItem(cachedKey);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            setPatientProfile({ id: session.user.id, ...parsed });
+            setLoading(false); // show UI immediately with cached data
+          }
+        } catch {}
+      }
+
       setLoading(true);
       try {
-        const role = session.user?.user_metadata?.role || 'patient';
         
         let clinicsList: NcdClinic[] = [];
         try {
@@ -479,7 +494,7 @@ function App() {
       }, 10000);
     };
 
-    // 1. BroadcastChannel Listener
+    // 1. BroadcastChannel Listener (same browser/device only)
     const channel = new BroadcastChannel('diabp-copilot-channel');
     channel.onmessage = (event) => {
       if (event.data) {
@@ -491,7 +506,7 @@ function App() {
       }
     };
 
-    // 2. Service Worker Message Listener
+    // 2. Service Worker Message Listener (same device only)
     const handleSWMessage = (event: MessageEvent) => {
       if (event.data) {
         if (event.data.type === 'VITALS_LOGGED_BROADCAST') {
@@ -506,10 +521,42 @@ function App() {
       navigator.serviceWorker.addEventListener('message', handleSWMessage);
     }
 
+    // 3. Supabase Realtime subscription — CROSS-DEVICE broadcast transport
+    // This is what makes admin test notifications reach mobile patients on other devices
+    let realtimeChannel: any = null;
+    if (isSupabaseConfigured) {
+      realtimeChannel = supabase
+        .channel('diabp-realtime-broadcasts')
+        .on('broadcast', { event: 'SYSTEM_BROADCAST' }, ({ payload }: any) => {
+          handleSystemBroadcast(payload);
+          // Also trigger SW push notification on this device
+          if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              type: 'DISPATCH_SYSTEM_BROADCAST',
+              payload
+            });
+          }
+        })
+        .on('broadcast', { event: 'VITALS_LOGGED' }, ({ payload }: any) => {
+          handleVitalsLogged(payload);
+          // Trigger clinician SW push notification
+          if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              type: 'PATIENT_LOGGED_VITALS',
+              payload
+            });
+          }
+        })
+        .subscribe();
+    }
+
     return () => {
       channel.close();
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+      }
+      if (realtimeChannel) {
+        supabase.removeChannel(realtimeChannel);
       }
     };
   }, [session, userRole]);

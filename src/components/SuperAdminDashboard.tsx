@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { 
   ShieldAlert, 
   Users, 
@@ -194,6 +195,19 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     });
     channel.close();
 
+    // CROSS-DEVICE: Send via Supabase Realtime so ALL connected devices receive it
+    if (isSupabaseConfigured) {
+      supabase.channel('diabp-realtime-broadcasts').send({
+        type: 'broadcast',
+        event: 'SYSTEM_BROADCAST',
+        payload: {
+          title: broadcastTitle.trim(),
+          body: broadcastBody.trim(),
+          target: broadcastTarget
+        }
+      });
+    }
+
     setBroadcastStatus("🚀 Custom push broadcast dispatched successfully!");
     setBroadcastTitle("");
     setBroadcastBody("");
@@ -219,14 +233,21 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       });
     }
 
+    // Same-device BroadcastChannel
     const channel = new BroadcastChannel('diabp-copilot-channel');
-    channel.postMessage({
-      type: 'VITALS_LOGGED',
-      payload
-    });
+    channel.postMessage({ type: 'VITALS_LOGGED', payload });
     channel.close();
 
-    // Also send an in-app visible broadcast so admin sees confirmation immediately
+    // CROSS-DEVICE: Send via Supabase Realtime so ALL connected devices receive it
+    if (isSupabaseConfigured) {
+      supabase.channel('diabp-realtime-broadcasts').send({
+        type: 'broadcast',
+        event: 'VITALS_LOGGED',
+        payload
+      });
+    }
+
+    // Admin confirmation toast (same-device broadcast with target: all)
     const previewChannel = new BroadcastChannel('diabp-copilot-channel');
     previewChannel.postMessage({
       type: 'SYSTEM_BROADCAST',
@@ -256,14 +277,21 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       });
     }
 
+    // Same-device BroadcastChannel
     const channel = new BroadcastChannel('diabp-copilot-channel');
-    channel.postMessage({
-      type: 'SYSTEM_BROADCAST',
-      payload
-    });
+    channel.postMessage({ type: 'SYSTEM_BROADCAST', payload });
     channel.close();
 
-    // Confirm admin sees it immediately via a separate 'all' broadcast
+    // CROSS-DEVICE: Send via Supabase Realtime so ALL connected devices receive it
+    if (isSupabaseConfigured) {
+      supabase.channel('diabp-realtime-broadcasts').send({
+        type: 'broadcast',
+        event: 'SYSTEM_BROADCAST',
+        payload
+      });
+    }
+
+    // Admin confirmation toast
     const previewChannel = new BroadcastChannel('diabp-copilot-channel');
     previewChannel.postMessage({
       type: 'SYSTEM_BROADCAST',
