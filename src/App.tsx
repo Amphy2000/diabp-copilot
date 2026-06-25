@@ -130,13 +130,21 @@ function App() {
           const cached = localStorage.getItem(cachedKey);
           if (cached) {
             const parsed = JSON.parse(cached);
-            setPatientProfile({ id: session.user.id, ...parsed });
+            // CRITICAL: Always override the name from auth metadata (single source of truth)
+            // This prevents stale/wrong names from corrupted localStorage cache
+            const authName = session.user.user_metadata?.display_name || parsed.name;
+            setPatientProfile({ id: session.user.id, ...parsed, name: authName });
             setLoading(false); // show UI immediately with cached data
+            // Don't setLoading(true) again below — Supabase will update silently in background
           }
         } catch {}
       }
 
-      setLoading(true);
+      // Only show spinner if we have no cached data to show
+      const hasCachedData = role === 'patient' && (() => {
+        try { return !!localStorage.getItem(`diabp_profile_${session.user.id}`); } catch { return false; }
+      })();
+      if (!hasCachedData) setLoading(true);
       try {
         
         let clinicsList: NcdClinic[] = [];
@@ -771,7 +779,18 @@ function App() {
   };
 
   const handleLogout = async () => {
+    // Clear all cached profile data for the current user before signing out
+    // This prevents the next user from seeing this user's cached profile
+    if (session?.user?.id) {
+      try {
+        localStorage.removeItem(`diabp_profile_${session.user.id}`);
+        localStorage.removeItem('diabp_patient_profile'); // clear shared legacy key
+      } catch {}
+    }
     await supabase.auth.signOut();
+    setPatientProfile(null);
+    setPatients([]);
+    setOrders([]);
     setUserFacilityId(null);
     window.location.reload();
   };

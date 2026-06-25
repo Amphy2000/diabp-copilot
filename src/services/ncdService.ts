@@ -336,9 +336,16 @@ export async function getPatientProfile(userId?: string, displayNameFallback?: s
           recommendations: s.recommendations
         }));
 
+        // IMPORTANT: If the stored name matches known demo names, use the displayNameFallback instead
+        // This acts as a self-healing guard against data corruption from earlier INITIAL_NCD_PATIENT seeding
+        const DEMO_NAMES = ['Chief Chinedu Eze', 'New Patient'];
+        const resolvedName = (DEMO_NAMES.includes(profileData.name) && displayNameFallback)
+          ? displayNameFallback
+          : (profileData.name || displayNameFallback || 'Patient');
+
         return {
           id: targetId,
-          name: profileData.name,
+          name: resolvedName,
           age: profileData.age,
           weight: profileData.weight,
           conditions: profileData.conditions,
@@ -352,9 +359,10 @@ export async function getPatientProfile(userId?: string, displayNameFallback?: s
           address: profileData.address || undefined,
           isPremium: profileData.is_premium || false,
           premiumExpiry: profileData.premium_expiry || undefined,
-          bpHistory: bpHistory.length > 0 ? bpHistory : INITIAL_NCD_PATIENT.bpHistory,
-          glucoseHistory: glucoseHistory.length > 0 ? glucoseHistory : INITIAL_NCD_PATIENT.glucoseHistory,
-          footScanHistory: footScanHistory.length > 0 ? footScanHistory : INITIAL_NCD_PATIENT.footScanHistory
+          // Use empty arrays as fallback — NEVER use INITIAL_NCD_PATIENT demo history
+          bpHistory: bpHistory.length > 0 ? bpHistory : [],
+          glucoseHistory: glucoseHistory.length > 0 ? glucoseHistory : [],
+          footScanHistory: footScanHistory.length > 0 ? footScanHistory : []
         };
       }
     } catch (err) {
