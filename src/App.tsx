@@ -1157,14 +1157,16 @@ function App() {
       {globalToasts.length > 0 && (
         <div style={{
           position: 'fixed',
-          bottom: '24px',
-          left: '24px',
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 24px)',
+          right: '16px',
+          left: '16px',
           zIndex: 100000,
           display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-          width: '100%',
+          flexDirection: 'column-reverse',
+          gap: '10px',
+          width: 'calc(100% - 32px)',
           maxWidth: '380px',
+          marginLeft: 'auto',
           pointerEvents: 'none'
         }}>
           {globalToasts.map((toast) => (

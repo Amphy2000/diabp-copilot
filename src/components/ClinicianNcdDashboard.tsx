@@ -4708,17 +4708,19 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
       {realTimeToasts.length > 0 && (
         <div style={{
           position: 'fixed',
-          bottom: '24px',
-          right: '24px',
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+          right: '12px',
+          left: '12px',
           zIndex: 99999,
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px',
-          width: '100%',
-          maxWidth: '380px',
+          gap: '10px',
+          width: 'calc(100% - 24px)',
+          maxWidth: '400px',
+          marginLeft: 'auto',
           pointerEvents: 'none'
         }}>
-          {realTimeToasts.map((toast) => {
+          {realTimeToasts.slice(0, 3).map((toast) => {
             const isCritical = toast.riskLevel === 'Critical';
             
             return (
