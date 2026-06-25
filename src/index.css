@@ -1410,3 +1410,455 @@ body {
     max-height: calc(100vh - 100px) !important;
   }
 }
+
+/* ============================================================
+   PREMIUM+ UI ENHANCEMENTS
+   Pure CSS additions — zero logic changes
+   ============================================================ */
+
+/* ── 1. SKELETON LOADING SHIMMER ── */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.04) 25%,
+    rgba(255,255,255,0.09) 50%,
+    rgba(255,255,255,0.04) 75%
+  );
+  background-size: 800px 100%;
+  animation: skeleton-shimmer 1.6s infinite linear;
+  border-radius: 8px;
+}
+
+.skeleton-card {
+  composes: skeleton;
+  height: 120px;
+  border-radius: 20px;
+  margin-bottom: 1rem;
+}
+
+.skeleton-line {
+  height: 14px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.04) 25%,
+    rgba(255,255,255,0.09) 50%,
+    rgba(255,255,255,0.04) 75%
+  );
+  background-size: 800px 100%;
+  animation: skeleton-shimmer 1.6s infinite linear;
+}
+
+.skeleton-line.short { width: 40%; }
+.skeleton-line.medium { width: 65%; }
+.skeleton-line.full { width: 100%; }
+
+/* ── 2. PAGE ENTRY ANIMATION ── */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.main-content {
+  animation: page-enter 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── 3. STAGGERED CARD REVEAL ── */
+@keyframes card-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.glass-panel {
+  animation: card-reveal 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Stagger each card using nth-child — works on grid children */
+.glass-panel:nth-child(1) { animation-delay: 0.05s; }
+.glass-panel:nth-child(2) { animation-delay: 0.10s; }
+.glass-panel:nth-child(3) { animation-delay: 0.15s; }
+.glass-panel:nth-child(4) { animation-delay: 0.20s; }
+.glass-panel:nth-child(5) { animation-delay: 0.25s; }
+.glass-panel:nth-child(6) { animation-delay: 0.30s; }
+
+/* ── 4. PREMIUM CARD HOVER — lift + glow ── */
+.glass-panel {
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.glass-panel:hover {
+  border-color: rgba(255, 255, 255, 0.13);
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255,255,255,0.06) inset;
+  transform: translateY(-2px);
+}
+
+/* ── 5. BUTTON PRESS FEEDBACK ── */
+button {
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+}
+
+button:active {
+  transform: scale(0.96);
+}
+
+/* Primary teal/blue action buttons — glow on hover */
+button[style*="background: linear-gradient"]:hover,
+button[style*="var(--color-teal-light)"]:hover,
+button[style*="var(--color-blue)"]:hover {
+  filter: brightness(1.12);
+  box-shadow: 0 0 20px rgba(20, 184, 166, 0.35);
+}
+
+/* ── 6. STREAK CARD — PREMIUM PULSE ── */
+@keyframes streak-pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.0),
+                0 4px 12px rgba(20, 184, 166, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(20, 184, 166, 0.08),
+                0 4px 20px rgba(20, 184, 166, 0.2);
+  }
+}
+
+.streak-card {
+  animation: streak-pulse-glow 3s ease-in-out infinite;
+  transition: all 0.3s ease;
+}
+
+.streak-card:hover {
+  background: rgba(20, 184, 166, 0.14);
+  border-color: rgba(20, 184, 166, 0.3);
+}
+
+/* ── 7. CHART GLOW ENHANCEMENT ── */
+/* Recharts line/area glow — targets SVG paths inside chart wrappers */
+.recharts-line-curve,
+.recharts-line path {
+  filter: drop-shadow(0 0 6px rgba(20, 184, 166, 0.5));
+}
+
+.recharts-area-area {
+  opacity: 0.18;
+}
+
+.recharts-dot circle,
+.recharts-active-dot circle {
+  filter: drop-shadow(0 0 8px rgba(20, 184, 166, 0.8));
+}
+
+/* Active dot on hover — pulsing glow */
+@keyframes dot-pulse {
+  0%, 100% { r: 4; opacity: 1; }
+  50%       { r: 7; opacity: 0.7; }
+}
+
+.recharts-active-dot circle {
+  animation: dot-pulse 1.5s ease-in-out infinite;
+}
+
+/* ── 8. TAB NAV — animated indicator ── */
+.tab-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.tab-btn::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: var(--color-teal-light);
+  border-radius: 2px;
+  transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1), left 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tab-btn:hover::after {
+  width: 60%;
+  left: 20%;
+}
+
+.tab-btn.active::after {
+  width: 100%;
+  left: 0;
+  background: var(--color-blue);
+}
+
+/* Remove the static border-bottom — handled by ::after now */
+.tab-btn.active {
+  border-bottom-color: transparent;
+}
+
+/* ── 9. INPUT FOCUS GLOW ── */
+input, select, textarea {
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18),
+              0 0 0 1px rgba(20, 184, 166, 0.4);
+}
+
+/* ── 10. RISK BADGE GLOW ── */
+@keyframes critical-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.0); }
+  50%       { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.12); }
+}
+
+/* Applied via inline style check — also targeting common patterns */
+[style*="ef4444"][style*="background"] {
+  animation: critical-pulse 2s ease-in-out infinite;
+}
+
+/* ── 11. NUMBER COUNT-UP ANIMATION ── */
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.stat-number {
+  animation: count-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  display: inline-block;
+}
+
+/* ── 12. HEADER — subtle shimmer line ── */
+@keyframes header-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.app-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(20,184,166,0.4) 30%,
+    rgba(2,132,199,0.5) 50%,
+    rgba(20,184,166,0.4) 70%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: header-shimmer 4s linear infinite;
+}
+
+/* ── 13. LOGO ICON — gentle rotation on hover ── */
+.logo-icon-box {
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+}
+
+.logo-icon-box:hover {
+  transform: rotate(-8deg) scale(1.1);
+  box-shadow: 0 8px 24px rgba(2, 132, 199, 0.45);
+}
+
+/* ── 14. ALERT / NOTIFICATION ROW ── */
+@keyframes alert-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Target alert rows inside panels */
+.glass-panel > div > div {
+  animation: alert-slide-in 0.3s ease both;
+}
+
+/* ── 15. PREMIUM SCROLLBAR ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(20, 184, 166, 0.4);
+}
+
+/* ── 16. MODAL ENTRY ── */
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Modal overlay backdrop */
+[style*="position: 'fixed'"][style*="inset: 0"],
+[style*="position: fixed"][style*="inset: 0"] {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* ── 17. EMPTY STATE POLISH ── */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+
+.empty-state-icon {
+  animation: float 3s ease-in-out infinite;
+  display: inline-block;
+}
+
+/* ── 18. MOBILE TOUCH RIPPLE-LIKE FEEDBACK ── */
+@media (hover: none) {
+  button:active {
+    transform: scale(0.94);
+    opacity: 0.85;
+    transition: transform 0.08s ease, opacity 0.08s ease;
+  }
+
+  .glass-panel:active {
+    transform: scale(0.99);
+    transition: transform 0.1s ease;
+  }
+}
+
+/* ── 19. ROLE BUTTON GLOW ON ACTIVE ── */
+.role-btn.active {
+  box-shadow:
+    0 4px 12px rgba(2, 132, 199, 0.35),
+    0 0 0 1px rgba(2, 132, 199, 0.2) inset;
+  animation: none;
+}
+
+.role-btn {
+  transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.role-btn:hover:not(.active) {
+  background: rgba(255,255,255,0.05);
+}
+
+/* ── 20. BACKGROUND BLOBS — subtle movement ── */
+@keyframes blob-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(20px, -15px) scale(1.04); }
+  66%       { transform: translate(-15px, 10px) scale(0.97); }
+}
+
+.bg-blob-1 { animation: blob-drift 18s ease-in-out infinite; }
+.bg-blob-2 { animation: blob-drift 22s ease-in-out infinite reverse; }
+.bg-blob-3 { animation: blob-drift 15s ease-in-out infinite 3s; }
+
+/* ── 21. PROFILE AVATAR RING ── */
+@keyframes avatar-ring-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Glow on profile/avatar containers */
+[style*="border-radius: '50%'"],
+[style*="borderRadius: '50%'"] {
+  position: relative;
+}
+
+/* ── 22. SUCCESS FLASH ── */
+@keyframes success-flash {
+  0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+  70%  { box-shadow: 0 0 0 14px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+.success-flash {
+  animation: success-flash 0.8s ease-out forwards;
+}
+
+/* ── 23. SMOOTH COLOR TRANSITIONS ON ALL INLINE COLORS ── */
+span, p, div, label {
+  transition: color 0.2s ease;
+}
+
+/* ── 24. GLASS PANEL INNER GLOW (top edge light) ── */
+.glass-panel::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  pointer-events: none;
+}
+
+/* ── 25. RECHARTS TOOLTIP — premium glass ── */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: rgba(13, 17, 23, 0.92) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 12px !important;
+  backdrop-filter: blur(16px) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
+  padding: 10px 14px !important;
+}
+
+.recharts-tooltip-label {
+  color: rgba(255,255,255,0.6) !important;
+  font-size: 11px !important;
+  margin-bottom: 6px !important;
+}
+
+.recharts-tooltip-item {
+  color: white !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+}
+
+/* ── END PREMIUM+ ENHANCEMENTS ── */
