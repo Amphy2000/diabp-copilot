@@ -191,7 +191,25 @@ function App() {
               phone: session.user.user_metadata?.phone || undefined
             };
           }
-          setPatientProfile(profile);
+          // SMART MERGE: Prefer Supabase data but keep existing cached fields
+          // if Supabase returns null (prevents phone/address flash-and-disappear)
+          setPatientProfile(prev => {
+            if (!prev) return profile;
+            return {
+              ...prev,
+              ...profile,
+              // Never overwrite a non-null local value with a null Supabase value
+              phone: profile!.phone || prev.phone,
+              address: profile!.address || prev.address,
+              name: profile!.name || prev.name,
+            };
+          });
+          // Update localStorage cache with the confirmed Supabase data
+          if (session?.user?.id) {
+            try {
+              localStorage.setItem(`diabp_profile_${session.user.id}`, JSON.stringify(profile));
+            } catch {}
+          }
 
           let refillOrders: NcdRefillOrder[] = [];
           try {
@@ -590,33 +608,120 @@ function App() {
       navigator.serviceWorker.addEventListener('message', handleSWMessage);
     }
 
-    // 3. Supabase Realtime subscription — CROSS-DEVICE broadcast transport
+    // 3. Supabase Realtime subscription — CROSS-DEVICE broadcast + DB change subscriptions
     // This is what makes admin test notifications reach mobile patients on other devices
+    // AND makes ALL data sync live without any refresh
     let realtimeChannel: any = null;
     if (isSupabaseConfigured) {
       realtimeChannel = supabase
         .channel('diabp-realtime-broadcasts')
+
+        // ---- BROADCAST EVENTS (notifications) ----
         .on('broadcast', { event: 'SYSTEM_BROADCAST' }, ({ payload }: any) => {
           handleSystemBroadcast(payload);
-          // Also trigger SW push notification on this device
           if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({
-              type: 'DISPATCH_SYSTEM_BROADCAST',
-              payload
-            });
+            navigator.serviceWorker.controller.postMessage({ type: 'DISPATCH_SYSTEM_BROADCAST', payload });
           }
         })
         .on('broadcast', { event: 'VITALS_LOGGED' }, ({ payload }: any) => {
           handleVitalsLogged(payload);
-          // Trigger clinician SW push notification
           if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({
-              type: 'PATIENT_LOGGED_VITALS',
-              payload
-            });
+            navigator.serviceWorker.controller.postMessage({ type: 'PATIENT_LOGGED_VITALS', payload });
           }
         })
-        .subscribe();
+
+        // ---- POSTGRES CHANGES (live data sync) ----
+        // Patient profile updated (name, phone, conditions, etc)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'ncd_profiles'
+        }, (payload: any) => {
+          const updated = payload.new as any;
+          if (!updated) return;
+          // Update patient profile if it matches current user
+          setPatientProfile(prev => {
+            if (!prev || prev.id !== updated.id) return prev;
+            return {
+              ...prev,
+              name: updated.name || prev.name,
+              age: updated.age ?? prev.age,
+              weight: updated.weight ?? prev.weight,
+              conditions: updated.conditions || prev.conditions,
+              baselineBp: updated.baseline_bp || prev.baselineBp,
+              targetGlucoseRange: updated.target_glucose_range || prev.targetGlucoseRange,
+              streakDays: updated.streak_days ?? prev.streakDays,
+              activeMeds: updated.active_meds || prev.activeMeds,
+              phone: updated.phone || prev.phone,
+              address: updated.address || prev.address,
+              isPremium: updated.is_premium ?? prev.isPremium,
+              premiumExpiry: updated.premium_expiry || prev.premiumExpiry,
+              assignedClinicId: updated.assigned_clinic_id || prev.assignedClinicId,
+              assignedPharmacyId: updated.assigned_pharmacy_id || prev.assignedPharmacyId,
+            };
+          });
+          // Also update the patients list for clinicians
+          setPatients(prev => prev.map(p =>
+            p.id === updated.id
+              ? { ...p, name: updated.name || p.name, isPremium: updated.is_premium ?? p.isPremium,
+                  streakDays: updated.streak_days ?? p.streakDays, conditions: updated.conditions || p.conditions }
+              : p
+          ));
+        })
+
+        // New vitals entry — updates bpHistory/glucoseHistory live
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'ncd_vitals'
+        }, (payload: any) => {
+          const v = payload.new as any;
+          if (!v) return;
+          const newBp = v.systolic && v.diastolic ? { date: new Date(v.created_at).toLocaleDateString('en-NG', { month: 'short', day: 'numeric' }), systolic: v.systolic, diastolic: v.diastolic } : null;
+          const newGlucose = v.glucose ? { date: new Date(v.created_at).toLocaleDateString('en-NG', { month: 'short', day: 'numeric' }), level: v.glucose, type: v.glucose_type || 'Fasting' } : null;
+          setPatientProfile(prev => {
+            if (!prev || prev.id !== v.patient_id) return prev;
+            return {
+              ...prev,
+              streakDays: v.streak_days ?? prev.streakDays,
+              bpHistory: newBp ? [...(prev.bpHistory || []), newBp].slice(-30) : prev.bpHistory,
+              glucoseHistory: newGlucose ? [...(prev.glucoseHistory || []), newGlucose].slice(-30) : prev.glucoseHistory,
+            };
+          });
+        })
+
+        // Order status updated — patient sees status change live
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'ncd_orders'
+        }, (payload: any) => {
+          const updated = payload.new as any;
+          const deleted = payload.old as any;
+          if (payload.eventType === 'DELETE' && deleted?.id) {
+            setOrders(prev => prev.filter(o => o.id !== deleted.id));
+            return;
+          }
+          if (!updated) return;
+          setOrders(prev => {
+            const exists = prev.find(o => o.id === updated.id);
+            if (exists) {
+              return prev.map(o => o.id === updated.id
+                ? { ...o, status: updated.status || o.status, updatedAt: updated.updated_at || o.updatedAt }
+                : o
+              );
+            }
+            // New order inserted — add to list
+            return [{ id: updated.id, patientId: updated.patient_id, patientName: updated.patient_name,
+              medicationName: updated.medication_name, quantity: updated.quantity, status: updated.status,
+              createdAt: updated.created_at, updatedAt: updated.updated_at,
+              orderNumber: updated.order_number, clinicId: updated.clinic_id, pharmacyId: updated.pharmacy_id }, ...prev];
+          });
+        })
+
+        .subscribe((status: string) => {
+          console.log('[Realtime] Channel status:', status);
+        });
     }
 
     return () => {
