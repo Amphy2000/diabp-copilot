@@ -13,36 +13,81 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      // 1. Unhandled exception / chunk loading error observer
+      // 1. Diagnostic exception reporter & chunk recovery
       window.addEventListener('error', (e) => {
         const msg = e.message || '';
         if (msg.includes('Loading chunk') || msg.includes('Script error') || msg.includes('Unexpected token')) {
-          console.warn('Critical bundle loading error caught. Purging Service Worker and hard reloading...', e);
+          console.warn('Chunk load error. Purging PWA caches and reloading...', e);
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(regs => {
-              for (const reg of regs) reg.unregister();
+              for (const r of regs) r.unregister();
               window.location.reload();
             });
           }
+          return;
+        }
+
+        // Render detailed visual crash panel directly to the screen (avoids hidden blank crashes)
+        try {
+          const errOverlay = document.createElement('div');
+          errOverlay.id = 'diabp-diagnostic-overlay';
+          errOverlay.style.position = 'fixed';
+          errOverlay.style.inset = '0';
+          errOverlay.style.background = '#0d1117';
+          errOverlay.style.color = '#f87171';
+          errOverlay.style.fontFamily = 'system-ui, -apple-system, monospace';
+          errOverlay.style.padding = '32px 24px';
+          errOverlay.style.zIndex = '10000000';
+          errOverlay.style.overflow = 'auto';
+          errOverlay.style.lineHeight = '1.6';
+
+          errOverlay.innerHTML = `
+            <div style="max-width: 680px; margin: 0 auto; background: #161b22; border: 1px solid rgba(248,113,113,0.2); border-radius: 12px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+              <h3 style="color:#ef4444; margin-top:0; font-size: 1.25rem; display: flex; align-items: center; gap: 8px;">🔴 DiaBP-Copilot Application Crash</h3>
+              <p style="color:#e2e8f0; font-size: 14px;"><strong>Fatal Error:</strong> ${e.message}</p>
+              <p style="color:#8b949e; font-size: 12px; margin-bottom: 16px;"><strong>Location:</strong> ${e.filename || 'Unknown file'} : Line ${e.lineno || 'N/A'}</p>
+              <pre style="background:#0d1117; color:#c9d1d9; padding:16px; border-radius:8px; overflow-x:auto; font-size:11px; border: 1px solid #30363d; max-height: 250px; text-align: left;">${e.error && e.error.stack ? e.error.stack : 'No call stack trace available'}</pre>
+              <hr style="border:0; border-top:1px solid #30363d; margin:20px 0;"/>
+              <p style="color:#8b949e; font-size:11px;">Please share a screenshot or copy the stack trace above to help support trace and resolve this crash immediately.</p>
+              <button onclick="localStorage.clear(); sessionStorage.clear(); if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(rs=>{for(let r of rs)r.unregister(); location.reload();});}else{location.reload();}" style="background:#ef4444; color:white; border:none; padding:10px 20px; border-radius:8px; font-weight:bold; cursor:pointer; font-size: 12px; transition: opacity 0.2s;">Reset App Storage & Force Reload</button>
+            </div>
+          `;
+          document.body.appendChild(errOverlay);
+        } catch (innerErr) {
+          console.error("Failed to render diagnostic overlay:", innerErr);
         }
       }, true);
 
-      // 2. Blank screen observer & self-healing trigger
-      window.addEventListener('load', () => {
-        setTimeout(() => {
-          const rootEl = document.getElementById('root');
-          if (rootEl && !rootEl.hasChildNodes()) {
-            console.warn('Blank screen detected. Executing emergency workspace reset...');
-            if ('serviceWorker' in navigator) {
-              navigator.serviceWorker.getRegistrations().then(regs => {
-                for (const reg of regs) reg.unregister();
-                window.location.reload();
-              });
-            } else {
-              window.location.reload();
-            }
-          }
-        }, 3000); // Check 3 seconds after complete window load
+      // 2. Unhandled rejection catcher
+      window.addEventListener('unhandledrejection', (e) => {
+        const reason = e.reason || {};
+        try {
+          if (document.getElementById('diabp-diagnostic-overlay')) return;
+          const errOverlay = document.createElement('div');
+          errOverlay.id = 'diabp-diagnostic-overlay';
+          errOverlay.style.position = 'fixed';
+          errOverlay.style.inset = '0';
+          errOverlay.style.background = '#0d1117';
+          errOverlay.style.color = '#f87171';
+          errOverlay.style.fontFamily = 'system-ui, -apple-system, monospace';
+          errOverlay.style.padding = '32px 24px';
+          errOverlay.style.zIndex = '10000000';
+          errOverlay.style.overflow = 'auto';
+          errOverlay.style.lineHeight = '1.6';
+
+          errOverlay.innerHTML = `
+            <div style="max-width: 680px; margin: 0 auto; background: #161b22; border: 1px solid rgba(248,113,113,0.2); border-radius: 12px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+              <h3 style="color:#ef4444; margin-top:0; font-size: 1.25rem;">🔴 Unhandled Promise Rejection</h3>
+              <p style="color:#e2e8f0; font-size: 14px;"><strong>Reason:</strong> ${reason.message || String(reason)}</p>
+              <pre style="background:#0d1117; color:#c9d1d9; padding:16px; border-radius:8px; overflow-x:auto; font-size:11px; border: 1px solid #30363d; max-height: 250px; text-align: left;">${reason.stack || 'No call stack trace available'}</pre>
+              <hr style="border:0; border-top:1px solid #30363d; margin:20px 0;"/>
+              <button onclick="localStorage.clear(); sessionStorage.clear(); if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(rs=>{for(let r of rs)r.unregister(); location.reload();});}else{location.reload();}" style="background:#ef4444; color:white; border:none; padding:10px 20px; border-radius:8px; font-weight:bold; cursor:pointer; font-size: 12px;">Reset App Storage & Force Reload</button>
+            </div>
+          `;
+          document.body.appendChild(errOverlay);
+        } catch (innerErr) {
+          console.error("Failed to render promise rejection overlay:", innerErr);
+        }
       });
 
       // 3. Regular Service Worker registration
