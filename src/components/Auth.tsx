@@ -58,20 +58,30 @@ export const Auth: React.FC = () => {
       setClinics(cList);
       setPharmacies(pList);
       
-      let initialClinicId = cList.length > 0 ? cList[0].id : '';
-      let initialPharmacyId = pList.length > 0 ? pList[0].id : '';
+      let initialClinicId = '';
+      if (cList && cList.length > 0) {
+        const firstClinic = cList.find(c => c && c.id);
+        if (firstClinic) initialClinicId = firstClinic.id;
+      }
+
+      let initialPharmacyId = '';
+      if (pList && pList.length > 0) {
+        const firstPharmacy = pList.find(p => p && p.id);
+        if (firstPharmacy) initialPharmacyId = firstPharmacy.id;
+      }
 
       // Parse referral param (?ref=...)
       const params = new URLSearchParams(window.location.search);
       const refParam = params.get('ref');
-      if (refParam) {
+      if (refParam && cList && cList.length > 0) {
         // 1. Try matching by direct Clinic UUID
-        const matchedById = cList.find(c => c.id === refParam);
+        const matchedById = cList.find(c => c && c.id === refParam);
         if (matchedById) {
           initialClinicId = matchedById.id;
         } else {
           // 2. Try matching by slugified short code (e.g. ezeclini) or substring
           const matchedByCode = cList.find(c => {
+            if (!c) return false;
             const clinicName = c.name || '';
             const code = clinicName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8);
             return code === refParam.toLowerCase() || clinicName.toLowerCase().includes(refParam.toLowerCase());
