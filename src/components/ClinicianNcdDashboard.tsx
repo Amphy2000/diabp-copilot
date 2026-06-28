@@ -212,8 +212,8 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
     userRole === 'pharmacist' && facilityId ? facilityId : (pharmacies[0]?.id || null)
   );
 
-  const activeClinic = clinics.find(c => c.id === activeClinicId);
-  const activePharmacy = pharmacies.find(p => p.id === activePharmacyId);
+  const activeClinic = (clinics || []).find(c => c && c.id === activeClinicId);
+  const activePharmacy = (pharmacies || []).find(p => p && p.id === activePharmacyId);
 
   // Sync state if user logs in/changes facility dynamically
   useEffect(() => {
@@ -650,7 +650,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
           }
 
           if (upgradeTarget === 'clinic') {
-            const activeClinic = clinics.find(c => c.id === activeClinicId);
+            const activeClinic = (clinics || []).find(c => c && c.id === activeClinicId);
             if (activeClinic && onUpdateClinic) {
               await onUpdateClinic({
                 ...activeClinic,
@@ -659,7 +659,7 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
               });
             }
           } else {
-            const activePharmacy = pharmacies.find(p => p.id === activePharmacyId);
+            const activePharmacy = (pharmacies || []).find(p => p && p.id === activePharmacyId);
             if (activePharmacy && onUpdatePharmacy) {
               await onUpdatePharmacy({
                 ...activePharmacy,
@@ -1168,8 +1168,8 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                 <ShieldCheck size={14} />
                 <span>
                   Facility: {activeRole === 'clinic' 
-                    ? (clinics.find(c => c.id === activeClinicId)?.name || 'Abuja Care Center') 
-                    : (pharmacies.find(p => p.id === activePharmacyId)?.name || 'Net Pharmacy')
+                    ? ((clinics || []).find(c => c && c.id === activeClinicId)?.name || 'Abuja Care Center') 
+                    : ((pharmacies || []).find(p => p && p.id === activePharmacyId)?.name || 'Net Pharmacy')
                   }
                 </span>
               </div>

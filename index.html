@@ -16,7 +16,7 @@
       // 1. Unhandled exception / chunk loading error observer
       window.addEventListener('error', (e) => {
         const msg = e.message || '';
-        if (msg.includes('Loading chunk') || msg.includes('Script error') || msg.includes('Unexpected token') || msg.includes('TypeError')) {
+        if (msg.includes('Loading chunk') || msg.includes('Script error') || msg.includes('Unexpected token')) {
           console.warn('Critical bundle loading error caught. Purging Service Worker and hard reloading...', e);
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(regs => {
