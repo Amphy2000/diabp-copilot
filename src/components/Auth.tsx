@@ -57,8 +57,32 @@ export const Auth: React.FC = () => {
       const pList = await getPharmacies();
       setClinics(cList);
       setPharmacies(pList);
-      if (cList.length > 0) setAssignedClinicId(cList[0].id);
-      if (pList.length > 0) setAssignedPharmacyId(pList[0].id);
+      
+      let initialClinicId = cList.length > 0 ? cList[0].id : '';
+      let initialPharmacyId = pList.length > 0 ? pList[0].id : '';
+
+      // Parse referral param (?ref=...)
+      const params = new URLSearchParams(window.location.search);
+      const refParam = params.get('ref');
+      if (refParam) {
+        // 1. Try matching by direct Clinic UUID
+        const matchedById = cList.find(c => c.id === refParam);
+        if (matchedById) {
+          initialClinicId = matchedById.id;
+        } else {
+          // 2. Try matching by slugified short code (e.g. ezeclini) or substring
+          const matchedByCode = cList.find(c => {
+            const code = c.name.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8);
+            return code === refParam.toLowerCase() || c.name.toLowerCase().includes(refParam.toLowerCase());
+          });
+          if (matchedByCode) {
+            initialClinicId = matchedByCode.id;
+          }
+        }
+      }
+
+      setAssignedClinicId(initialClinicId);
+      setAssignedPharmacyId(initialPharmacyId);
     }
     loadLists();
   }, []);

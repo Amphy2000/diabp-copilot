@@ -2205,3 +2205,82 @@ export async function requestClinicPayout(
   );
   return !!result;
 }
+
+/** Fetch all payout requests across all clinics (Super Admin function) */
+export async function getAllPayoutRequests(): Promise<ClinicEarning[]> {
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from('clinic_earnings')
+        .select('*')
+        .eq('event_type', 'payout_request')
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        return data.map((row: any) => ({
+          id: row.id,
+          clinicId: row.clinic_id,
+          eventType: row.event_type,
+          patientId: row.patient_id,
+          patientName: row.patient_name,
+          amount: row.amount,
+          description: row.description,
+          status: row.status,
+          createdAt: row.created_at,
+        }));
+      }
+    } catch (err) {
+      console.warn('[getAllPayoutRequests] Supabase error, falling back:', err);
+    }
+  }
+
+  // Fallback: scan all local clinic ledger items in localStorage
+  try {
+    const list: ClinicEarning[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('diabp_clinic_earnings_')) {
+        const data = localStorage.getItem(key);
+        if (data) {
+          const items: ClinicEarning[] = JSON.parse(data);
+          list.push(...items.filter(item => item.eventType === 'payout_request'));
+        }
+      }
+    }
+    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } catch (err) {
+    console.error('Failed to read payout requests from localStorage:', err);
+    return [];
+  }
+}
+
+/** Update the status of a payout request (Super Admin function) */
+export async function updatePayoutStatus(clinicId: string, earningId: string, status: ClinicEarning['status']): Promise<boolean> {
+  if (isSupabaseConfigured) {
+    try {
+      const { error } = await supabase
+        .from('clinic_earnings')
+        .update({ status })
+        .eq('id', earningId);
+
+      if (!error) return true;
+    } catch (err) {
+      console.warn('[updatePayoutStatus] Supabase error, falling back:', err);
+    }
+  }
+
+  // Fallback: update localStorage item
+  try {
+    const key = `diabp_clinic_earnings_${clinicId}`;
+    const data = localStorage.getItem(key);
+    if (data) {
+      const items: ClinicEarning[] = JSON.parse(data);
+      const updated = items.map(item => item.id === earningId ? { ...item, status } : item);
+      localStorage.setItem(key, JSON.stringify(updated));
+      return true;
+    }
+  } catch (err) {
+    console.error('Failed to update payout status in localStorage:', err);
+  }
+  return false;
+}

@@ -15,8 +15,9 @@ import {
   FileSpreadsheet,
   Search
 } from 'lucide-react';
-import type { PatientNcdProfile, NcdClinic, NcdPharmacy, NcdRefillOrder } from '../services/ncdService';
-import { triggerServerPush } from '../services/ncdService';
+import type { PatientNcdProfile, NcdClinic, NcdPharmacy, NcdRefillOrder, ClinicEarning } from '../services/ncdService';
+import { triggerServerPush, getAllPayoutRequests, updatePayoutStatus } from '../services/ncdService';
+import { Banknote } from 'lucide-react';
 
 const superAdminPitchCopy = `DiaBP-Copilot: B2B Clinician & Pharmacy Partnership Pitch
 
@@ -157,10 +158,29 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   onDeletePatient,
   onDeleteOrder
 }) => {
-  const [activeTab, setActiveTab] = useState<'facilities' | 'patients' | 'audits' | 'pitchdeck' | 'broadcast'>('facilities');
+  const [activeTab, setActiveTab] = useState<'facilities' | 'patients' | 'audits' | 'pitchdeck' | 'broadcast' | 'payouts'>('facilities');
   const [pitchSlide, setPitchSlide] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  // Payout states
+  const [payoutRequests, setPayoutRequests] = useState<ClinicEarning[]>([]);
+  const [payoutsLoading, setPayoutsLoading] = useState(false);
+  const [payoutActionFeedback, setPayoutActionFeedback] = useState<string | null>(null);
+
+  // Load payout requests when payouts tab is active
+  const loadPayoutRequests = async () => {
+    setPayoutsLoading(true);
+    const data = await getAllPayoutRequests();
+    setPayoutRequests(data);
+    setPayoutsLoading(false);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'payouts') {
+      loadPayoutRequests();
+    }
+  }, [activeTab]);
 
   // Broadcast Hub state variables
   const [broadcastTitle, setBroadcastTitle] = useState('');
@@ -678,6 +698,13 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
             style={{ fontSize: '0.75rem', padding: '8px 16px' }}
           >
             📢 Broadcast Hub
+          </button>
+          <button
+            onClick={() => setActiveTab('payouts')}
+            className={`tab-btn ${activeTab === 'payouts' ? 'active' : ''}`}
+            style={{ fontSize: '0.75rem', padding: '8px 16px' }}
+          >
+            💳 Payout Requests
           </button>
         </div>
 
@@ -1549,7 +1576,127 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               </div>
             </div>
           </div>
+        </div>
+      )}
 
+      {activeTab === 'payouts' && (
+        <div className="space-y-6">
+          <div className="glass-panel" style={{ padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'white', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  💳 System Payout Requests
+                </h4>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                  Approve and record clinic payout withdrawals. Execute bank transfers via Paystack/Flutterwave dashboard or manually, then mark as Paid.
+                </p>
+              </div>
+              <button 
+                onClick={loadPayoutRequests} 
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '6px 12px', borderRadius: '8px', fontSize: '0.7rem', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                🔄 Refresh Ledger
+              </button>
+            </div>
+
+            {payoutActionFeedback && (
+              <div style={{ marginBottom: '16px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', color: '#4ade80', fontSize: '0.75rem', fontWeight: 600 }}>
+                {payoutActionFeedback}
+              </div>
+            )}
+
+            {payoutsLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>Loading requests...</div>
+            ) : payoutRequests.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', border: '1px dashed rgba(255,255,255,0.06)', borderRadius: '12px' }}>
+                <span style={{ fontSize: '24px', display: 'block', marginBottom: '8px' }}>💳</span>
+                <span style={{ fontSize: '0.8rem' }}>No clinic payout requests recorded in the system.</span>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.75rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+                      <th style={{ padding: '12px' }}>Requested Date</th>
+                      <th style={{ padding: '12px' }}>Clinic Name</th>
+                      <th style={{ padding: '12px' }}>Amount (₦)</th>
+                      <th style={{ padding: '12px' }}>Bank Payout Details</th>
+                      <th style={{ padding: '12px' }}>Status</th>
+                      <th style={{ padding: '12px', textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payoutRequests.map(req => {
+                      const requestClinic = clinics.find(c => c.id === req.clinicId);
+                      const isPending = req.status === 'pending' || req.status === 'requested';
+                      
+                      // Extract Bank Details from Description
+                      // Description format: "Payout request → AccountName | BankName | AccountNumber"
+                      const descParts = req.description.split('→');
+                      const rawDetails = descParts[1] || req.description;
+                      const details = rawDetails.trim();
+
+                      return (
+                        <tr key={req.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', color: 'white' }}>
+                          <td style={{ padding: '12px', color: 'var(--text-muted)' }}>
+                            {new Date(req.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                          <td style={{ padding: '12px', fontWeight: 'bold' }}>
+                            {requestClinic?.name || 'Unknown Clinic'}
+                            <span style={{ fontSize: '8px', color: 'var(--text-muted)', display: 'block' }}>ID: {req.clinicId}</span>
+                          </td>
+                          <td style={{ padding: '12px', color: '#f87171', fontWeight: 'bold' }}>
+                            ₦{Math.abs(req.amount).toLocaleString()}
+                          </td>
+                          <td style={{ padding: '12px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
+                            {details}
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <span style={{ 
+                              padding: '2px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: 'bold',
+                              background: isPending ? 'rgba(249,115,22,0.1)' : 'rgba(34,197,94,0.1)',
+                              border: `1px solid ${isPending ? 'rgba(249,115,22,0.2)' : 'rgba(34,197,94,0.2)'}`,
+                              color: isPending ? '#fb923c' : '#4ade80'
+                            }}>
+                              {req.status.toUpperCase()}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'right' }}>
+                            {isPending ? (
+                              <button
+                                onClick={async () => {
+                                  const ok = await updatePayoutStatus(req.clinicId, req.id, 'paid');
+                                  if (ok) {
+                                    setPayoutActionFeedback(`Successfully marked request from ${requestClinic?.name || 'Clinic'} as PAID.`);
+                                    loadPayoutRequests();
+                                    setTimeout(() => setPayoutActionFeedback(null), 4000);
+                                  }
+                                }}
+                                style={{
+                                  background: 'rgba(34,197,94,0.12)',
+                                  border: '1px solid rgba(34,197,94,0.25)',
+                                  color: '#4ade80',
+                                  padding: '4px 10px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 'bold',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Mark as Paid
+                              </button>
+                            ) : (
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Disbursed ✓</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

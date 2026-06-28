@@ -1326,6 +1326,50 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
         </div>
       )}
 
+      {/* Clinic Onboarding & Referral Hub */}
+      {activeRole === 'clinic' && activeClinic && (
+        <div className="glass-panel" style={{ padding: '16px', background: 'rgba(2, 132, 199, 0.05)', border: '1px solid rgba(2, 132, 199, 0.15)', marginBottom: '8px', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', textAlign: 'left' }}>
+            <div style={{ flex: '1', minWidth: '240px' }}>
+              <h5 style={{ margin: 0, fontSize: '0.8rem', color: '#38bdf8', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                🔗 Patient Referral & Onboarding
+              </h5>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                Share your referral link. Patients signing up through this link are automatically assigned to your care team, earning your clinic ₦300 on Premium activations.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ background: '#1c1c1e', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.7rem', color: 'white', fontFamily: 'monospace' }}>
+                Code: <strong style={{ color: '#38bdf8' }}>{activeClinic.name.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8)}</strong>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const code = activeClinic.name.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8);
+                  const refLink = `${window.location.origin}${window.location.pathname}?ref=${code}`;
+                  navigator.clipboard.writeText(refLink);
+                  alert(`📋 Referral link copied to clipboard!\n\n${refLink}`);
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, var(--color-blue) 0%, #0369a1 100%)',
+                  border: 'none',
+                  color: 'white',
+                  borderRadius: '8px',
+                  padding: '8px 14px',
+                  fontSize: '0.7rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 10px rgba(2, 132, 199, 0.2)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                Copy Link
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Onboarding Quickstart Guide */}
       {(() => {
         const hasSubaccount = activeRole === 'clinic' ? !!activeClinic?.subaccountId : !!activePharmacy?.subaccountId;
