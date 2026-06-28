@@ -13,6 +13,39 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
+      // 1. Unhandled exception / chunk loading error observer
+      window.addEventListener('error', (e) => {
+        const msg = e.message || '';
+        if (msg.includes('Loading chunk') || msg.includes('Script error') || msg.includes('Unexpected token') || msg.includes('TypeError')) {
+          console.warn('Critical bundle loading error caught. Purging Service Worker and hard reloading...', e);
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(regs => {
+              for (const reg of regs) reg.unregister();
+              window.location.reload();
+            });
+          }
+        }
+      }, true);
+
+      // 2. Blank screen observer & self-healing trigger
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          const rootEl = document.getElementById('root');
+          if (rootEl && !rootEl.hasChildNodes()) {
+            console.warn('Blank screen detected. Executing emergency workspace reset...');
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(regs => {
+                for (const reg of regs) reg.unregister();
+                window.location.reload();
+              });
+            } else {
+              window.location.reload();
+            }
+          }
+        }, 3000); // Check 3 seconds after complete window load
+      });
+
+      // 3. Regular Service Worker registration
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').then((reg) => {
