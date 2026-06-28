@@ -20,7 +20,12 @@ import {
   Lock,
   CreditCard,
   Sparkles,
-  Circle
+  Circle,
+  TrendingUp,
+  Wallet,
+  DollarSign,
+  Banknote,
+  ChevronDown
 } from 'lucide-react';
 import { 
   auditNcdRegimen,
@@ -31,8 +36,13 @@ import {
   dismissAlertsForPatient,
   getRefillTracker,
   getFacilityStaff,
-  addFacilityStaff
+  addFacilityStaff,
+  getClinicEarnings,
+  logClinicEarning,
+  requestClinicPayout,
+  CLINIC_EARNING_RATES
 } from '../services/ncdService';
+import type { ClinicEarning } from '../services/ncdService';
 import type { PatientNcdProfile, NcdRefillOrder, NcdClinic, NcdPharmacy, NcdAlert } from '../services/ncdService';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 
@@ -424,6 +434,29 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
   const [sendWhatsAppChecked, setSendWhatsAppChecked] = useState(true);
   const [generatedWhatsAppUrl, setGeneratedWhatsAppUrl] = useState<string | null>(null);
   const [checkInSaving, setCheckInSaving] = useState(false);
+
+  // ── Clinic Earnings States ──
+  const [clinicEarnings, setClinicEarnings] = useState<ClinicEarning[]>([]);
+  const [earningsLoading, setEarningsLoading] = useState(false);
+  const [showEarningsSection, setShowEarningsSection] = useState(false);
+  // Payout form state
+  const [payoutAmount, setPayoutAmount] = useState('');
+  const [payoutBankName, setPayoutBankName] = useState('GTBank');
+  const [payoutAccountNumber, setPayoutAccountNumber] = useState('');
+  const [payoutAccountName, setPayoutAccountName] = useState('');
+  const [payoutSubmitting, setPayoutSubmitting] = useState(false);
+  const [payoutSuccess, setPayoutSuccess] = useState('');
+  const [payoutError, setPayoutError] = useState('');
+
+  // Load clinic earnings when active clinic changes
+  useEffect(() => {
+    if (activeRole !== 'clinic' || !activeClinicId) return;
+    setEarningsLoading(true);
+    getClinicEarnings(activeClinicId).then(data => {
+      setClinicEarnings(data);
+      setEarningsLoading(false);
+    });
+  }, [activeClinicId, activeRole]);
 
   const handleOpenCheckIn = (patient: PatientNcdProfile) => {
     const bpArr = patient.bpHistory || [];
@@ -4459,6 +4492,170 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
         </div>
       )}
 
+      {/* ══════════════════════════════════════════════════════
+           CLINIC EARNINGS DASHBOARD SECTION
+          ══════════════════════════════════════════════════════ */}
+      {activeRole === 'clinic' && activeClinicId && (
+        <div className="glass-panel" style={{ marginTop: '24px', background: 'linear-gradient(135deg, rgba(16,32,20,0.5) 0%, rgba(13,17,23,0.5) 100%)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: '20px', padding: '24px' }}>
+          {/* Section Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #16a34a 0%, #14b8a6 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(22,163,74,0.3)' }}>
+                <Wallet size={20} color="white" />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'white' }}>Clinic Earnings</h3>
+                <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-secondary)' }}>Revenue earned by referring &amp; managing patients on DiaBP Copilot</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowEarningsSection(prev => !prev)}
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: 'var(--text-secondary)', cursor: 'pointer', padding: '6px 14px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              {showEarningsSection ? 'Collapse' : 'Expand'}
+              <ChevronDown size={14} style={{ transform: showEarningsSection ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s' }} />
+            </button>
+          </div>
+
+          {/* ── Balance Summary Cards ── */}
+          {(() => {
+            const totalEarned = clinicEarnings.filter(e => e.amount > 0).reduce((s, e) => s + e.amount, 0);
+            const totalPaidOut = Math.abs(clinicEarnings.filter(e => e.amount < 0).reduce((s, e) => s + e.amount, 0));
+            const available = totalEarned - totalPaidOut;
+            const checkInCount = clinicEarnings.filter(e => e.eventType === 'check_in').length;
+            const referralCount = clinicEarnings.filter(e => e.eventType === 'premium_referral').length;
+            return (
+              <>
+                {/* Balance row */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+                  <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(22,163,74,0.1)', border: '1px solid rgba(22,163,74,0.2)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 800, color: '#4ade80', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Available Balance</span>
+                    <span style={{ fontSize: '1.6rem', fontWeight: 900, color: 'white' }}>₦{available.toLocaleString()}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Ready for payout</span>
+                  </div>
+                  <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(20,184,166,0.08)', border: '1px solid rgba(20,184,166,0.15)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 800, color: 'var(--color-teal-light)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📋 Check-in Fees</span>
+                    <span style={{ fontSize: '1.4rem', fontWeight: 900, color: 'white' }}>₦{(checkInCount * CLINIC_EARNING_RATES.check_in).toLocaleString()}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{checkInCount} check-ins × ₦{CLINIC_EARNING_RATES.check_in}</span>
+                  </div>
+                  <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.15)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.05em' }}>👑 Premium Referrals</span>
+                    <span style={{ fontSize: '1.4rem', fontWeight: 900, color: 'white' }}>₦{(referralCount * CLINIC_EARNING_RATES.premium_referral).toLocaleString()}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{referralCount} referrals × ₦{CLINIC_EARNING_RATES.premium_referral}</span>
+                  </div>
+                  <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.15)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 800, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📤 Total Paid Out</span>
+                    <span style={{ fontSize: '1.4rem', fontWeight: 900, color: 'white' }}>₦{totalPaidOut.toLocaleString()}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Cumulative withdrawals</span>
+                  </div>
+                </div>
+
+                {/* How Clinics Earn Info */}
+                <div style={{ padding: '14px 16px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.08)', marginBottom: '20px' }}>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>💡 How Your Clinic Earns</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', background: 'rgba(20,184,166,0.07)', padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(20,184,166,0.12)' }}>📋 <strong style={{color:'white'}}>₦100</strong> per in-clinic check-in logged</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', background: 'rgba(234,179,8,0.07)', padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(234,179,8,0.12)' }}>👑 <strong style={{color:'white'}}>₦300</strong> when your patient upgrades to Premium</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', background: 'rgba(139,92,246,0.07)', padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(139,92,246,0.12)' }}>📊 <strong style={{color:'white'}}>₦50/patient</strong> monthly retainer (10+ active patients)</span>
+                  </div>
+                </div>
+
+                {/* Expanded Section — History + Payout */}
+                {showEarningsSection && (
+                  <>
+                    {/* Earnings History Table */}
+                    <div style={{ marginBottom: '20px' }}>
+                      <p style={{ margin: '0 0 10px 0', fontSize: '11px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Transaction History</p>
+                      {earningsLoading ? (
+                        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '12px' }}>Loading earnings...</div>
+                      ) : clinicEarnings.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '13px', border: '1px dashed rgba(255,255,255,0.06)', borderRadius: '12px' }}>
+                          <div style={{ fontSize: '24px', marginBottom: '8px' }}>📋</div>
+                          <div>No earnings recorded yet.</div>
+                          <div style={{ fontSize: '11px', marginTop: '4px' }}>Start by doing patient check-ins — each one earns ₦100.</div>
+                        </div>
+                      ) : (
+                        <div style={{ maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {clinicEarnings.slice(0, 50).map(e => (
+                            <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '10px', background: e.amount < 0 ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.02)', border: `1px solid ${e.amount < 0 ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)'}` }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontSize: '12px', fontWeight: 700, color: 'white' }}>
+                                  {e.eventType === 'check_in' ? '📋' : e.eventType === 'premium_referral' ? '👑' : e.eventType === 'payout_request' ? '📤' : '📊'} {e.description}
+                                </span>
+                                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                                  {new Date(e.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: '14px', fontWeight: 900, color: e.amount < 0 ? '#f87171' : '#4ade80', minWidth: '80px', textAlign: 'right' }}>
+                                {e.amount < 0 ? '-' : '+'}₦{Math.abs(e.amount).toLocaleString()}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Payout Request Form */}
+                    <div style={{ padding: '20px', borderRadius: '14px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <p style={{ margin: '0 0 14px 0', fontSize: '12px', fontWeight: 800, color: 'white' }}>💳 Request Payout</p>
+                      {payoutSuccess ? (
+                        <div style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', color: '#4ade80', fontSize: '13px', fontWeight: 600 }}>
+                          ✅ {payoutSuccess}
+                        </div>
+                      ) : (
+                        <form onSubmit={async (e) => {
+                          e.preventDefault();
+                          const amt = parseFloat(payoutAmount);
+                          if (!amt || amt <= 0) { setPayoutError('Enter a valid amount'); return; }
+                          if (!payoutAccountNumber || payoutAccountNumber.length < 10) { setPayoutError('Enter a valid 10-digit account number'); return; }
+                          if (!payoutAccountName.trim()) { setPayoutError('Enter the account name'); return; }
+                          if (amt > available) { setPayoutError(`Amount exceeds available balance (₦${available.toLocaleString()})`); return; }
+                          setPayoutError('');
+                          setPayoutSubmitting(true);
+                          const ok = await requestClinicPayout(activeClinicId!, amt, payoutBankName, payoutAccountNumber, payoutAccountName);
+                          if (ok) {
+                            setClinicEarnings(prev => [{ id: `earn-${Date.now()}`, clinicId: activeClinicId!, eventType: 'payout_request', amount: -amt, description: `Payout → ${payoutAccountName} | ${payoutBankName} | ${payoutAccountNumber}`, status: 'requested', createdAt: new Date().toISOString() }, ...prev]);
+                            setPayoutSuccess(`Payout of ₦${amt.toLocaleString()} submitted! Processing within 1–2 business days.`);
+                            setPayoutAmount('');
+                            setPayoutAccountNumber('');
+                            setPayoutAccountName('');
+                            setTimeout(() => setPayoutSuccess(''), 6000);
+                          }
+                          setPayoutSubmitting(false);
+                        }} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Amount (₦)</label>
+                            <input type="number" placeholder={`Max ₦${available.toLocaleString()}`} value={payoutAmount} onChange={e => setPayoutAmount(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '13px' }} />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Bank</label>
+                            <select value={payoutBankName} onChange={e => setPayoutBankName(e.target.value)} style={{ background: 'rgba(31,41,55,0.8)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '13px' }}>
+                              {NIGERIAN_BANKS.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
+                            </select>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Account Number</label>
+                            <input type="text" placeholder="0123456789" maxLength={10} value={payoutAccountNumber} onChange={e => setPayoutAccountNumber(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '13px' }} />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Account Name</label>
+                            <input type="text" placeholder="As on bank records" value={payoutAccountName} onChange={e => setPayoutAccountName(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '13px' }} />
+                          </div>
+                          {payoutError && <div style={{ gridColumn: '1/-1', fontSize: '11px', color: '#f87171', padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: '6px' }}>⚠️ {payoutError}</div>}
+                          <button type="submit" disabled={payoutSubmitting || available <= 0} style={{ gridColumn: '1/-1', background: available > 0 ? 'linear-gradient(135deg, #16a34a 0%, #14b8a6 100%)' : 'rgba(255,255,255,0.1)', border: 'none', color: 'white', borderRadius: '10px', padding: '12px', fontWeight: 800, fontSize: '13px', cursor: available > 0 ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: payoutSubmitting ? 0.7 : 1 }}>
+                            <Banknote size={16} />{payoutSubmitting ? 'Processing...' : available > 0 ? `Request Payout (₦${available.toLocaleString()} available)` : 'No Balance Available'}
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                  </>
+                )}
+              </>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Patient Check-in Modal */}
       {showCheckInModal && checkInPatient && (
         <div style={{
@@ -4671,6 +4868,21 @@ export const ClinicianNcdDashboard: React.FC<ClinicianNcdDashboardProps> = ({
                         checkInGlucose,
                         checkInGlucoseType
                       );
+
+                      // ── Log ₦100 check-in earning for the clinic ──
+                      if (activeClinicId && checkInPatient) {
+                        const earned = await logClinicEarning(
+                          activeClinicId,
+                          'check_in',
+                          CLINIC_EARNING_RATES.check_in,
+                          `In-clinic vitals check-in: ${checkInPatient.name}`,
+                          checkInPatient.id,
+                          checkInPatient.name
+                        );
+                        if (earned) {
+                          setClinicEarnings(prev => [earned, ...prev]);
+                        }
+                      }
 
                       if (sendWhatsAppChecked) {
                         const facilityName = activeRole === 'clinic' ? activeClinic?.name : activePharmacy?.name;

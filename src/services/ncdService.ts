@@ -2072,3 +2072,136 @@ export async function triggerServerPush(
     return null;
   }
 }
+
+// ─────────────────────────────────────────────────────────
+//  CLINIC EARNINGS SYSTEM
+// ─────────────────────────────────────────────────────────
+
+export interface ClinicEarning {
+  id: string;
+  clinicId: string;
+  eventType: 'check_in' | 'premium_referral' | 'retainer' | 'payout_request';
+  patientId?: string;
+  patientName?: string;
+  amount: number; // in Naira (positive = earned, negative = payout)
+  description: string;
+  status: 'pending' | 'paid' | 'requested';
+  createdAt: string;
+}
+
+// Earning rates
+export const CLINIC_EARNING_RATES = {
+  check_in: 100,         // ₦100 per verified in-person check-in
+  premium_referral: 300, // ₦300 when assigned patient upgrades to Premium
+  retainer_per_patient: 50, // ₦50/month per active patient (10+ active = retainer kicks in)
+};
+
+/** Fetch all earnings for a clinic (Supabase with localStorage fallback) */
+export async function getClinicEarnings(clinicId: string): Promise<ClinicEarning[]> {
+  if (!clinicId) return [];
+
+  // Try Supabase first
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from('clinic_earnings')
+        .select('*')
+        .eq('clinic_id', clinicId)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (!error && data) {
+        return data.map((row: any) => ({
+          id: row.id,
+          clinicId: row.clinic_id,
+          eventType: row.event_type,
+          patientId: row.patient_id,
+          patientName: row.patient_name,
+          amount: row.amount,
+          description: row.description,
+          status: row.status,
+          createdAt: row.created_at,
+        }));
+      }
+    } catch (err) {
+      console.warn('[getClinicEarnings] Supabase error, using localStorage fallback:', err);
+    }
+  }
+
+  // localStorage fallback
+  try {
+    const stored = localStorage.getItem(`diabp_clinic_earnings_${clinicId}`);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Log a new earning event for a clinic */
+export async function logClinicEarning(
+  clinicId: string,
+  eventType: ClinicEarning['eventType'],
+  amount: number,
+  description: string,
+  patientId?: string,
+  patientName?: string
+): Promise<ClinicEarning | null> {
+  if (!clinicId) return null;
+
+  const earning: ClinicEarning = {
+    id: `earn-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+    clinicId,
+    eventType,
+    patientId,
+    patientName,
+    amount,
+    description,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  };
+
+  // Try Supabase insert
+  if (isSupabaseConfigured) {
+    try {
+      await supabase.from('clinic_earnings').insert({
+        clinic_id: clinicId,
+        event_type: eventType,
+        patient_id: patientId || null,
+        patient_name: patientName || null,
+        amount,
+        description,
+        status: 'pending',
+      });
+    } catch (err) {
+      console.warn('[logClinicEarning] Supabase insert failed, using localStorage:', err);
+    }
+  }
+
+  // Always update localStorage as fast local cache
+  try {
+    const stored = localStorage.getItem(`diabp_clinic_earnings_${clinicId}`);
+    const existing: ClinicEarning[] = stored ? JSON.parse(stored) : [];
+    const updated = [earning, ...existing].slice(0, 200); // keep last 200
+    localStorage.setItem(`diabp_clinic_earnings_${clinicId}`, JSON.stringify(updated));
+  } catch {}
+
+  return earning;
+}
+
+/** Request a payout — records a negative earning entry */
+export async function requestClinicPayout(
+  clinicId: string,
+  amount: number,
+  bankName: string,
+  accountNumber: string,
+  accountName: string
+): Promise<boolean> {
+  const description = `Payout request → ${accountName} | ${bankName} | ${accountNumber}`;
+  const result = await logClinicEarning(
+    clinicId,
+    'payout_request',
+    -Math.abs(amount),
+    description
+  );
+  return !!result;
+}
