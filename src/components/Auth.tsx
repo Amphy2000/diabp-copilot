@@ -41,6 +41,7 @@ export const Auth: React.FC = () => {
   const [assignedPharmacyId, setAssignedPharmacyId] = useState('');
   const [patientPhone, setPatientPhone] = useState('');
   const [patientAddress, setPatientAddress] = useState('');
+  const [referralCodeInput, setReferralCodeInput] = useState('');
 
   // Doctor/Pharmacist Registration Details
   const [onboardOption, setOnboardOption] = useState<'join' | 'create'>('join');
@@ -74,6 +75,7 @@ export const Auth: React.FC = () => {
       const params = new URLSearchParams(window.location.search);
       const refParam = params.get('ref');
       if (refParam && cList && cList.length > 0) {
+        setReferralCodeInput(refParam);
         // 1. Try matching by direct Clinic UUID
         const matchedById = cList.find(c => c && c.id === refParam);
         if (matchedById) {
@@ -444,6 +446,38 @@ export const Auth: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Referral Code Box */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Referral / Clinic Code (Optional)</label>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        placeholder="e.g. ezeclini or paste clinic ID"
+                        value={referralCodeInput}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setReferralCodeInput(val);
+                          // Auto match clinic in dropdown
+                          const matched = clinics.find(c => {
+                            if (!c) return false;
+                            const clinicName = c.name || '';
+                            const code = clinicName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8);
+                            return code === val.toLowerCase() || c.id === val;
+                          });
+                          if (matched) {
+                            setAssignedClinicId(matched.id);
+                          }
+                        }}
+                        style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '8px 12px 8px 12px', color: 'white', fontSize: '0.8rem' }}
+                      />
+                      {assignedClinicId && clinics.find(c => c && c.id === assignedClinicId) && (
+                        <span style={{ position: 'absolute', right: '10px', fontSize: '0.7rem', color: '#10b981', fontWeight: 'bold', background: 'rgba(16,185,129,0.1)', padding: '2px 8px', borderRadius: '6px' }}>
+                          ✓ Linked
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Assigned Clinic & Pharmacy dropdowns */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -455,7 +489,7 @@ export const Auth: React.FC = () => {
                       >
                         <option value="">-- No Assigned Clinic --</option>
                         {clinics.map(c => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
+                          c && <option key={c.id} value={c.id}>{c.name}</option>
                         ))}
                       </select>
                     </div>
@@ -468,7 +502,7 @@ export const Auth: React.FC = () => {
                       >
                         <option value="">-- No Preferred Pharmacy --</option>
                         {pharmacies.map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
+                          p && <option key={p.id} value={p.id}>{p.name}</option>
                         ))}
                       </select>
                     </div>
