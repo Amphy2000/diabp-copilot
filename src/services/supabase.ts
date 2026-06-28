@@ -109,71 +109,55 @@ const mockAuth = {
   }
 };
 
+// Helper to generate a fully chainable, thenable query builder object
+const mockQueryBuilder = (initialData: any = []) => {
+  const data = Array.isArray(initialData) ? initialData : [initialData];
+  const builder: any = {
+    select: () => builder,
+    eq: (colName: string, val: any) => {
+      const filtered = data.filter((row: any) => row && row[colName] === val);
+      return mockQueryBuilder(filtered);
+    },
+    order: () => builder,
+    limit: () => builder,
+    single: async () => {
+      return { data: data[0] || null, error: null };
+    },
+    then: (resolve: any) => {
+      resolve({ data: data, error: null });
+      return Promise.resolve({ data: data, error: null });
+    }
+  };
+  return builder;
+};
+
 // Create a mock db query builder that stores facility associations in localStorage
 const mockFrom = (tableName: string) => {
   return {
     select: (columns?: string) => {
-      return {
-        eq: (colName: string, val: any) => {
-          return {
-            single: async () => {
-              if (tableName === 'ncd_clinicians') {
-                const associations = JSON.parse(localStorage.getItem('diabp_mock_clinicians') || '[]');
-                const found = associations.find((a: any) => a.user_id === val);
-                return { data: found || null, error: null };
-              }
-              if (tableName === 'ncd_pharmacists') {
-                const associations = JSON.parse(localStorage.getItem('diabp_mock_pharmacists') || '[]');
-                const found = associations.find((a: any) => a.user_id === val);
-                return { data: found || null, error: null };
-              }
-              return { data: null, error: null };
-            },
-            limit: (n: number) => {
-              return {
-                then(resolve: any) {
-                  resolve({ data: [], error: null });
-                }
-              };
-            }
-          };
-        },
-        order: (col: string, options?: any) => {
-          return {
-            then(resolve: any) {
-              resolve({ data: [], error: null });
-            }
-          };
-        }
-      };
+      let tableData: any[] = [];
+      if (tableName === 'ncd_clinicians') {
+        tableData = JSON.parse(localStorage.getItem('diabp_mock_clinicians') || '[]');
+      } else if (tableName === 'ncd_pharmacists') {
+        tableData = JSON.parse(localStorage.getItem('diabp_mock_pharmacists') || '[]');
+      }
+      return mockQueryBuilder(tableData);
     },
     insert: (rows: any[]) => {
+      const rowList = Array.isArray(rows) ? rows : [rows];
       if (tableName === 'ncd_clinicians') {
         const associations = JSON.parse(localStorage.getItem('diabp_mock_clinicians') || '[]');
-        associations.push(...rows);
+        associations.push(...rowList);
         localStorage.setItem('diabp_mock_clinicians', JSON.stringify(associations));
-      }
-      if (tableName === 'ncd_pharmacists') {
+      } else if (tableName === 'ncd_pharmacists') {
         const associations = JSON.parse(localStorage.getItem('diabp_mock_pharmacists') || '[]');
-        associations.push(...rows);
+        associations.push(...rowList);
         localStorage.setItem('diabp_mock_pharmacists', JSON.stringify(associations));
       }
-      return {
-        select: () => ({
-          single: async () => ({ data: rows[0], error: null })
-        })
-      };
+      return mockQueryBuilder(rowList);
     },
     update: (payload: any) => {
-      return {
-        eq: (col: string, val: any) => {
-          return {
-            then(resolve: any) {
-              resolve({ data: null, error: null });
-            }
-          };
-        }
-      };
+      return mockQueryBuilder([]);
     }
   };
 };
