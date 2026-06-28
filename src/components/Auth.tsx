@@ -72,8 +72,9 @@ export const Auth: React.FC = () => {
         } else {
           // 2. Try matching by slugified short code (e.g. ezeclini) or substring
           const matchedByCode = cList.find(c => {
-            const code = c.name.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8);
-            return code === refParam.toLowerCase() || c.name.toLowerCase().includes(refParam.toLowerCase());
+            const clinicName = c.name || '';
+            const code = clinicName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8);
+            return code === refParam.toLowerCase() || clinicName.toLowerCase().includes(refParam.toLowerCase());
           });
           if (matchedByCode) {
             initialClinicId = matchedByCode.id;
